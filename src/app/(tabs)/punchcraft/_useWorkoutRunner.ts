@@ -1693,11 +1693,13 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
     // events. Absent `voice`, nothing is constructed and the workout is
     // silent by construction rather than by a flag (doc §25).
     // MVP v2 (GH #305): a recipe may cap the coach at 'minimal' — the
-    // click-track sets keep bells + stance + countdown and hand every
-    // punch call to the visuals. The more-restrictive-wins rule inside
-    // shouldSpeak makes this a pure ceiling over the athlete's policy.
+    // click-track sets keep bells + stance + countdown. It is a CEILING
+    // over the athlete's own policy, so the one setting below it has to
+    // survive: an athlete who switched the coach OFF used to have that
+    // overwritten to 'minimal' here, and every shipped sample rang its
+    // round bells at full volume with "Voice coach: Off" selected.
     const effectivePolicy =
-      voice && workout.recipe.voiceMode === 'minimal'
+      voice && workout.recipe.voiceMode === 'minimal' && voice.policy.mode !== 'off'
         ? { ...voice.policy, mode: 'minimal' as const }
         : voice?.policy
     const announcer = voice

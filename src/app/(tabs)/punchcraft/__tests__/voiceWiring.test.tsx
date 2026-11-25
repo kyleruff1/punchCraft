@@ -418,14 +418,14 @@ function workoutWithMetronome(enabled: boolean): GeneratedWorkout {
 
 function mountWithWorkout(
   workout: GeneratedWorkout,
-  opts: { clickAudible?: boolean } = {},
+  opts: { clickAudible?: boolean; policy?: Partial<VoiceCoachPolicy> } = {},
 ): Harness {
   const clock = createFakeClock()
   const port = new RecordingPort()
   const ref = React.createRef<WorkoutRunner>()
   const voice = {
     output: port,
-    policy: defaultVoiceCoachPolicy(),
+    policy: { ...defaultVoiceCoachPolicy(), ...opts.policy },
     detector: new StaticPlaybackDetector(false),
   }
 
@@ -567,6 +567,63 @@ describe('metronome wiring (M39-V1b / #280)', () => {
     })
 
     expect(h.port.metronomeCalls).toContain('stop')
+    h.unmount()
+  })
+})
+
+describe("a recipe's minimal cap is a ceiling, not an override", () => {
+  // Every shipped sample carries `voiceMode: 'minimal'`: bells, stance and
+  // countdown, no spoken combinations. The runner applied that by writing
+  // 'minimal' over the athlete's own mode — including over 'off'. So with
+  // "Voice coach: Off" selected, every sample still rang its round bells.
+
+  const MINIMAL: GeneratedWorkout = {
+    ...WORKOUT,
+    id: 'minimal-cap-fixture',
+    recipe: { ...defaultRecipe(), voiceMode: 'minimal' },
+  }
+
+  const bells = (h: Harness): number => h.port.assets.filter((a) => a === 'bell').length
+
+  it('makes no sound at all when the athlete has switched the coach off', async () => {
+    const h = mountWithWorkout(MINIMAL, { policy: { mode: 'off' } })
+    await h.settle()
+    h.begin()
+    // Through the round-start bell and the round-end bell.
+    h.step(WORK_MS + REST_MS)
+
+    expect(bells(h)).toBe(0)
+    expect(h.port.assets).toEqual([])
+    expect(h.port.spoken).toEqual([])
+    h.unmount()
+  })
+
+  it('still rings the bells for an athlete on a fuller setting', async () => {
+    const h = mountWithWorkout(MINIMAL, { policy: { mode: 'full' } })
+    await h.settle()
+    h.begin()
+    h.step(WORK_MS + REST_MS)
+
+    expect(bells(h)).toBeGreaterThanOrEqual(2)
+    h.unmount()
+  })
+
+  it('still rings them for an athlete who chose minimal themselves', async () => {
+    const h = mountWithWorkout(MINIMAL, { policy: { mode: 'minimal' } })
+    await h.settle()
+    h.begin()
+
+    expect(bells(h)).toBeGreaterThanOrEqual(1)
+    h.unmount()
+  })
+
+  it('keeps "off" off on a recipe with no cap, as it always did', async () => {
+    const h = mount({ mode: 'off' })
+    await h.settle()
+    h.begin()
+    h.step(WORK_MS + REST_MS)
+
+    expect(h.port.assets).toEqual([])
     h.unmount()
   })
 })
