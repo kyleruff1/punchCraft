@@ -109,9 +109,18 @@ const BIAS_OPTIONS: ReadonlyArray<PickerOption<WorkoutRecipe['bias']>> = [
 
 const VOICE_MODE_OPTIONS: ReadonlyArray<PickerOption<WorkoutRecipe['voiceMode']>> = [
   { value: 'off', label: 'Off' },
-  { value: 'minimal', label: 'Minimal', description: 'Cue calls only.' },
-  { value: 'standard', label: 'Standard', description: 'Cues plus round transitions.' },
-  { value: 'full', label: 'Full', description: 'Cues, transitions, encouragement.' },
+  // What each mode does, per `shouldSpeak` in VoiceCoachPolicy. Minimal used
+  // to read "Cue calls only." — the exact opposite: punch calls are the one
+  // thing it drops.
+  {
+    value: 'minimal',
+    label: 'Minimal',
+    description: 'Bells, stance changes and the countdown. No punch calls.',
+  },
+  { value: 'standard', label: 'Standard', description: 'Punch calls, bells and round summaries.' },
+  // Full adds coaching reminders over Standard. No workout schedules one
+  // yet, so today the two sound the same — say so rather than promise more.
+  { value: 'full', label: 'Full', description: 'Standard, plus coaching reminders (none yet).' },
 ]
 
 const VOICE_VOCABULARY_OPTIONS: ReadonlyArray<PickerOption<WorkoutRecipe['voiceVocabulary']>> = [

@@ -25,6 +25,7 @@ import { fileURLToPath } from 'node:url'
 import { compileWorkoutScore } from '../../src/domain/programs/workoutScore'
 import { runtimeCoachAssetResolver } from '../../src/audio/coachAssetResolvers'
 import { bpmForRecipe } from '../../src/domain/workout/cadence'
+import { coachPathOf } from '../../src/domain/workout/GeneratedWorkout'
 import {
   getSampleWorkout,
   listSampleWorkouts,
@@ -271,12 +272,13 @@ export function buildFirstRoundManifest(
     const ev = toExpectedCoachEvent(slot)
     if (ev) coachEvents.push(ev)
   }
-  // MVP v2 (GH #305): a click-track set caps the coach at 'minimal' —
-  // punch calls belong to the visuals, so there are no per-word
+  // MVP v2 (GH #305): on a click-track set the announcer is capped below
+  // punch calls — the click script speaks them — so there are no per-word
   // expectations to correlate. Emitting them anyway would hard-FAIL every
-  // click set on audio it is designed not to produce.
-  const voiceMinimal = workout.recipe.voiceMode === 'minimal'
-  if (round0 && !voiceMinimal) {
+  // click set on audio it is designed not to produce. Keyed on the
+  // workout's authored coach path, the same field the runner reads.
+  const clickScriptWorkout = coachPathOf(workout) === 'click-script'
+  if (round0 && !clickScriptWorkout) {
     for (const cue of round0.cues) {
       if (atwCueIds.has(cue.id)) continue
       for (let i = 0; i < cue.tokens.length; i += 1) {

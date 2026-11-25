@@ -27,7 +27,11 @@
  */
 
 import { logger, safe } from '@/diagnostics/logger'
-import type { GeneratedWorkout } from '@/domain/workout/GeneratedWorkout'
+import {
+  coachPathOf,
+  type CoachPath,
+  type GeneratedWorkout,
+} from '@/domain/workout/GeneratedWorkout'
 import type { ProgramRound, WorkoutToken } from '@/domain/workout/WorkoutTokens'
 import { RECIPE_SCHEMA_VERSION } from '@/domain/workout/versions'
 import type { WorkoutRecipe } from '@/domain/workout/WorkoutRecipe'
@@ -151,6 +155,13 @@ interface BlocksPayload {
   expectedTechniqueDistribution: Record<string, number>
   estimatedActivePunchesPerMinute: number
   warnings: string[]
+  /**
+   * Which coach path ran the workout. Always written, so a row that has
+   * none was saved before the field existed — and for those rows the path
+   * was whatever `recipe.voiceMode === 'minimal'` selected at the time
+   * (`params_snapshot_json` still carries that).
+   */
+  coachPath?: CoachPath
 }
 
 /* ------------------------------------------------------------- row mapping */
@@ -346,6 +357,7 @@ export class WorkoutRepository {
       expectedTechniqueDistribution: w.expectedTechniqueDistribution,
       estimatedActivePunchesPerMinute: w.estimatedActivePunchesPerMinute,
       warnings: w.warnings,
+      coachPath: coachPathOf(w),
     }
     const now = new Date().toISOString()
 
@@ -664,6 +676,8 @@ export class WorkoutRepository {
       expectedTechniqueDistribution: blocks.expectedTechniqueDistribution ?? {},
       estimatedActivePunchesPerMinute: blocks.estimatedActivePunchesPerMinute ?? 0,
       warnings: blocks.warnings ?? [],
+      // Only the marked path is a field on the workout; `score` is its absence.
+      ...(blocks.coachPath === 'click-script' ? { coachPath: 'click-script' as const } : {}),
     }
   }
 

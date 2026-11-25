@@ -46,6 +46,7 @@ import { fonts, sizes, weights } from '@/theme/typography'
 import { nextRoundPreview } from '@domain/session/restPhases'
 import { systemMonotonicClock } from '@domain/time/MonotonicClock'
 import { getSampleWorkout } from '@domain/workout/samples'
+import { coachPathOf } from '@domain/workout/GeneratedWorkout'
 import { generateWorkout } from '@domain/workout/generateWorkout'
 import {
   getLive,
@@ -211,14 +212,15 @@ export default function LiveScreen(): React.JSX.Element {
   // exactly right and stays stable across flips.
   const startClickVocabulary = recipe.voiceVocabulary === 'names' ? ('techniques' as const) : ('numbers' as const)
 
-  // Click-minimal workouts never speak per-word clips — warming 20 word
-  // players for them was a third of the 44-live-session pile-up that
+  // A workout that never speaks per-word clips does not warm them — 20 word
+  // players for nothing was a third of the 44-live-session pile-up that
   // starved round-4 audio (leak hunt 2026-09-05). Light preload keeps just
-  // bells + tones warm.
-  const preloadLight =
-    (selectedSampleKey
-      ? getSampleWorkout(selectedSampleKey).workout.recipe.voiceMode
-      : recipe.voiceMode) === 'minimal'
+  // bells + tones warm. Two different reasons get a workout there: a
+  // click-track set, whose announcer is capped below punch calls whatever
+  // the athlete chose; and a generated workout whose athlete chose Minimal.
+  const preloadLight = selectedSampleKey
+    ? coachPathOf(getSampleWorkout(selectedSampleKey).workout) === 'click-script'
+    : recipe.voiceMode === 'minimal'
 
   React.useEffect(() => {
     // Preload during the countdown, not at the first cue: M34-01 measured a
@@ -799,11 +801,13 @@ export default function LiveScreen(): React.JSX.Element {
         {/* EXPERIMENT (GH #305): the walk census shows ~20 UI-thread frame
             gaps per round (max ~0.9s) swallowing walk steps, and the Skia
             membrane repaints every frame on that same thread. Click sets
-            (voiceMode minimal — the walk IS the product) run without the
-            reactive layer for one verdict round: multi-jumps -> ~0
-            convicts the backdrop; unchanged exonerates it. Static art +
-            scrim remain either way. */}
-        {workout.recipe.voiceMode === 'minimal' ? null : (
+            (the walk IS the product) run without the reactive layer for
+            one verdict round: multi-jumps -> ~0 convicts the backdrop;
+            unchanged exonerates it. Static art + scrim remain either way.
+            Keyed on the workout being a click set — it used to read
+            `voiceMode === 'minimal'`, so choosing a quiet coach on a
+            generated workout also switched its backdrop off. */}
+        {coachPathOf(workout) === 'click-script' ? null : (
           <BackdropRenderer
             bus={backdropBus}
             quality={backdropQuality}

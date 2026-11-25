@@ -99,6 +99,8 @@ class RecordingPort implements VoiceOutputPort {
   readonly tones: ToneKind[] = []
   readonly spoken: string[] = []
   cancels = 0
+  /** Slots of the click-script clips played (section lead-ins, per-bar calls). */
+  readonly clickScripts: string[] = []
   readonly metronomeCalls: string[] = []
   /** Volume passed to each metronome.start (the dev-click mute gates this). */
   readonly metronomeStartVolumes: number[] = []
@@ -116,6 +118,9 @@ class RecordingPort implements VoiceOutputPort {
   }
   cancel(): void {
     this.cancels += 1
+  }
+  playClickScript(clip: { text: string; traceId?: string }): void {
+    this.clickScripts.push(clip.traceId ?? clip.text)
   }
   setVolumes(_v: Volumes): void {}
 
@@ -571,16 +576,17 @@ describe('metronome wiring (M39-V1b / #280)', () => {
   })
 })
 
-describe("a recipe's minimal cap is a ceiling, not an override", () => {
-  // Every shipped sample carries `voiceMode: 'minimal'`: bells, stance and
-  // countdown, no spoken combinations. The runner applied that by writing
-  // 'minimal' over the athlete's own mode — including over 'off'. So with
-  // "Voice coach: Off" selected, every sample still rang its round bells.
+describe("a click-script workout's announcer cap is a ceiling, not an override", () => {
+  // Every shipped sample is a click-script workout: its announcer keeps to
+  // bells, stance and countdown, because the click script speaks the
+  // combinations. The runner applied that by writing 'minimal' over the
+  // athlete's own mode — including over 'off'. So with "Voice coach: Off"
+  // selected, every sample still rang its round bells.
 
   const MINIMAL: GeneratedWorkout = {
     ...WORKOUT,
     id: 'minimal-cap-fixture',
-    recipe: { ...defaultRecipe(), voiceMode: 'minimal' },
+    coachPath: 'click-script',
   }
 
   const bells = (h: Harness): number => h.port.assets.filter((a) => a === 'bell').length
@@ -595,6 +601,37 @@ describe("a recipe's minimal cap is a ceiling, not an override", () => {
     expect(bells(h)).toBe(0)
     expect(h.port.assets).toEqual([])
     expect(h.port.spoken).toEqual([])
+    expect(h.port.clickScripts).toEqual([])
+    h.unmount()
+  })
+
+  it('keeps the announcer off the punch calls even for an athlete on Full', async () => {
+    // Two voices on one bar is what the cap exists to prevent: on this path
+    // the click script names the combination, so the announcer must not.
+    const h = mountWithWorkout(MINIMAL, { policy: { mode: 'full', style: 'call-and-go' } })
+    await h.settle()
+    h.begin()
+    h.step(4_000)
+
+    expect(h.port.assets).not.toContain('1')
+    h.unmount()
+  })
+
+  it('is decided by the coach path, not by a recipe that happens to say minimal', async () => {
+    // The old test: `workout.recipe.voiceMode === 'minimal'`. A workout that
+    // is NOT a click script must not have its announcer capped by that
+    // field — the athlete's own policy is what the announcer runs on.
+    const scoreWorkout: GeneratedWorkout = {
+      ...WORKOUT,
+      id: 'score-path-fixture',
+      recipe: { ...defaultRecipe(), voiceMode: 'minimal' },
+    }
+    const h = mountWithWorkout(scoreWorkout, { policy: { mode: 'standard', style: 'call-and-go' } })
+    await h.settle()
+    h.begin()
+    h.step(4_000)
+
+    expect(h.port.assets).toContain('1')
     h.unmount()
   })
 
@@ -625,5 +662,122 @@ describe("a recipe's minimal cap is a ceiling, not an override", () => {
 
     expect(h.port.assets).toEqual([])
     h.unmount()
+  })
+})
+
+describe("the click script obeys the athlete's voice mode", () => {
+  // The click-script loop had one gate: D1 (`voiceAllowed`). It never asked
+  // whether the athlete wanted punch calls at all, so "Minimal" — bells,
+  // stance changes and the countdown, no punch calls — would still speak
+  // every per-bar call. It could not be noticed on the library workouts,
+  // which said `voiceMode: 'minimal'` themselves to mean something else.
+
+  // A bar the click-script bank has a call for ("Four ones!"). The bank is
+  // rendered for the library's motifs only: the file's usual 1-2 fixture
+  // has no call clip, and a workout with none builds an empty schedule.
+  const fourJabs = (order: number, isLast: boolean): ProgramRound => ({
+    ...round(order, isLast),
+    blocks: [
+      {
+        id: `r${order}-b1`,
+        kind: 'repeated-combo',
+        stance: 'inherit',
+        startOffsetMs: 0,
+        durationMs: 12_000,
+        gapBeats: 0,
+        repeat: 3,
+        tokens: [0, 1, 2, 3].map((beatOffset) => ({
+          kind: 'punch' as const,
+          number: 1 as const,
+          body: false,
+          beatOffset,
+        })),
+      },
+    ],
+  })
+
+  const SCORE: GeneratedWorkout = {
+    ...WORKOUT,
+    id: 'four-jabs-score-fixture',
+    schedule: [fourJabs(1, false), fourJabs(2, true)],
+  }
+  const CLICK: GeneratedWorkout = { ...SCORE, id: 'four-jabs-click-fixture', coachPath: 'click-script' }
+
+  const bells = (h: Harness): number => h.port.assets.filter((a) => a === 'bell').length
+
+  const runRound = async (
+    workout: GeneratedWorkout,
+    policy: Partial<VoiceCoachPolicy>,
+  ): Promise<Harness> => {
+    const h = mountWithWorkout(workout, { policy })
+    await h.settle()
+    h.begin()
+    h.step(WORK_MS)
+    return h
+  }
+
+  it('speaks its per-bar calls on Standard', async () => {
+    const h = await runRound(CLICK, { mode: 'standard' })
+    expect(h.port.clickScripts.length).toBeGreaterThan(0)
+    expect(h.port.clickScripts.every((id) => id.startsWith('call/1-1-1-1#'))).toBe(true)
+    h.unmount()
+  })
+
+  it('speaks them on Full', async () => {
+    const h = await runRound(CLICK, { mode: 'full' })
+    expect(h.port.clickScripts.length).toBeGreaterThan(0)
+    h.unmount()
+  })
+
+  it('leaves them to the visuals on Minimal, and still rings the bells', async () => {
+    const h = await runRound(CLICK, { mode: 'minimal' })
+    expect(h.port.clickScripts).toEqual([])
+    expect(bells(h)).toBeGreaterThanOrEqual(1)
+    h.unmount()
+  })
+
+  it('says nothing on Off', async () => {
+    const h = await runRound(CLICK, { mode: 'off' })
+    expect(h.port.clickScripts).toEqual([])
+    expect(h.port.assets).toEqual([])
+    h.unmount()
+  })
+
+  it('applies the same gate to a workout on the score path', async () => {
+    // The loop is driven by which clips exist, not by the coach path, so a
+    // score-path workout whose bar has a call clip is called too. The
+    // control first: on Standard this fixture is.
+    const spoken = await runRound(SCORE, { mode: 'standard' })
+    expect(spoken.port.clickScripts.length).toBeGreaterThan(0)
+    spoken.unmount()
+
+    const quiet = await runRound(SCORE, { mode: 'minimal' })
+    expect(quiet.port.clickScripts).toEqual([])
+    quiet.unmount()
+  })
+
+  it('honours a style that asks for less, like the announcer does', async () => {
+    const h = await runRound(CLICK, { mode: 'full', style: 'minimal' })
+    expect(h.port.clickScripts).toEqual([])
+    h.unmount()
+  })
+
+  it('does not dim a bar waiting for a call that Minimal will never make', async () => {
+    // "Lit = spoken": a round's opening bar renders dim until the coach has
+    // called it. That only makes sense while the coach is calling. On
+    // Minimal the visuals are the workout, exactly as they are on Off.
+    const openerDimmed = async (mode: VoiceCoachPolicy['mode']): Promise<boolean> => {
+      const h = mountWithWorkout(CLICK, { policy: { mode } })
+      await h.settle()
+      h.begin()
+      h.step(600)
+      const dimmed = h.runner.readCues().current?.masked === true
+      h.unmount()
+      return dimmed
+    }
+
+    expect(await openerDimmed('standard')).toBe(true)
+    expect(await openerDimmed('minimal')).toBe(false)
+    expect(await openerDimmed('off')).toBe(false)
   })
 })

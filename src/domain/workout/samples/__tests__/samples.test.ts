@@ -15,7 +15,8 @@ import {
   threeRoundFundamentals,
   type SampleWorkoutKey,
 } from '../index'
-import { validateGeneratedWorkout } from '../../GeneratedWorkout'
+import { coachPathOf, validateGeneratedWorkout } from '../../GeneratedWorkout'
+import { defaultRecipe } from '../../WorkoutRecipe'
 import { buildRoundSchedule } from '../../roundSchedule'
 import { allClickMaps } from '../allClickMaps'
 import { QUICK_WORKOUT_ORDER } from '../quickWorkouts'
@@ -26,6 +27,36 @@ import { handSequence, resolveEffectiveStance } from '../../../programs/StanceMa
 
 const ALL = listSampleWorkouts()
 const MAPS = allClickMaps()
+
+describe('which coach calls the punches is authored, not inferred from the voice mode', () => {
+  // `recipe.voiceMode === 'minimal'` used to be how a workout said "I am a
+  // click-track set". That is the athlete's volume knob, so it could not
+  // also be turned down by the athlete without changing what the workout
+  // was. The marker is its own field now.
+
+  it('marks every library workout as a click-script workout', () => {
+    expect(ALL).toHaveLength(22)
+    for (const sample of ALL) {
+      expect([sample.key, coachPathOf(sample.workout)]).toEqual([sample.key, 'click-script'])
+    }
+  })
+
+  it('leaves the voice mode at the default on all of them', () => {
+    const standard = defaultRecipe().voiceMode
+    expect(standard).toBe('standard')
+    for (const sample of ALL) {
+      expect([sample.key, sample.workout.recipe.voiceMode]).toEqual([sample.key, standard])
+    }
+  })
+
+  it('leaves the diagnostic rig on the score path', () => {
+    expect(coachPathOf(getSampleWorkout('diagnostic-token-sequence').workout)).toBe('score')
+  })
+
+  it('reads a workout with no marker as the score path', () => {
+    expect(coachPathOf({})).toBe('score')
+  })
+})
 
 describe('the sample catalogue', () => {
   it('exposes exactly the binding keys — ten full workouts, then the twelve quick ones', () => {
@@ -235,9 +266,9 @@ describe('three-round-fundamentals — click-track edition (MVP v2, GH #305)', (
     expect(threeRoundFundamentals.schedule).toHaveLength(3)
   })
 
-  it('is a click set: metronome audible, voice capped at minimal, 120 BPM', () => {
+  it('is a click set: metronome audible, on the click-script coach path, 120 BPM', () => {
     expect(threeRoundFundamentals.recipe.metronome).toEqual({ enabled: true, volume: 0.6 })
-    expect(threeRoundFundamentals.recipe.voiceMode).toBe('minimal')
+    expect(coachPathOf(threeRoundFundamentals)).toBe('click-script')
     expect(bpmForRecipe(threeRoundFundamentals.recipe)).toBe(120)
   })
 

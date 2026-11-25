@@ -58,7 +58,7 @@ import { resolveCapabilityTier, sequenceScoreLabel } from '@domain/workout/capab
 import { systemMonotonicClock, type MonotonicClock } from '@domain/time/MonotonicClock'
 import { WorkoutSessionClock, type SessionTransition } from '@domain/session/WorkoutSessionClock'
 import { RoundResultFreeze } from '@domain/session/restPhases'
-import type { GeneratedWorkout } from '@domain/workout/GeneratedWorkout'
+import { coachPathOf, type GeneratedWorkout } from '@domain/workout/GeneratedWorkout'
 import type { PunchEventSource } from '@domain/punch/PunchEventSource'
 import type { TrackerPunchEvent } from '@domain/punch/PunchEvent'
 import type { BackdropImpulsePort } from '@domain/effects/BackdropImpulsePort'
@@ -798,7 +798,11 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
     maskedCueIdsRef.current = maskedBarIds(
       cues,
       calledIds,
-      !!voice && voice.policy.mode !== 'off',
+      // "Lit = spoken" only holds while the coach is calling punches. With
+      // the coach off, or on Minimal (no punch calls), the visuals are the
+      // workout and nothing may be dimmed waiting for a call that is not
+      // coming.
+      !!voice && shouldSpeak(voice.policy, 'punch-command', false),
       bpm,
     )
   }, [workout.id, voice, bpm])
@@ -1715,14 +1719,21 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
     // The announcer holds the policy and the gate; the runner only feeds it
     // events. Absent `voice`, nothing is constructed and the workout is
     // silent by construction rather than by a flag (doc §25).
-    // MVP v2 (GH #305): a recipe may cap the coach at 'minimal' — the
-    // click-track sets keep bells + stance + countdown. It is a CEILING
-    // over the athlete's own policy, so the one setting below it has to
-    // survive: an athlete who switched the coach OFF used to have that
-    // overwritten to 'minimal' here, and every shipped sample rang its
-    // round bells at full volume with "Voice coach: Off" selected.
+    // MVP v2 (GH #305): on a click-track set the ANNOUNCER is capped at
+    // 'minimal' — bells + stance + countdown — because the click script
+    // owns the punch calls there, and the announcer calling them too would
+    // put two voices on one bar. It is a CEILING over the athlete's own
+    // policy, so the one setting below it has to survive: an athlete who
+    // switched the coach OFF used to have that overwritten to 'minimal'
+    // here, and every shipped sample rang its round bells at full volume
+    // with "Voice coach: Off" selected.
+    //
+    // Keyed on the workout's authored `coachPath`, not on
+    // `recipe.voiceMode`: the mode is the athlete's volume knob and no
+    // longer doubles as "this is a click-track workout".
+    const clickScriptWorkout = coachPathOf(workout) === 'click-script'
     const effectivePolicy =
-      voice && workout.recipe.voiceMode === 'minimal' && voice.policy.mode !== 'off'
+      voice && clickScriptWorkout && voice.policy.mode !== 'off'
         ? { ...voice.policy, mode: 'minimal' as const }
         : voice?.policy
     const announcer = voice
@@ -1792,7 +1803,7 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
     // for 3-a-ii the dispatcher checks at fire time — good enough while
     // slots are only combo-announces).
     let slotDispatcher: SlotDispatcher | null = null
-    const scoreDispatchEnabled = workout.recipe.voiceMode !== 'minimal'
+    const scoreDispatchEnabled = !clickScriptWorkout
     /**
      * Score tick each round's work phase begins at, indexed by round.
      *
@@ -2118,11 +2129,23 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
         if (schedule && schedule.roundIndex === snapshot.roundIndex && voice) {
           for (const entry of schedule.entries) {
             if (entry.state !== 'pending' || snapshot.workElapsedMs < entry.dispatchAtMs) continue
+            // D1 (coach off / third-party music without opt-in): the whole
+            // guided layer stays silent. And the athlete's mode: a lead-in
+            // and a per-bar call are both punch commands, which Minimal
+            // leaves to the visuals — the same gate the announcer and the
+            // score dispatcher apply, so Minimal means one thing on every
+            // workout. Checked at dispatch, not at build, so a mid-round
+            // change is honoured.
+            const mayCall =
+              voiceAllowed(voice.policy, playbackActiveRef.current) &&
+              shouldSpeak(voice.policy, 'punch-command', false)
             if (snapshot.workElapsedMs > entry.giveUpAtMs) {
               entry.state = 'skipped'
               // A skipped CALL is routine (busy lane, next call seconds
-              // away); a skipped LEAD-IN lost real coaching — warn.
-              if (entry.kind === 'lead-in') {
+              // away); a skipped LEAD-IN lost real coaching — warn. Not
+              // when the coach was silent on purpose: nothing was lost,
+              // and "the lane never freed" would be a false report.
+              if (entry.kind === 'lead-in' && mayCall) {
                 logger.warn('workout.clickScript.skipped', 'lead-in window expired before the lane freed', {
                   slot: safe(entry.slot),
                   workElapsedMs: safe(snapshot.workElapsedMs),
@@ -2130,10 +2153,7 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
               }
               continue
             }
-            // D1 (coach off / third-party music without opt-in): the whole
-            // guided layer stays silent. Checked at dispatch, not at build,
-            // so a mid-round playback change is honoured.
-            if (!voiceAllowed(voice.policy, playbackActiveRef.current)) continue
+            if (!mayCall) continue
             const audibleUntilMs = voice.output.audibleUntilMs?.() ?? 0
             // A section's rep-0 call OWNS its pad by construction (Variant
             // B: the opener pad fits bell-clear + call + breath; mid-round
