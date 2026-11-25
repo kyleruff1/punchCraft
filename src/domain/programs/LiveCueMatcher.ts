@@ -126,6 +126,12 @@ export type LiveMatcherEvent =
   | { type: 'extra'; extra: LiveExtra }
   | {
       type: 'cue-settled'
+      /**
+       * The cue that settled. Carried rather than left for the listener to
+       * look up by `result.cueId`: a cue the athlete asked to repeat exists
+       * only in the engine, so a lookup in the static timeline finds nothing.
+       */
+      cue: CueInstance
       result: CueMatchResult
       score: CueScore
       /**
@@ -396,6 +402,7 @@ export class LiveCueMatcher {
 
     this.publish({
       type: 'cue-settled',
+      cue: open.cue,
       result,
       score,
       corrections: this.correctionsFor(open, result),

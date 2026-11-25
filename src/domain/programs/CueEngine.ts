@@ -203,9 +203,15 @@ export class CueEngine {
   /**
    * Re-run the current cue at the next gap.
    *
-   * The copy carries `repeatIndex + 1` and every timing field shifted by the
-   * same delta, so the acceptance window keeps its shape rather than being
-   * recomputed from graces the engine does not own.
+   * The copy carries every timing field shifted by the same delta, so the
+   * acceptance window keeps its shape rather than being recomputed from
+   * graces the engine does not own.
+   *
+   * Its `repeatIndex` is the next one NO rep of the block holds — natural or
+   * already injected. It used to be `source.repeatIndex + 1`, which for any
+   * rep but the block's last is the natural next rep's own index: two cues
+   * with one `(blockId, repeatIndex)`, which is the identity `cue_results`
+   * keys its rows on.
    */
   repeatCue(): void {
     const runtime = this.currentRuntime() ?? this.lastFinishedRuntime()
@@ -219,10 +225,17 @@ export class CueEngine {
     const delta = startAt - source.scheduledStartMs
     if (delta <= 0) return
 
+    const repeatIndex =
+      1 +
+      Math.max(
+        ...this.runtimes
+          .filter((r) => r.cue.blockId === source.blockId)
+          .map((r) => r.cue.repeatIndex),
+      )
     const copy: CueInstance = {
       ...source,
-      id: `${source.blockId}#${source.repeatIndex + 1}r`,
-      repeatIndex: source.repeatIndex + 1,
+      id: `${source.blockId}#${repeatIndex}r`,
+      repeatIndex,
       previewAt: Math.max(0, source.previewAt + delta),
       announceAt: Math.max(0, source.announceAt + delta),
       scheduledStartMs: source.scheduledStartMs + delta,

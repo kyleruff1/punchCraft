@@ -298,6 +298,15 @@ describe('settling on window close', () => {
     expect(settled.score.label).toBe('hand-sequence match')
   })
 
+  it('hands the settled cue over with its result', () => {
+    // A listener must not have to look the cue up by id: a cue the athlete
+    // asked to repeat is not in the static timeline it would look in.
+    const h = harness()
+    h.matcher.onCueEvent(windowOpened())
+    h.matcher.onCueEvent(windowClosed())
+    expect(h.settled()[0]?.cue).toBe(CUE)
+  })
+
   it('reports no corrections when provisional and settled agree', () => {
     const h = harness()
     h.matcher.onCueEvent(windowOpened())

@@ -456,6 +456,39 @@ describe('athlete controls', () => {
     expect(next.id).not.toBe(original.id)
   })
 
+  it('gives the copy a repeat index no other rep of the block holds', () => {
+    // A block thrown three times: reps 0, 1 and 2. Repeating rep 0 used to
+    // mint a second rep 1 — the natural next rep's own index — and
+    // `(blockId, repeatIndex)` is what a stored result is keyed on.
+    const timeline = timelineFor([block({ kind: 'repeated-combo', repeat: 3 })])
+    const h = harness(timeline)
+    h.runTo(10_100)
+    const original = h.engine.snapshot().current!
+    expect(original.repeatIndex).toBe(0)
+
+    h.engine.repeatCue()
+    h.runTo(60_000)
+
+    const reps = h.engine
+      .results()
+      .filter((r) => r.cue.blockId === original.blockId)
+      .map((r) => r.cue.repeatIndex)
+    expect(reps).toHaveLength(4)
+    expect(new Set(reps).size).toBe(4)
+    expect(Math.max(...reps)).toBe(3)
+  })
+
+  it('keeps handing out fresh indexes when a cue is repeated more than once', () => {
+    const h = harness()
+    h.runTo(10_100)
+    h.engine.repeatCue()
+    h.engine.repeatCue()
+    h.runTo(60_000)
+
+    const reps = h.engine.results().map((r) => r.cue.repeatIndex)
+    expect(new Set(reps).size).toBe(reps.length)
+  })
+
   it('runs the repeated copy through its own lifecycle', () => {
     const h = harness()
     h.runTo(10_100)
