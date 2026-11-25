@@ -1767,14 +1767,20 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
      * round-relative clock back into the score's axis.
      */
     let roundStartTicks: number[] = []
-    if (announcer && voice && scoreDispatchEnabled) {
-      const compiledScore = compileWorkoutScore(workout, {
+    /** The compiled timeline's identity, when this run compiled one. */
+    let timelineHash: string | null = null
+    const scorePathLive = Boolean(announcer && voice && scoreDispatchEnabled)
+    const compileScore = (): ReturnType<typeof compileWorkoutScore> =>
+      compileWorkoutScore(workout, {
         stance,
         bpm: bpmForRecipe(workout.recipe),
         revision: 1,
         compiledAtEpochMs: Date.now(),
         coachAssets: runtimeCoachAssetResolver,
       })
+    if (announcer && voice && scoreDispatchEnabled) {
+      const compiledScore = compileScore()
+      timelineHash = compiledScore.identity.timelineHash
       slotDispatcher = new SlotDispatcher({
         getCurrentVocabulary: () =>
           voice.policy.vocabulary === 'names' ? 'technique' : 'numeric',
@@ -1906,6 +1912,34 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
           timelineHash: safe(compiledScore.identity.timelineHash),
         },
       )
+    } else if (__DEV__ || isQaEnabled()) {
+      // The click path never compiles the score, so it had no identity to
+      // log — and the verification suite, which only ever drives click-path
+      // workouts, could not tie a capture to its manifest at all. Compile it
+      // here purely for its hash, in dev and QA runs only: an athlete's
+      // ordinary run pays nothing for it and cannot be broken by a compile
+      // fault, and the suite (which runs with QA on) gets its proof.
+      try {
+        timelineHash = compileScore().identity.timelineHash
+      } catch (error) {
+        logger.warn(
+          'workout.timeline.provenanceFailed',
+          'could not compile the timeline for its identity',
+          { workout: safe(workout.id), error: safe(String(error)) },
+        )
+      }
+    }
+    // Which compiled timeline this run is, on EITHER coach path. The armed
+    // record above carries the same hash but exists only when the score
+    // path arms — which no shipped sample does — so on its own it left
+    // every capture the suite takes unverifiable (`verify-first-round`
+    // reads this record first and falls back to that one).
+    if (timelineHash !== null) {
+      logger.info('workout.timeline.provenance', 'compiled timeline identity', {
+        workout: safe(workout.id),
+        timelineHash: safe(timelineHash),
+        path: safe(scorePathLive ? 'score' : 'click'),
+      })
     }
     slotDispatcherRef.current = slotDispatcher
 

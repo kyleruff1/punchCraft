@@ -20,9 +20,17 @@
  *   - assetMissing (the dispatcher had no clip for a compiled slot)
  *   - notArmed (the score path never armed on a workout whose manifest
  *     expects score slots)
- * The last three are provenance-gated: they are suppressed to soft
- * warnings when the capture and the manifest cannot be proven to be the
- * same timeline, because on a stale pair their absence proves nothing.
+ *   - a clip that failed to load or play (`voice.clipMissing` /
+ *     `voice.playFailed` inside the round)
+ *   - no per-bar loop call dispatched at all, where the manifest expects some
+ * The three before those are SCORE-PATH gates and provenance-gated: they
+ * are suppressed to soft warnings when the capture and the manifest cannot
+ * be proven to be the same timeline, because on a stale pair their absence
+ * proves nothing. They are inert on a click-path workout, which is every
+ * shipped sample; the last two are what that path is held to.
+ *
+ * Soft-warns additionally on loop-call coverage under CALL_COVERAGE_LOW_PCT
+ * and on an UNVERIFIED capture — one carrying no compiled-timeline hash.
  *
  * Anchor storm is a health flag, never a hard fail — it is a diagnostic
  * signal for Stage 3b (acoustic) to prove the audio-visual disconnect.
@@ -68,6 +76,13 @@ const LATE_WINDOW_MS = 2500
 // so including it would invert the argument.
 const RE_ANCHOR_REGRESSION_CEILING = 300
 
+// Below this share of the expected per-bar loop calls, the run is flagged.
+// It is the line the report has always drawn ("LOW"); until now it was only
+// printed. Per-bar calls are most of what the click-path coach says — about
+// seventy a round — and a skipped call is routine (a busy lane yields), so
+// the gate is a floor on coverage rather than a demand for every bar.
+const CALL_COVERAGE_LOW_PCT = 90
+
 /**
  * How far a `slotDispatcher.deferred` record may sit from the expectation
  * it is claimed to explain. Expectation-relative, NOT an absolute window:
@@ -95,7 +110,29 @@ export function parseLogcat(logcatText) {
   for (const { dateStr, timeStr, body } of records) {
     const ts = parseTimestampMs(dateStr, timeStr)
     if (body.includes('workout.runner.start')) {
-      events.push({ type: 'runner.start', ts, raw: body })
+      events.push({ type: 'runner.start', ts, workout: extractField(body, 'workout'), raw: body })
+      continue
+    }
+    // ORDERING IS LOAD-BEARING, as for `voice.playFailed` below:
+    // 'workout.timeline.provenanceFailed' CONTAINS 'workout.timeline.provenance'.
+    if (body.includes('workout.timeline.provenanceFailed')) {
+      events.push({
+        type: 'timeline.provenanceFailed',
+        ts,
+        workout: extractField(body, 'workout'),
+        raw: body,
+      })
+      continue
+    }
+    if (body.includes('workout.timeline.provenance')) {
+      events.push({
+        type: 'timeline.provenance',
+        ts,
+        workout: extractField(body, 'workout'),
+        timelineHash: extractField(body, 'timelineHash'),
+        path: extractField(body, 'path'),
+        raw: body,
+      })
       continue
     }
     if (body.includes('workout.round.boundary')) {
@@ -284,7 +321,7 @@ function findT0(events) {
 /**
  * Is this capture and this manifest provably the same compiled timeline?
  *
- * The app logs the hash it actually compiled in `slotDispatcher.armed`. The
+ * The app logs the hash it actually compiled (see the two records below). The
  * report printed the MANIFEST's hash beside it and let the reader assume the
  * two agreed; they need not, and after any compiler change they do not.
  *
@@ -297,33 +334,58 @@ function findT0(events) {
  *                   moved while all 56 per-word coachEvents stayed
  *                   byte-identical — so a mismatch does not imply the
  *                   expectations moved. Hence STALE, not FAIL.
- *   `unavailable` — no armed record. Means coach-off, a truncated capture,
- *                   or a pre-instrumentation build. It does NOT mean
- *                   "per-word workout": the armed log sits inside
- *                   `if (announcer && voice)` with no slot-count guard, so
- *                   even a zero-slot workout carries a hash.
+ *   `unavailable` — no hash in the capture at all: a build without the
+ *                   instrumentation, a run with QA off, or a truncated
+ *                   capture. The run cannot be tied to this manifest's
+ *                   timeline, and is reported as UNVERIFIED — never green.
+ *
+ * Two records carry the hash. `timeline.provenance` is logged for every
+ * workout on either coach path. `slotDispatcher.armed` is logged only when
+ * the score path arms — it sits inside `if (announcer && voice &&
+ * scoreDispatchEnabled)`, and no shipped sample takes that branch — so on
+ * its own it left every capture the suite takes `unavailable`. (This
+ * comment used to claim the armed log had no such guard. It was true once.)
+ *
+ * Workout identity is checked separately and needs no hash: `runner.start`
+ * names the workout the app armed.
  */
 function checkProvenance(events, manifest) {
   const armed = events.filter((e) => e.type === 'slotDispatcher.armed')
-  if (armed.length === 0) {
-    return { state: 'unavailable', reason: 'no slotDispatcher.armed record in capture', armedCount: 0 }
+  const hashed = events.filter(
+    (e) => e.type === 'timeline.provenance' || e.type === 'slotDispatcher.armed',
+  )
+  const started = events.filter((e) => e.type === 'runner.start' && e.workout)
+  const startedWorkout = started.length > 0 ? started[started.length - 1].workout : undefined
+
+  if (hashed.length === 0) {
+    return {
+      state: 'unavailable',
+      reason: 'no timeline.provenance or slotDispatcher.armed record in capture',
+      armedCount: 0,
+      deviceWorkout: startedWorkout,
+      workoutMismatch: Boolean(startedWorkout) && startedWorkout !== manifest.workoutId,
+    }
   }
-  const last = armed[armed.length - 1]
-  const distinctHashes = [...new Set(armed.map((a) => a.timelineHash).filter(Boolean))]
+  const last = hashed[hashed.length - 1]
+  const lastArmed = armed[armed.length - 1]
+  const distinctHashes = [...new Set(hashed.map((a) => a.timelineHash).filter(Boolean))]
   const deviceHash = last.timelineHash
   const manifestHash = manifest.identity?.timelineHash
-  const workoutMismatch = Boolean(last.workout) && last.workout !== manifest.workoutId
+  const deviceWorkout = last.workout || startedWorkout
+  const workoutMismatch = Boolean(deviceWorkout) && deviceWorkout !== manifest.workoutId
   return {
     state: deviceHash && manifestHash && deviceHash === manifestHash ? 'match' : 'mismatch',
     deviceHash,
     manifestHash,
-    deviceWorkout: last.workout,
+    deviceWorkout,
     workoutMismatch,
     distinctHashes,
     armedCount: armed.length,
-    totalCompiledSlots: last.totalCompiledSlots,
-    enqueuedSlots: last.enqueuedSlots,
-    announceThenWorkCues: last.announceThenWorkCues,
+    /** Which coach path the app said it ran; absent on an armed-only capture. */
+    path: last.path,
+    totalCompiledSlots: lastArmed?.totalCompiledSlots,
+    enqueuedSlots: lastArmed?.enqueuedSlots,
+    announceThenWorkCues: lastArmed?.announceThenWorkCues,
   }
 }
 
@@ -569,19 +631,40 @@ function classifyRunHealth(t0, reanchor, verdicts, extras, dispatcher, provenanc
 
   const stale = provenance.state === 'mismatch'
   const identityUnknown = provenance.state === 'unavailable'
-  // The three NEW gates fire on records never once captured. Suppress them to
-  // warnings when the capture and manifest are not provably the same
+  // The three SCORE-PATH gates fire on records only the score path writes
+  // (`deferred`, `assetMissing`) or on expectations only it creates
+  // (`notArmed` needs combo-announce events in the manifest). Suppress them
+  // to warnings when the capture and manifest are not provably the same
   // timeline; `missing`/`duplicated` keep hard-failing, because a stale pair
   // can still surface a genuine coach bug.
+  //
+  // They are INERT on a click-path workout — which is every shipped sample:
+  // no such manifest has a combo-announce, and the click path writes neither
+  // record. The gates below are what that path actually has.
   const gateSuppressed = stale || identityUnknown
   const newGates = deferred > 0 || assetMissing > 0 || notArmed
   const reanchorRegression = reanchor.inRound1 > RE_ANCHOR_REGRESSION_CEILING
+
+  // -- gates that hold on EITHER coach path ---------------------------------
+  // A clip the coach tried to play and could not: the native player threw
+  // on load (`clipMissing`) or on play (`playFailed`). No provenance is
+  // needed for these to mean something — the app reported the failure itself.
+  const playbackFailures = (dispatcher.playFailedCount ?? 0) + (dispatcher.clipMissingCount ?? 0)
+  // Per-bar loop calls. Counted, never itemized (see `verify`).
+  const callsExpected = dispatcher.expectedCallBars ?? 0
+  const callsDispatched = dispatcher.callsDispatched ?? 0
+  const callCoveragePct =
+    callsExpected > 0 ? Math.round((callsDispatched / callsExpected) * 100) : null
+  const noCalls = callsExpected > 0 && callsDispatched === 0
+  const lowCalls = callCoveragePct !== null && !noCalls && callCoveragePct < CALL_COVERAGE_LOW_PCT
 
   const hardFail =
     !t0 ||
     provenance.workoutMismatch ||
     missing > 0 ||
     duplicated > 0 ||
+    playbackFailures > 0 ||
+    noCalls ||
     (!gateSuppressed && newGates)
   const softWarn =
     late > 0 ||
@@ -589,6 +672,9 @@ function classifyRunHealth(t0, reanchor, verdicts, extras, dispatcher, provenanc
     extra > 0 ||
     deferredUnattributed > 0 ||
     reanchorRegression ||
+    lowCalls ||
+    // A run that cannot be tied to its manifest's timeline is not a pass.
+    identityUnknown ||
     (gateSuppressed && newGates)
 
   return {
@@ -612,6 +698,13 @@ function classifyRunHealth(t0, reanchor, verdicts, extras, dispatcher, provenanc
     reanchorRegression,
     notArmed,
     expectsScoreSlots,
+    playbackFailures,
+    callsDispatched,
+    callsExpected,
+    callCoveragePct,
+    noCalls,
+    lowCalls,
+    identityUnknown,
     stale,
     provenance: provenance.state,
     hardFail,
@@ -687,11 +780,16 @@ function renderReport(
   lines.push(`| Duplicated | ${health.duplicated} |`)
   lines.push(`| Extra (stray) | ${health.extra} |`)
   if (dispatcher.expectedCallBars > 0) {
-    const pct = Math.round((dispatcher.callsDispatched / dispatcher.expectedCallBars) * 100)
+    const pct = health.callCoveragePct
+    const flag = health.noCalls ? ' — NONE (fail)' : health.lowCalls ? ' — LOW (warn)' : ''
     lines.push(
-      `| Loop calls dispatched (round 1) | ${dispatcher.callsDispatched} / ${dispatcher.expectedCallBars} bars (${pct}%${pct < 90 ? ' — LOW' : ''}) |`,
+      `| Loop calls dispatched (round 1) | ${dispatcher.callsDispatched} / ${dispatcher.expectedCallBars} bars (${pct}%${flag}) |`,
     )
   }
+  lines.push(
+    `| Clips that failed to load or play (round 1) | ${health.playbackFailures}` +
+      `${health.playbackFailures > 0 ? ` — ${dispatcher.clipMissingCount} did not load, ${dispatcher.playFailedCount} did not play (fail)` : ''} |`,
+  )
   const windowSec = Math.round((health.observedWindowMs ?? 0) / 1000)
   const rate =
     health.observedWindowMs > 0
@@ -830,6 +928,10 @@ export function verify(manifest, logcatText) {
     armed: events.some((e) => e.type === 'slotDispatcher.armed'),
     deferredCount: deferrals.length,
     assetMissingCount: events.filter((e) => e.type === 'slotDispatcher.assetMissing').length,
+    // Scoped to the round, like every other observation: a clip that fails
+    // in the walkout or a later round is not this manifest's to judge.
+    playFailedCount: events.filter((e) => e.type === 'voice.playFailed' && inWindow(e)).length,
+    clipMissingCount: events.filter((e) => e.type === 'voice.clipMissing' && inWindow(e)).length,
     totalCompiledSlots: provenance.totalCompiledSlots,
     enqueuedSlots: provenance.enqueuedSlots,
     announceThenWorkCues: provenance.announceThenWorkCues,
