@@ -989,8 +989,10 @@ export default function LiveScreen(): React.JSX.Element {
       </View>
 
       {/* Discard is destructive, so it is confirmed rather than immediate
-          (spec §19.4). The stop itself already happened — only the fate of
-          the session is still open. */}
+          (spec §19.4). The stop itself already happened, and the session is
+          already written — a crash before this dialog must not lose it — so
+          Save simply leaves, and Discard deletes that row on the way out.
+          (The two used to be one handler: both just left.) */}
       {confirmingStop ? (
         <View style={styles.confirm} testID="stop-confirm">
           <Text style={styles.confirmText}>Workout stopped. Keep this session?</Text>
@@ -1005,7 +1007,10 @@ export default function LiveScreen(): React.JSX.Element {
             </Pressable>
             <Pressable
               accessibilityRole="button"
-              onPress={() => router.back()}
+              onPress={() => {
+                runner.discardSession()
+                router.back()
+              }}
               style={[styles.control, styles.stopControl]}
               testID="confirm-discard"
             >

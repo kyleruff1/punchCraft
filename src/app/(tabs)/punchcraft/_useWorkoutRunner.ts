@@ -280,6 +280,21 @@ export interface WorkoutRunner {
   readCues(): { current?: CueView; next?: CueView; walkPlan?: RoundWalkPlan; freeWork?: boolean; avatar?: { cue: CueInstance; tokenIndex: number } }
   /** Settled matching so far. Read by M33-03 grading and M33-08 persistence. */
   readResults(): WorkoutRunnerResults
+  /**
+   * Delete the session this run just wrote — the athlete's answer to "Keep
+   * this session?" after a stop.
+   *
+   * A stopped workout is written the moment it stops, on purpose: a crash
+   * between the stop and the dialog must not lose it. So Discard means
+   * removing a row that already exists, and until this existed the dialog's
+   * two buttons did exactly the same thing. The delete cascades to the
+   * session's rounds, punches, cue results and metrics; raw BLE frames are
+   * never part of a session and are untouched.
+   *
+   * Returns whether a session was removed — false when nothing was written
+   * (stopped before a cue, or persistence unavailable) or it is already gone.
+   */
+  discardSession(): boolean
 }
 
 export interface UseWorkoutRunnerArgs {
@@ -875,6 +890,11 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
   const startedAtRef = useRef(0)
   /** The end is written once; a cancel after a completion must not double it. */
   const persistedRef = useRef(false)
+  /** The session `endSession` wrote, kept so the athlete can discard it. */
+  const writtenSessionRef = useRef<{
+    sessionId: string
+    sessions: WorkoutPersistence['sessions']
+  } | null>(null)
   /** Token indexes affirmed in the cue currently on the stage. */
   const affirmedRef = useRef<number[]>([])
   const extrasRef = useRef(0)
@@ -1432,6 +1452,7 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
           activeDurationMs: Math.round(activeElapsedSecondsRef.current * 1000),
           cancelled,
         })
+        writtenSessionRef.current = { sessionId: session.sessionId, sessions: repos.sessions }
         report({ status: 'persisted', cancelled, session })
       } catch (error) {
         logger.error('workout.session.endWriteFailed', 'finished workout was not written', {
@@ -2354,6 +2375,27 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
         cueResults: matcherRef.current?.results() ?? [],
         ...(lastScoreRef.current ? { lastScore: lastScoreRef.current } : {}),
       }),
+      discardSession: () => {
+        const written = writtenSessionRef.current
+        if (!written) return false
+        // Cleared first: a second press, or a failure below, must not retry
+        // against a row that may already be gone.
+        writtenSessionRef.current = null
+        try {
+          const deleted = written.sessions.delete(written.sessionId)
+          logger.info('workout.session.discarded', 'the athlete discarded the stopped session', {
+            session: safe(written.sessionId),
+            deleted: safe(deleted),
+          })
+          return deleted
+        } catch (error) {
+          logger.error('workout.session.discardFailed', 'could not delete the discarded session', {
+            session: safe(written.sessionId),
+            error: safe(String(error)),
+          })
+          return false
+        }
+      },
     }),
     [applyTransitions, buildLeadInSchedule, clock, pushStore, source, syncFromEngine, cuesById],
   )

@@ -536,3 +536,96 @@ describe("punches outside a running workout are not the workout's", () => {
     h.unmount()
   })
 })
+
+describe('discarding a stopped session', () => {
+  // After a stop the screen asks "Keep this session?". The session is
+  // already written by then — a crash before the dialog must not lose it —
+  // and the two answers used to be one handler: both just left the screen.
+  // Discard now removes the row it is talking about.
+
+  /** A workout stopped after its first combination was answered and settled. */
+  function stopped(p: TestPersistence): Harness {
+    const second = expandTimeline(WORKOUT, 'orthodox', bpmForRecipe(WORKOUT.recipe))[0]!.cues[1]!
+    const h = mount(p)
+    h.begin()
+    h.emit('left')
+    h.step(400)
+    h.emit('right')
+    // On into the second combination's window, which settles the first — a
+    // combination cut off by the stop itself is cancelled, never graded.
+    h.step(second.scheduledStartMs)
+    act(() => {
+      h.runner.emergencyStop()
+    })
+    return h
+  }
+
+  it('removes the session and everything written with it', () => {
+    const p = realPersistence()
+    const h = stopped(p)
+    expect(h.outcomes[0]).toMatchObject({ status: 'persisted', cancelled: true })
+    expect(p.count('sessions')).toBe(1)
+    expect(p.count('cue_results')).toBeGreaterThan(0)
+    expect(p.count('punch_events')).toBeGreaterThan(0)
+
+    let removed = false
+    act(() => {
+      removed = h.runner.discardSession()
+    })
+
+    expect(removed).toBe(true)
+    expect(p.count('sessions')).toBe(0)
+    expect(p.count('cue_results')).toBe(0)
+    expect(p.count('punch_events')).toBe(0)
+    h.unmount()
+  })
+
+  it('keeps the session when the athlete does not discard it', () => {
+    const p = realPersistence()
+    const h = stopped(p)
+    h.unmount()
+    expect(p.count('sessions')).toBe(1)
+  })
+
+  it('is safe to press twice', () => {
+    const p = realPersistence()
+    const h = stopped(p)
+    expect(h.runner.discardSession()).toBe(true)
+    expect(h.runner.discardSession()).toBe(false)
+    h.unmount()
+  })
+
+  it('removes only its own session', () => {
+    const p = realPersistence()
+    const earlier = stopped(p)
+    earlier.unmount()
+    const later = stopped(p)
+    expect(p.count('sessions')).toBe(2)
+
+    later.runner.discardSession()
+    expect(p.count('sessions')).toBe(1)
+    later.unmount()
+  })
+
+  it('has nothing to remove when nothing was written', () => {
+    // Stopped before a single cue reached the stage: no session exists.
+    const p = realPersistence()
+    const h = mount(p)
+    act(() => {
+      h.runner.emergencyStop()
+    })
+    expect(h.runner.discardSession()).toBe(false)
+    expect(p.count('sessions')).toBe(0)
+    h.unmount()
+  })
+
+  it('has nothing to remove when persistence is switched off', () => {
+    const h = mount(null)
+    h.begin()
+    act(() => {
+      h.runner.emergencyStop()
+    })
+    expect(h.runner.discardSession()).toBe(false)
+    h.unmount()
+  })
+})
