@@ -18,6 +18,11 @@ module.exports = {
   // - `.claude/worktrees/**` holds git worktrees for parallel agent
   //   branches. Without this, jest discovers their suites too and reports a
   //   combined count for code that is not on this branch.
+  //   Anchored at `<rootDir>` on purpose: unanchored, the pattern also
+  //   matches a worktree's OWN path, so jest run from inside one — where
+  //   agent sessions work by default — reported "No tests found" and nothing
+  //   ran. Anchored, it still excludes worktrees nested under whichever
+  //   checkout jest was started from.
   // - `__tests__/helpers/` holds shared fixtures and adapters, not suites —
   //   without this jest treats every helper module as an empty test file.
   testPathIgnorePatterns: [
@@ -26,7 +31,7 @@ module.exports = {
     '/ios/',
     '/dist/',
     '/.expo/',
-    '/.claude/worktrees/',
+    '<rootDir>/.claude/worktrees/',
     '/__tests__/helpers/',
     // PunchBridge is its own package with node:test suites — run them
     // with `npm test` in tools/punchbridge, not under the app's jest.
