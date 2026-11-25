@@ -50,9 +50,18 @@ export class RecoveryPlayer {
    * Build the native playlist for a recovery script — segment / silence
    * / segment / silence / … Idempotent per scriptId; a new scriptId
    * frees the previous playlist first.
+   *
+   * Except once the walkthrough has started: then a different script is
+   * ignored until `stop()`. The athlete can flip numbers ⇄ techniques
+   * mid-rest, which hands this the other vocabulary's script for the same
+   * rest. Accepting it freed the playlist that was sounding — the voice
+   * stopped mid-word — and the replacement could never start, because
+   * `started` is latched once per rest. The remainder of the rest was
+   * silent. The new vocabulary takes effect at the next rest instead.
    */
   prepare(script: RecoveryScript): void {
     if (this.preparedScriptId === script.scriptId) return
+    if (this.started) return
     const sources: number[] = []
     for (let i = 0; i < script.segments.length; i += 1) {
       const segment = script.segments[i] as RecoveryScript['segments'][number]
