@@ -85,6 +85,13 @@ const PHASE_SHARE = {
 const MAX_REPAIR_PASSES = 24
 
 /**
+ * The widest gap a repeat phase may leave between reps, in beats. Past this
+ * the stretch between calls stops reading as a rhythm and starts reading as
+ * dead air.
+ */
+const MAX_PHASE_GAP_BEATS = 5
+
+/**
  * How close to the bell the repair pass fills. Was 4s; the switch-test
  * lab measured 3.8-4.2s of dead air before the end ding and Kyle wants
  * the coach working closer to it — 2s leaves one breath, not a hole.
@@ -412,11 +419,31 @@ export function fillScoredRound(
       const wantedReps = Math.round(desiredPunches / Math.max(1, pick.punchCount))
       const reps = Math.max(2, Math.min(12, wantedReps))
       const solvedGap = budgetBeats / reps - comboBeats
-      const gapBeats = Math.max(MIN_GAP_BEATS, Math.min(5, solvedGap * tighten))
+      const gapBeats = Math.max(
+        MIN_GAP_BEATS,
+        Math.min(MAX_PHASE_GAP_BEATS, solvedGap * tighten),
+      )
       // With the gap clamped, honour the TIME budget over the punch share:
       // duration is the D26 contract, punches are the recipe's wish.
+      //
+      // That has to hold in BOTH directions. Clamped at the floor, the wanted
+      // reps overrun the budget and `fitReps` trims them. Clamped at the
+      // CEILING — a punch target so low that the reps it asks for would sit
+      // more than five beats apart — the wanted reps fall SHORT of the
+      // budget, and taking the smaller of the two kept them short: the phase
+      // spanned a fraction of its share, every phase did the same, and the
+      // repair pass could not make up the difference. A 60-minute workout at
+      // a 900 goal ran out of blocks 41-61 s before every bell (605 s of a
+      // 2 880 s work block with the coach silent, measured). At the ceiling
+      // the time budget sets the reps.
       const fitReps = Math.max(2, Math.min(12, Math.floor(budgetBeats / (comboBeats + gapBeats))))
-      const spec = comboSpecFor(nextId(), pick.notation, Math.min(reps, fitReps), gapBeats)
+      const gapHitCeiling = solvedGap > MAX_PHASE_GAP_BEATS
+      const spec = comboSpecFor(
+        nextId(),
+        pick.notation,
+        gapHitCeiling ? fitReps : Math.min(reps, fitReps),
+        gapBeats,
+      )
       if (cadence !== undefined) spec.cadence = cadence
       if (callout !== undefined) {
         spec.leadInBeats = msToBeats(reserveMs, bpm)

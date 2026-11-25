@@ -162,9 +162,10 @@ export default function RecipeScreen(): React.JSX.Element {
 
   // Does the workout this recipe would GENERATE actually fill its rounds?
   // `validateRecipe` cannot say — that takes the generator, run with the same
-  // device-side options the live screen runs it with. At a low goal per round
-  // the answer is no: the coach goes quiet for the last stretch of every
-  // round, and until now the athlete found that out on the bag.
+  // device-side options the live screen runs it with. With too narrow a set
+  // of punches, or combinations capped very short, the answer is no: the
+  // coach goes quiet for the last stretch of a round, and until now the
+  // athlete found that out on the bag.
   //
   // Deferred, so a run of stepper taps is never held up by a generation; and
   // skipped when a library workout is picked, since the recipe is not what
@@ -356,7 +357,7 @@ export default function RecipeScreen(): React.JSX.Element {
           label="Advanced"
           caption="Which punches, defense, footwork and coaching calls the workout may use."
         >
-          <EnablementMenu recipe={recipe} conflicts={conflicts} onChange={setRecipe} />
+          <EnablementMenu recipe={recipe} conflicts={allConflicts} onChange={setRecipe} />
         </CollapsibleSection>
 
         {/* Sample — as a picker row so it stays one line by default. */}

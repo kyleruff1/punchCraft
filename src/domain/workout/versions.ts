@@ -17,8 +17,14 @@
  * The workout generator. Same recipe + this version + seed must reproduce an
  * identical plan (R18, doc §16). Bump on any change to template selection,
  * theme planning, or block arrangement.
+ *
+ * - `1.3.0` — a repeat phase whose gap clamps at its ceiling now takes the
+ *   reps that fill its time share, so a low punch goal no longer leaves a
+ *   round's last 40-60 s without content (D26). The version also seeds
+ *   selection, so every generated workout differs from its `1.2.0` plan
+ *   for the same recipe and seed — not only the low-goal ones.
  */
-export const GENERATOR_VERSION = '1.2.0'
+export const GENERATOR_VERSION = '1.3.0'
 
 /**
  * Schema of the persisted `WorkoutRecipe` object in `workout_recipes.params_json`.

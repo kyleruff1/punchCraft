@@ -37,6 +37,10 @@ import PuncheokieLanding from '../../puncheokie/index'
 import { useWorkoutStore } from '@state/useWorkoutStore'
 import { listSampleWorkouts } from '@domain/workout/samples'
 import { GOAL_TIERS, intensityLabel } from '@domain/workout/punchGoals'
+import { coverageConflict } from '@domain/workout/coverageConflict'
+import { generateWorkout } from '@domain/workout/generateWorkout'
+import { fillOptionsForRecipe } from '@audio/fillOptionsForRecipe'
+import type { PunchNumber } from '@domain/workout/WorkoutTokens'
 
 const store = () => useWorkoutStore.getState()
 
@@ -187,6 +191,26 @@ describe('rounds that would run out of combinations', () => {
   const dryNotice = (tree: ReactTestRenderer): ReactTestInstance[] =>
     tree.root.findAllByProps({ testID: 'conflict-rounds-run-dry' }, { deep: false })
 
+  /**
+   * A recipe narrow enough that the generator cannot fill a round: two
+   * punches, combinations capped at two. No build-up ladder survives, and
+   * what is left runs out before the bell.
+   */
+  const NARROW = { enabledPunches: [1, 2] as PunchNumber[], maximumComboPunches: 2, seed: 'x' }
+  const narrow = (): void => {
+    act(() => {
+      store().setRecipe(NARROW)
+    })
+  }
+
+  it('the narrow recipe really does run dry, with the options this screen uses', () => {
+    // The premise of every test below, checked against the same generator
+    // and options the screen calls rather than assumed.
+    narrow()
+    const recipe = store().recipe
+    expect(coverageConflict(generateWorkout(recipe, fillOptionsForRecipe(recipe)))).not.toBeNull()
+  })
+
   it('says nothing for the default recipe', () => {
     const tree = render(<RecipeScreen />)
     expect(dryNotice(tree)).toHaveLength(0)
@@ -198,46 +222,50 @@ describe('rounds that would run out of combinations', () => {
     expect(dryNotice(tree)).toHaveLength(0)
   })
 
-  it('warns, in the summary, when the goal is too low to fill the rounds', () => {
-    // Reachable with the stepper, and by anything that sets the recipe
-    // directly. The generator has always known; now the athlete does too,
-    // before the workout rather than during it.
+  it('says nothing about a low goal — the generator fills the round regardless', () => {
+    // Until generator 1.3.0 this was the common way to get silent rounds.
     act(() => {
       store().setRecipe({ durationMinutes: 60, totalPunchGoal: 900 })
     })
     const tree = render(<RecipeScreen />)
+    expect(dryNotice(tree)).toHaveLength(0)
+  })
 
-    const card = tree.root.findByProps({ testID: 'recipe-summary-card' })
-    const text = textOf(card)
+  it('warns, in the summary, when the punches are too few to fill the rounds', () => {
+    // The generator has always known; now the athlete does too, before the
+    // workout rather than during it.
+    narrow()
+    const tree = render(<RecipeScreen />)
+
+    const text = textOf(tree.root.findByProps({ testID: 'recipe-summary-card' }))
     expect(text).toContain('Warning')
     expect(text).toContain('out of combinations before the bell')
     // Never a dead end: it says what to change.
-    expect(text).toContain('Raise the punch goal')
+    expect(text).toContain('Enable more punches')
   })
 
-  it('shows it beside the goal control too, where the athlete can act on it', () => {
-    act(() => {
-      store().setRecipe({ durationMinutes: 60, totalPunchGoal: 900 })
-    })
+  it('shows it beside the punch controls too, where the athlete can act on it', () => {
+    narrow()
     const tree = render(<RecipeScreen />)
-    press(tree, 'goal-toggle')
-    expect(dryNotice(tree).length).toBeGreaterThanOrEqual(2)
+    const inSummary = dryNotice(tree).length
+    press(tree, 'advanced-toggle')
+    expect(dryNotice(tree).length).toBeGreaterThan(inSummary)
   })
 
-  it('clears as soon as the goal is raised', () => {
-    act(() => {
-      store().setRecipe({ durationMinutes: 60, totalPunchGoal: 900 })
-    })
+  it('clears as soon as the punches are widened again', () => {
+    narrow()
     const tree = render(<RecipeScreen />)
     expect(dryNotice(tree).length).toBeGreaterThan(0)
 
-    pickOption(tree, 'goal', 'steady')
+    act(() => {
+      store().setRecipe({ enabledPunches: [1, 2, 3, 4, 5, 6], maximumComboPunches: 5 })
+    })
     expect(dryNotice(tree)).toHaveLength(0)
   })
 
   it('stays quiet when a library workout is selected — the recipe is not what runs', () => {
+    narrow()
     act(() => {
-      store().setRecipe({ durationMinutes: 60, totalPunchGoal: 900 })
       store().selectSample(listSampleWorkouts()[0]!.key)
     })
     const tree = render(<RecipeScreen />)
