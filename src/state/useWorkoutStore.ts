@@ -1,5 +1,5 @@
 /**
- * Zustand store for the Puncheokie workout recipe (M31-06).
+ * Zustand store for the punchCraft workouts workout recipe (M31-06).
  *
  * Holds the recipe the athlete is configuring plus the two values derived
  * from it — `conflicts` (M31-04 `validateRecipe`) and `summary` (M31-04

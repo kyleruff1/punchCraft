@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
-  "corpusId": "puncheokie-inter-round-recovery-v1",
-  "title": "Puncheokie Inter-Round Recovery Coach Corpus",
+  "corpusId": "workouts-inter-round-recovery-v1",
+  "title": "punchCraft workouts Inter-Round Recovery Coach Corpus",
   "purpose": "Twenty interchangeable spoken recovery modules for a sixty-second rest between three-minute boxing rounds.",
   "restWindow": {
     "restDurationSec": 60,

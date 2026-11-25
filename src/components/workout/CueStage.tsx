@@ -299,7 +299,7 @@ function useWalkedView(
   const cue = current?.cue
   const onOrdinal = React.useCallback((epoch: string, ordinal: number) => {
     setWalk({ epoch, ordinal })
-    logger.info('puncheokie.ring.visual', 'walk advanced', {
+    logger.info('workout.ring.visual', 'walk advanced', {
       cueId: safe(epoch),
       ordinal: safe(ordinal),
     })

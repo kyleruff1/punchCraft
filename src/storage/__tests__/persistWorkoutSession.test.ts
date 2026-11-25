@@ -100,7 +100,7 @@ describe('a successful write lands everything together', () => {
   })
 
   it('records the mode punchCraft actually runs workouts under', () => {
-    // #194's text says 'puncheokie'; that predates punchCraft taking
+    // #194's text says 'workouts'; that predates punchCraft taking
     // ownership of building and running workouts.
     const h = harness()
     const session = h.sessions.getById(persist(h).sessionId)!

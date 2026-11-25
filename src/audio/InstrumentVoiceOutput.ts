@@ -31,7 +31,7 @@
  *
  * A throw from `setAudioMode` or `createAudioPlaylist` (preload or swap
  * path) sets `available = false`, tears everything down, logs ONE
- * `puncheokie.instrument.unavailable` warning, and every public method
+ * `workout.instrument.unavailable` warning, and every public method
  * no-ops thereafter — the jam keeps running silently, never blocked. An
  * INDIVIDUAL one-shot clip failing to load is log-and-continue (the
  * `playerFor` posture): the instrument loses one note, not its voice.
@@ -328,7 +328,7 @@ export class InstrumentVoiceOutput {
     clip: InstrumentBankClip | undefined,
   ): PooledOneShot | undefined {
     if (clip === undefined) {
-      logger.warn('puncheokie.instrument.clipMissing', 'no bank entry for one-shot', {
+      logger.warn('workout.instrument.clipMissing', 'no bank entry for one-shot', {
         key: safe(poolKey),
         texture: safe(this.texture),
       })
@@ -354,7 +354,7 @@ export class InstrumentVoiceOutput {
       this.oneShots.set(poolKey, slot)
       return slot
     } catch (err) {
-      logger.warn('puncheokie.instrument.clipMissing', 'one-shot did not load', {
+      logger.warn('workout.instrument.clipMissing', 'one-shot did not load', {
         key: safe(poolKey),
         texture: safe(this.texture),
         error: safe(String(err)),
@@ -424,7 +424,7 @@ export class InstrumentVoiceOutput {
         try {
           player.play()
         } catch (err) {
-          logger.warn('puncheokie.instrument.playFailed', 'one-shot did not play', {
+          logger.warn('workout.instrument.playFailed', 'one-shot did not play', {
             key: safe(poolKey),
             path: safe(path),
             error: safe(String(err)),
@@ -432,7 +432,7 @@ export class InstrumentVoiceOutput {
           return
         }
         if (path === 'seek-stalled') {
-          logger.warn('puncheokie.instrument.seekStalled', 'one-shot rewind stalled — played anyway', {
+          logger.warn('workout.instrument.seekStalled', 'one-shot rewind stalled — played anyway', {
             key: safe(poolKey),
             waitedMs: safe(Math.round(this.clock() - dispatchedAt)),
           })
@@ -447,7 +447,7 @@ export class InstrumentVoiceOutput {
           playOnce('rewound')
         })
     } catch (err) {
-      logger.warn('puncheokie.instrument.playFailed', 'one-shot did not play', {
+      logger.warn('workout.instrument.playFailed', 'one-shot did not play', {
         key: safe(poolKey),
         error: safe(String(err)),
       })
@@ -461,7 +461,7 @@ export class InstrumentVoiceOutput {
    */
   private swapLoop(kind: 'bed' | 'bass', key: string, clip: InstrumentBankClip | undefined): void {
     if (clip === undefined) {
-      logger.warn('puncheokie.instrument.clipMissing', 'no bank entry for loop', {
+      logger.warn('workout.instrument.clipMissing', 'no bank entry for loop', {
         kind: safe(kind),
         key: safe(key),
         texture: safe(this.texture),
@@ -535,7 +535,7 @@ export class InstrumentVoiceOutput {
     this.availableFlag = false
     this.destroyPlaylists()
     this.releasePools()
-    logger.warn('puncheokie.instrument.unavailable', reason, {
+    logger.warn('workout.instrument.unavailable', reason, {
       texture: safe(this.texture),
       ...(error === undefined ? {} : { error: safe(String(error)) }),
     })

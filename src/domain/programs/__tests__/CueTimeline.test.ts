@@ -6,7 +6,7 @@
 /**
  * Cue timeline expansion (M32-03).
  *
- * Expansion is where every timing bug in Puncheokie either gets caught or
+ * Expansion is where every timing bug in punchCraft workouts either gets caught or
  * gets shipped, so these tests lean on the real sample workouts (M31-05)
  * rather than on hand-built fixtures — the samples are what the live screen
  * will actually run.

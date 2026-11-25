@@ -4,7 +4,7 @@
  * verify-suite.mjs and observed-summary.mjs read the same shapes).
  *
  * `adb logcat -v time` lines look like
- *   `MM-DD HH:MM:SS.mmm I/ReactNativeJS(pid): '[puncheokie.x] message', { field: 1,`
+ *   `MM-DD HH:MM:SS.mmm I/ReactNativeJS(pid): '[workout.x] message', { field: 1,`
  * and React Native's ConsoleSink wraps an object payload across several
  * lines with the SAME prefix. `stitchLogRecords` collapses those into one
  * body per record so `extractField` can see a field that sits two lines
@@ -80,8 +80,8 @@ export function stitchLogRecords(logcatText) {
  * The event code of a stitched record, or undefined.
  *
  * `ConsoleSink` (src/diagnostics/logger.ts) writes
- * `console.info('[INFO] puncheokie.voice.play', 'clip playing', {…})`, which
- * reaches logcat as `'[INFO] puncheokie.voice.play', 'clip playing', { … }` —
+ * `console.info('[INFO] workout.voice.play', 'clip playing', {…})`, which
+ * reaches logcat as `'[INFO] workout.voice.play', 'clip playing', { … }` —
  * the LEVEL is what sits in the brackets and the code follows it. A matcher
  * built on `'[<code>]` finds nothing on a real capture while passing happily
  * against a fixture written the same wrong way; that cost one release drive.
@@ -92,12 +92,34 @@ export function recordTag(body) {
 }
 
 /**
+ * Legacy log-code prefix. Event codes were renamed `puncheokie.*` ->
+ * `workout.*` when the Puncheoke instrument was forked out, but the ~319
+ * captures under tools/analysis/{sessions,suites,monitor,listen,batches}
+ * were recorded BEFORE that rename and still carry the old prefix. Those
+ * captures are the baselines every regression comparison rests on — the
+ * breath-floor A/B and the pre/post-floor suites among them — so the matcher
+ * accepts either spelling rather than silently returning zero rows on
+ * historical data. Drop this once no capture in use predates the rename.
+ */
+const LEGACY_TAG_PREFIX = 'puncheokie.'
+const CURRENT_TAG_PREFIX = 'workout.'
+
+/** Every spelling of `tag` that should match, newest first. */
+function tagAliases(tag) {
+  if (!tag.startsWith(CURRENT_TAG_PREFIX)) return [tag]
+  return [tag, LEGACY_TAG_PREFIX + tag.slice(CURRENT_TAG_PREFIX.length)]
+}
+
+/**
  * Stitched records whose code is EXACTLY `tag`, each with its `ts` (ms since
- * midnight). Exact, so `puncheokie.qa.run` never swallows
- * `puncheokie.qa.run.blocked` or `.duplicate`.
+ * midnight). Exact, so `workout.qa.run` never swallows
+ * `workout.qa.run.blocked` or `.duplicate`.
+ *
+ * Matches the pre-fork `puncheokie.*` spelling too — see LEGACY_TAG_PREFIX.
  */
 export function recordsWithTag(logcatText, tag) {
+  const accepted = new Set(tagAliases(tag))
   return stitchLogRecords(logcatText)
-    .filter((r) => recordTag(r.body) === tag)
+    .filter((r) => accepted.has(recordTag(r.body)))
     .map((r) => ({ ts: parseTimestampMs(r.dateStr, r.timeStr), body: r.body }))
 }

@@ -70,7 +70,7 @@ const DIR_ALLOWLIST_PREFIXES = [
    * tests rather than under it. The protocol allowlist above already covers
    * "JSDoc + tests" for the same reason. */
   'src/domain/__tests__/instrument.',
-  /* Puncheokie design docs describe the drum model in its own vocabulary —
+  /* punchCraft workouts design docs describe the drum model in its own vocabulary —
    * drum-kit-design.md lists "MIDI velocity" and "groove energy" as two
    * DIFFERENT things, which is precisely the distinction §4.3 protects. */
   'docs/puncheoke/',

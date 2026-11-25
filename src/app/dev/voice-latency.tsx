@@ -7,7 +7,7 @@
  * ## The ARMED cases, and why they were added
  *
  * The original `preloaded` case measured 149.9 ms median on this tablet
- * (docs/puncheokie-voice-spike.md:92) — a number since used to argue that
+ * (docs/workouts-voice-spike.md:92) — a number since used to argue that
  * expo-audio is too slow to monitor a live instrument on. But that case
  * calls `seekTo(0)` and then starts the clock BEFORE `play()`, and `seekTo`
  * is async, so the seek is still in flight while the clock runs. The
@@ -242,7 +242,7 @@ async function armPlayer(player: AudioPlayer): Promise<void> {
  * The third candidate instrument, `audioSampleUpdate` (real PCM frames), is
  * NOT usable here: it reports `supported: true` on this tablet and delivers no
  * samples above the silence threshold — every rep times out
- * (docs/puncheokie-voice-spike.md:396). It is also post-volume, so it could
+ * (docs/workouts-voice-spike.md:396). It is also post-volume, so it could
  * never work on the muted unattended runs.
  */
 async function timeBothClocks(
@@ -518,7 +518,7 @@ async function timeArmedOboe(
           // also be placed on, did each of those happen" — which is what
           // PLAYHEAD_TO_SPEAKER_MS needs, since the remaining unknown is
           // entirely off-device.
-          logger.info('puncheokie.ruler.rep', 'rep timing', {
+          logger.info('workout.ruler.rep', 'rep timing', {
             asset: safe(c.label),
             rep: safe(i),
             startedEpochMs: safe(startedEpochMs),
@@ -534,7 +534,7 @@ async function timeArmedOboe(
 
         if (pairs.length === 0) {
           say(`  ${c.label}: no paired samples (both clocks must fire)`)
-          logger.info('puncheokie.ruler', 'no paired samples', { asset: safe(c.label) })
+          logger.info('workout.ruler', 'no paired samples', { asset: safe(c.label) })
           continue
         }
         const med = (v: number[]): number => {
@@ -547,7 +547,7 @@ async function timeArmedOboe(
         const skew = pairs.map((p) => p.playheadMs - p.statusMs)
         const r = (v: number): number => Math.round(v * 10) / 10
         say(`  ${c.label}: n=${pairs.length} status=${r(med(st))} playhead=${r(med(ph))} SKEW=${r(med(skew))} ms`)
-        logger.info('puncheokie.ruler', 'paired onset calibration', {
+        logger.info('workout.ruler', 'paired onset calibration', {
           asset: safe(c.label),
           n: safe(pairs.length),
           statusMedianMs: safe(r(med(st))),
@@ -558,11 +558,11 @@ async function timeArmedOboe(
         })
       }
       say('ruler: done — skew is how much our reported onsets UNDERSTATE, and it is a lower bound')
-      logger.info('puncheokie.ruler.done', 'ruler calibration complete', { reps: safe(REPS) })
+      logger.info('workout.ruler.done', 'ruler calibration complete', { reps: safe(REPS) })
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       say(`ruler FAILED: ${message}`)
-      logger.warn('puncheokie.ruler', 'calibration failed', { error: safe(message) })
+      logger.warn('workout.ruler', 'calibration failed', { error: safe(message) })
     }
   }, [say])
 
@@ -721,7 +721,7 @@ async function timeArmedOboe(
       })
 
       say(`playlist ruler: ${arms.length} arms x ${REPS} reps, interleaved — clip ${call.id} (${CALL_MS} ms)`)
-      logger.info('puncheokie.plruler.start', 'playlist ruler starting', {
+      logger.info('workout.plruler.start', 'playlist ruler starting', {
         runId: safe(runId),
         arms: safe(arms.length),
         reps: safe(REPS),
@@ -749,7 +749,7 @@ async function timeArmedOboe(
             const nativeTracks = playlist.trackCount
             if (nativeTracks !== sources.length) {
               acc[arm.key]!.failed += 1
-              logger.warn('puncheokie.plruler.rep', 'track count mismatch — rep skipped', {
+              logger.warn('workout.plruler.rep', 'track count mismatch — rep skipped', {
                 runId: safe(runId),
                 arm: safe(arm.label),
                 rep: safe(rep),
@@ -828,7 +828,7 @@ async function timeArmedOboe(
               dwells.push(`${a.index}${isClip ? 'c' : 's'}:${Math.round(ms)}`)
             }
 
-            logger.info('puncheokie.plruler.rep', 'playlist rep timing', {
+            logger.info('workout.plruler.rep', 'playlist rep timing', {
               runId: safe(runId),
               arm: safe(arm.label),
               rates: safe(arm.rates),
@@ -847,7 +847,7 @@ async function timeArmedOboe(
             })
           } catch (err) {
             acc[arm.key]!.failed += 1
-            logger.warn('puncheokie.plruler.rep', 'rep failed', {
+            logger.warn('workout.plruler.rep', 'rep failed', {
               runId: safe(runId),
               arm: safe(arm.label),
               rep: safe(rep),
@@ -865,7 +865,7 @@ async function timeArmedOboe(
           `clipDwell=${r1(med(a.clipDwell)) ?? 'n/a'} silDwell=${r1(med(a.silDwell)) ?? 'n/a'} ` +
           `residual=${r1(med(a.residual)) ?? 'n/a'} (n=${a.residual.length}, failed=${a.failed})`
         say(line)
-        logger.info('puncheokie.plruler.arm', 'playlist arm summary', {
+        logger.info('workout.plruler.arm', 'playlist arm summary', {
           runId: safe(runId),
           arm: safe(arm.label),
           rates: safe(arm.rates),
@@ -893,7 +893,7 @@ async function timeArmedOboe(
           continue
         }
         say(`  ${what}: ${r1(t - h)} ms per boundary`)
-        logger.info('puncheokie.plruler.verdict', 'boundary cost difference', {
+        logger.info('workout.plruler.verdict', 'boundary cost difference', {
           runId: safe(runId),
           comparison: safe(what),
           homogeneousDwellMs: safe(r1(h)),
@@ -902,11 +902,11 @@ async function timeArmedOboe(
         })
       }
       say('playlist ruler: done — the call delta is the finding, the bell delta is the control')
-      logger.info('puncheokie.plruler.done', 'playlist ruler complete', { runId: safe(runId) })
+      logger.info('workout.plruler.done', 'playlist ruler complete', { runId: safe(runId) })
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       say(`playlist ruler FAILED: ${message}`)
-      logger.warn('puncheokie.plruler', 'playlist calibration failed', { runId: safe(runId), error: safe(message) })
+      logger.warn('workout.plruler', 'playlist calibration failed', { runId: safe(runId), error: safe(message) })
     } finally {
       setRunning(false)
     }

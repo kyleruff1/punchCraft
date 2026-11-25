@@ -41,7 +41,7 @@ export class RecoveryPlayer {
   private preparedScriptId: string | null = null
 
   constructor(opts: { observer?: PlaybackObserver | null } = {}) {
-    this.pl = new CeremonyPlaylist(opts.observer ?? null, 'puncheokie.recovery')
+    this.pl = new CeremonyPlaylist(opts.observer ?? null, 'workout.recovery')
   }
   private started = false
   private paused = false
@@ -81,7 +81,7 @@ export class RecoveryPlayer {
     if (!this.started || this.paused || !this.pl.loaded) return
     this.paused = true
     this.pl.pause()
-    logger.info('puncheokie.recovery', 'recovery paused in place', {
+    logger.info('workout.recovery', 'recovery paused in place', {
       scriptId: safe(this.preparedScriptId),
     })
   }
@@ -102,7 +102,7 @@ export class RecoveryPlayer {
       } catch {
         // The rest continues without the walkthrough.
       }
-      logger.info('puncheokie.recovery', 'recovery resumed in place', {
+      logger.info('workout.recovery', 'recovery resumed in place', {
         scriptId: safe(this.preparedScriptId),
       })
       return
@@ -118,13 +118,13 @@ export class RecoveryPlayer {
         label: this.preparedScriptId ?? 'recovery',
         playIdPrefix: 'recovery',
       })
-      logger.info('puncheokie.recovery', 'recovery playing', {
+      logger.info('workout.recovery', 'recovery playing', {
         scriptId: safe(this.preparedScriptId),
         restElapsedMs: safe(restElapsedMs),
         playId: safe(playId),
       })
     } catch (error) {
-      logger.warn('puncheokie.recovery', 'playlist play failed', {
+      logger.warn('workout.recovery', 'playlist play failed', {
         scriptId: safe(this.preparedScriptId),
         error: safe(String(error)),
       })
@@ -134,7 +134,7 @@ export class RecoveryPlayer {
   /** End of rest, or unmount. Frees the playlist. Safe to call repeatedly. */
   stop(): void {
     if (this.pl.loaded) {
-      logger.info('puncheokie.recovery', 'recovery stopped', {
+      logger.info('workout.recovery', 'recovery stopped', {
         scriptId: safe(this.preparedScriptId),
         wasPlaying: safe(this.started),
       })

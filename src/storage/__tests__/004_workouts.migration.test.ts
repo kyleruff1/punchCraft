@@ -1,5 +1,5 @@
 /**
- * Migration 004 — the four Puncheokie workout tables, their CHECK enums, the
+ * Migration 004 — the four punchCraft workouts workout tables, their CHECK enums, the
  * D8 NOT NULL on the realized stream, and the foreign keys, verified against a
  * real in-memory SQLite (node:sqlite).
  *
@@ -65,7 +65,7 @@ function seedWorkout(db: MemoryDb, opts: { sessionId?: string | null } = {}): vo
 function seedSession(db: MemoryDb, id = 's1'): void {
   db.execSync(
     `INSERT INTO sessions (id, mode, status, created_at)
-     VALUES ('${id}', 'puncheokie', 'configuring', '2026-08-23T00:00:00.000Z')`,
+     VALUES ('${id}', 'workouts', 'configuring', '2026-08-23T00:00:00.000Z')`,
   )
 }
 

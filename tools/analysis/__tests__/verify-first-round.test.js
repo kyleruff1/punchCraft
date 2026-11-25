@@ -51,19 +51,19 @@ const COMBO_EXPECTATION = {
 /** t0 for these fixtures: metronome 'loop started' at 13:49:47.342. */
 const T0_LINE = line(
   '13:49:47.342',
-  "'[INFO] puncheokie.metronome', 'loop started', { bpm: 240 }",
+  "'[INFO] workout.metronome', 'loop started', { bpm: 240 }",
 )
 
 describe('parseLogcat — defects that were silent', () => {
   it('parses voice.playFailed rather than swallowing it in the voice.play branch', () => {
-    // 'puncheokie.voice.playFailed' CONTAINS 'puncheokie.voice.play'. Tested
+    // 'workout.voice.playFailed' CONTAINS 'workout.voice.play'. Tested
     // in the wrong order it matches the play branch, satisfies neither inner
     // arm, and hits that branch's unconditional `continue` — parsed to
     // nothing at all, with no error anywhere.
     const text = [
       warn(
         '13:49:50.100',
-        "'[WARN] puncheokie.voice.playFailed', 'clip failed to play', { asset: '1',",
+        "'[WARN] workout.voice.playFailed', 'clip failed to play', { asset: '1',",
       ),
       warn('13:49:50.100', "  text: 'One' }"),
       '',
@@ -81,7 +81,7 @@ describe('parseLogcat — defects that were silent', () => {
     // in progress without pushing it, losing one event per logcat.
     const text = [
       T0_LINE,
-      line('13:49:48.000', "'[INFO] puncheokie.voice.play', 'clip playing', { asset: '1',"),
+      line('13:49:48.000', "'[INFO] workout.voice.play', 'clip playing', { asset: '1',"),
       line('13:49:48.000', '  priority: 2 }'),
       '', // trailing newline
     ].join('\n')
@@ -94,7 +94,7 @@ describe('parseLogcat — defects that were silent', () => {
     const text = [
       line(
         '13:49:19.038',
-        "'[INFO] puncheokie.slotDispatcher.armed', 'armed', { workout: 'speed-combos',",
+        "'[INFO] workout.slotDispatcher.armed', 'armed', { workout: 'speed-combos',",
       ),
       line('13:49:19.038', '  totalCompiledSlots: 98,'),
       line('13:49:19.038', '  enqueuedSlots: 23,'),
@@ -114,7 +114,7 @@ describe('parseLogcat — defects that were silent', () => {
 
   it('tags the bell ADDITIVELY — it is still a voice.clip', () => {
     const text = [
-      line('13:49:47.000', "'[INFO] puncheokie.voice.play', 'clip playing', { asset: 'bell' }"),
+      line('13:49:47.000', "'[INFO] workout.voice.play', 'clip playing', { asset: 'bell' }"),
       '',
     ].join('\n')
     const events = parseLogcat(text)
@@ -126,7 +126,7 @@ describe('parseLogcat — defects that were silent', () => {
     const text = [
       line(
         '13:49:47.342',
-        "'[INFO] puncheokie.round.boundary', 'session phase boundary', { transition: 'rest-entered',",
+        "'[INFO] workout.round.boundary', 'session phase boundary', { transition: 'rest-entered',",
       ),
       line('13:49:47.342', '  roundIndex: 0,'),
       line('13:49:47.342', '  workElapsedMs: 240000 }'),
@@ -143,7 +143,7 @@ describe('verify — a drifted event is labelled by the SIGN of its drift', () =
     [
       line(
         time,
-        "'[INFO] puncheokie.voice.play', 'combo-announce playing', { kind: 'combo-announce',",
+        "'[INFO] workout.voice.play', 'combo-announce playing', { kind: 'combo-announce',",
       ),
       line(time, `  text: '${COMBO_EXPECTATION.text}',`),
       line(time, '  durationMs: 900 }'),
@@ -191,7 +191,7 @@ describe('verify — deferral join', () => {
     [
       line(
         time,
-        `'[INFO] puncheokie.slotDispatcher.deferred', 'coach lane busy', { slotId: '${slotId}',`,
+        `'[INFO] workout.slotDispatcher.deferred', 'coach lane busy', { slotId: '${slotId}',`,
       ),
       line(time, '  audibleUntilMs: 1200 }'),
     ].join('\n')
@@ -233,7 +233,7 @@ describe('verify — provenance gating', () => {
     [
       line(
         '13:49:19.038',
-        "'[INFO] puncheokie.slotDispatcher.armed', 'armed', { workout: 'speed-combos',",
+        "'[INFO] workout.slotDispatcher.armed', 'armed', { workout: 'speed-combos',",
       ),
       line('13:49:19.038', `  timelineHash: '${hash}' }`),
     ].join('\n')
@@ -265,7 +265,7 @@ describe('verify — provenance gating', () => {
       T0_LINE,
       line(
         '13:49:52.903',
-        `'[INFO] puncheokie.slotDispatcher.deferred', 'coach lane busy', { slotId: '${COMBO_EXPECTATION.slotId}',`,
+        `'[INFO] workout.slotDispatcher.deferred', 'coach lane busy', { slotId: '${COMBO_EXPECTATION.slotId}',`,
       ),
       line('13:49:52.903', '  audibleUntilMs: 1200 }'),
       '',

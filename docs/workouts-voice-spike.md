@@ -1,6 +1,6 @@
 # M34-01 — Voice playback latency, audio focus, and Spotify coexistence
 
-**Issue:** [#195](https://github.com/kyleruff1/punchCraft-Puncheokie/issues/195) ·
+**Issue:** [#195](https://github.com/kyleruff1/punchCraft-punchCraft workouts/issues/195) ·
 **Status:** GO (with one deferred manual check) · **Measured:** 2026-08-23
 
 Go/no-go spike deciding how the Voice Coach produces sound. It answers three

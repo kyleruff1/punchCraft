@@ -94,11 +94,11 @@ export function parseLogcat(logcatText) {
   const records = stitchLogRecords(logcatText)
   for (const { dateStr, timeStr, body } of records) {
     const ts = parseTimestampMs(dateStr, timeStr)
-    if (body.includes('puncheokie.runner.start')) {
+    if (body.includes('workout.runner.start')) {
       events.push({ type: 'runner.start', ts, raw: body })
       continue
     }
-    if (body.includes('puncheokie.round.boundary')) {
+    if (body.includes('workout.round.boundary')) {
       events.push({
         type: 'round.boundary',
         ts,
@@ -109,7 +109,7 @@ export function parseLogcat(logcatText) {
       })
       continue
     }
-    if (body.includes('puncheokie.slotDispatcher.armed')) {
+    if (body.includes('workout.slotDispatcher.armed')) {
       events.push({
         type: 'slotDispatcher.armed',
         ts,
@@ -122,7 +122,7 @@ export function parseLogcat(logcatText) {
       })
       continue
     }
-    if (body.includes('puncheokie.slotDispatcher.deferred')) {
+    if (body.includes('workout.slotDispatcher.deferred')) {
       events.push({
         type: 'slotDispatcher.deferred',
         ts,
@@ -132,7 +132,7 @@ export function parseLogcat(logcatText) {
       })
       continue
     }
-    if (body.includes('puncheokie.slotDispatcher.assetMissing')) {
+    if (body.includes('workout.slotDispatcher.assetMissing')) {
       events.push({
         type: 'slotDispatcher.assetMissing',
         ts,
@@ -150,19 +150,19 @@ export function parseLogcat(logcatText) {
       events.push({ type: 'intro.complete', ts, raw: body })
       continue
     }
-    if (body.includes("puncheokie.metronome") && body.includes("loop started")) {
+    if (body.includes("workout.metronome") && body.includes("loop started")) {
       events.push({ type: 'metronome.started', ts, raw: body })
       continue
     }
-    if (body.includes('puncheokie.transport') && body.includes('re-anchored')) {
+    if (body.includes('workout.transport') && body.includes('re-anchored')) {
       events.push({ type: 'transport.reanchor', ts, raw: body })
       continue
     }
-    // ORDERING IS LOAD-BEARING: 'puncheokie.voice.playFailed' CONTAINS
-    // 'puncheokie.voice.play'. Below the play branch these match it, fall
+    // ORDERING IS LOAD-BEARING: 'workout.voice.playFailed' CONTAINS
+    // 'workout.voice.play'. Below the play branch these match it, fall
     // through both inner arms, and hit its unconditional `continue` —
     // parsed to nothing at all. They must be tested first.
-    if (body.includes('puncheokie.voice.playFailed')) {
+    if (body.includes('workout.voice.playFailed')) {
       events.push({
         type: 'voice.playFailed',
         ts,
@@ -172,11 +172,11 @@ export function parseLogcat(logcatText) {
       })
       continue
     }
-    if (body.includes('puncheokie.voice.clipMissing')) {
+    if (body.includes('workout.voice.clipMissing')) {
       events.push({ type: 'voice.clipMissing', ts, asset: extractField(body, 'asset'), raw: body })
       continue
     }
-    if (body.includes("puncheokie.voice.play")) {
+    if (body.includes("workout.voice.play")) {
       if (body.includes("'combo-announce playing'")) {
         const text = extractField(body, 'text')
         const durationMs = extractField(body, 'durationMs')
@@ -214,11 +214,11 @@ export function parseLogcat(logcatText) {
       }
       continue
     }
-    if (body.includes('puncheokie.clickScript.skipped')) {
+    if (body.includes('workout.clickScript.skipped')) {
       events.push({ type: 'clickScript.skipped', ts, slot: extractField(body, 'slot'), raw: body })
       continue
     }
-    if (body.includes('puncheokie.clickScript.dispatch')) {
+    if (body.includes('workout.clickScript.dispatch')) {
       events.push({
         type: 'clickScript.dispatch',
         ts,
@@ -230,7 +230,7 @@ export function parseLogcat(logcatText) {
       })
       continue
     }
-    if (body.includes("puncheokie.cue.tokenDue")) {
+    if (body.includes("workout.cue.tokenDue")) {
       events.push({
         type: 'cue.tokenDue',
         ts,

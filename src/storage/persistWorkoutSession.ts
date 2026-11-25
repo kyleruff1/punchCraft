@@ -119,7 +119,7 @@ export function persistWorkoutSession(
     const generatedWorkoutId = workout.id
     const session = sessions.create({
       // punchCraft owns building and running workouts; the older
-      // 'puncheokie' mode in #194's text predates that move.
+      // 'workouts' mode in #194's text predates that move.
       mode: 'punchcraft',
       status: cancelled ? 'cancelled' : 'completed',
       startedMonotonicMs,
@@ -185,7 +185,7 @@ export function persistWorkoutSession(
 
     db.execSync('COMMIT')
 
-    logger.info('puncheokie.session.persisted', 'workout session written', {
+    logger.info('workout.session.persisted', 'workout session written', {
       session: safe(session.id),
       cueResults: safe(cueResults.length),
       adaptations: safe(adaptations.length),
@@ -203,11 +203,11 @@ export function persistWorkoutSession(
     try {
       db.execSync('ROLLBACK')
     } catch (rollbackErr) {
-      logger.error('puncheokie.session.rollbackFailed', 'rollback failed after a write error', {
+      logger.error('workout.session.rollbackFailed', 'rollback failed after a write error', {
         error: safe(String(rollbackErr)),
       })
     }
-    logger.error('puncheokie.session.persistFailed', 'workout session not written', {
+    logger.error('workout.session.persistFailed', 'workout session not written', {
       error: safe(String(err)),
     })
     throw err

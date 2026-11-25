@@ -1,5 +1,5 @@
 /**
- * The `puncheokie.voice.play` records carry what the timing observer and
+ * The `workout.voice.play` records carry what the timing observer and
  * the offline analyzer join on (GH #291, C0).
  *
  * The log sink prints FIELDS only — a record's own `monotonicTimeMs` never
@@ -82,7 +82,7 @@ function rig(options: { timingObserver?: boolean } = {}) {
 }
 
 let records: LogRecord[] = []
-const plays = (): LogRecord[] => records.filter((r) => r.code === 'puncheokie.voice.play')
+const plays = (): LogRecord[] => records.filter((r) => r.code === 'workout.voice.play')
 const field = (r: LogRecord, k: string): unknown => r.fields[k]?.value
 
 beforeEach(() => {
@@ -139,7 +139,7 @@ describe('voice.play records', () => {
     h.tick(900)
     fake.emit({ playing: false, currentTime: 0.9 })
 
-    const observed = records.filter((r) => r.code === 'puncheokie.voice.observed')
+    const observed = records.filter((r) => r.code === 'workout.voice.observed')
     expect(observed).toHaveLength(1)
     const o = observed[0]!
     expect(field(o, 'playId')).toBe(playId)
@@ -155,7 +155,7 @@ describe('voice.play records', () => {
     const h = rig()
     h.output.playInstruction({ text: 'aside', module: 611, durationMs: 900 })
     expect(h.fakes[h.fakes.length - 1]?.listeners).toHaveLength(0)
-    expect(records.filter((r) => r.code === 'puncheokie.voice.observed')).toHaveLength(0)
+    expect(records.filter((r) => r.code === 'workout.voice.observed')).toHaveLength(0)
     expect(field(plays()[0]!, 'playId')).toEqual(expect.any(String))
   })
 
@@ -164,9 +164,9 @@ describe('voice.play records', () => {
     h.output.playInstruction({ text: 'aside', module: 612, durationMs: 5_000 })
     h.fakes[h.fakes.length - 1]!.emit({ playing: true })
     h.output.release()
-    const observed = records.filter((r) => r.code === 'puncheokie.voice.observed')
+    const observed = records.filter((r) => r.code === 'workout.voice.observed')
     expect(observed.map((r) => field(r, 'outcome'))).toEqual(['released'])
-    const stats = records.find((r) => r.code === 'puncheokie.observer.stats')
+    const stats = records.find((r) => r.code === 'workout.observer.stats')
     expect(stats).toBeDefined()
     expect(field(stats!, 'watched')).toBe(1)
     expect(field(stats!, 'openAtRelease')).toBe(1)

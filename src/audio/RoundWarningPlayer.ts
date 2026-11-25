@@ -44,7 +44,7 @@ export class RoundWarningPlayer {
   private readonly pl: CeremonyPlaylist
 
   constructor(opts: { observer?: PlaybackObserver | null } = {}) {
-    this.pl = new CeremonyPlaylist(opts.observer ?? null, 'puncheokie.warn')
+    this.pl = new CeremonyPlaylist(opts.observer ?? null, 'workout.warn')
   }
   private preparedRound: number | null = null
   private started = false
@@ -127,7 +127,7 @@ export class RoundWarningPlayer {
     if (!this.started || this.paused || !this.pl.loaded) return
     this.paused = true
     this.pl.pause()
-    logger.info('puncheokie.warn', 'round warning paused in place', {
+    logger.info('workout.warn', 'round warning paused in place', {
       round: safe(this.preparedRound),
     })
   }
@@ -148,7 +148,7 @@ export class RoundWarningPlayer {
       } catch {
         // The bell still rings without the countdown.
       }
-      logger.info('puncheokie.warn', 'round warning resumed in place', {
+      logger.info('workout.warn', 'round warning resumed in place', {
         round: safe(this.preparedRound),
         remainingMs: safe(remainingMs),
       })
@@ -165,14 +165,14 @@ export class RoundWarningPlayer {
         label: `warn-round-${this.preparedRound ?? 0}`,
         playIdPrefix: 'warn',
       })
-      logger.info('puncheokie.warn', 'round warning playing', {
+      logger.info('workout.warn', 'round warning playing', {
         round: safe(this.preparedRound),
         remainingMs: safe(remainingMs),
         totalMs: safe(this.pl.plannedMs),
         playId: safe(playId),
       })
     } catch (error) {
-      logger.warn('puncheokie.warn', 'round warning play failed', {
+      logger.warn('workout.warn', 'round warning play failed', {
         error: safe(String(error)),
       })
     }
@@ -181,7 +181,7 @@ export class RoundWarningPlayer {
   /** The bell (or an exit) ends it. Safe to call repeatedly. */
   stop(): void {
     if (this.pl.loaded) {
-      logger.info('puncheokie.warn', 'round warning stopped', {
+      logger.info('workout.warn', 'round warning stopped', {
         round: safe(this.preparedRound),
         wasPlaying: safe(this.started),
       })

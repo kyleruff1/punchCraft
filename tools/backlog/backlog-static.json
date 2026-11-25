@@ -1,6 +1,6 @@
 {
   "project": {
-    "title": "punchCraft Puncheokie",
+    "title": "punchCraft punchCraft workouts",
     "description": "Android-first Expo app reviving FightCamp v1 BLE punch trackers.",
     "iteration": {
       "startDate": "2026-08-24",
@@ -102,7 +102,7 @@
             "color": "ORANGE"
           },
           {
-            "name": "Puncheokie",
+            "name": "punchCraft workouts",
             "color": "PINK"
           },
           {
@@ -184,7 +184,7 @@
     "velocity-lab": "Velocity Lab",
     "calibration": "Calibration",
     "punchcraft": "punchCraft",
-    "puncheokie": "Puncheokie",
+    "workouts": "punchCraft workouts",
     "spotify": "Spotify",
     "storage": "Storage",
     "qa-docs": "QA/Docs"
@@ -238,7 +238,7 @@
     {
       "name": "phase:5",
       "color": "fecaca",
-      "description": "Phase 5 — Puncheokie program engine without Spotify"
+      "description": "Phase 5 — punchCraft workouts program engine without Spotify"
     },
     {
       "name": "phase:6",
@@ -281,9 +281,9 @@
       "description": "punchCraft session and metrics"
     },
     {
-      "name": "area:puncheokie",
+      "name": "area:workouts",
       "color": "ec4899",
-      "description": "Puncheokie program engine and cue runner"
+      "description": "punchCraft workouts program engine and cue runner"
     },
     {
       "name": "area:spotify",
@@ -499,19 +499,19 @@
       "key": "M24",
       "title": "M24: Program model & editor",
       "phase": 5,
-      "description": "SUPERSEDED 2026-08-23 by M31 (Puncheokie v0.2, docs/puncheokie-ux-workout-engine.md). Milestone closed; its issues were closed as superseded."
+      "description": "SUPERSEDED 2026-08-23 by M31 (punchCraft workouts v0.2, docs/workouts-ux-engine.md). Milestone closed; its issues were closed as superseded."
     },
     {
       "key": "M25",
       "title": "M25: Stance mapping & cue runner",
       "phase": 5,
-      "description": "SUPERSEDED 2026-08-23 by M32 (Puncheokie v0.2). Retains only the StanceMapper issues M25-01 and M25-02."
+      "description": "SUPERSEDED 2026-08-23 by M32 (punchCraft workouts v0.2). Retains only the StanceMapper issues M25-01 and M25-02."
     },
     {
       "key": "M26",
       "title": "M26: Cue matching & capability-aware scoring",
       "phase": 5,
-      "description": "SUPERSEDED 2026-08-23 by M33 (Puncheokie v0.2). Retains only the CueMatcher/scoring/fixture issues M26-01, M26-02 and M26-04."
+      "description": "SUPERSEDED 2026-08-23 by M33 (punchCraft workouts v0.2). Retains only the CueMatcher/scoring/fixture issues M26-01, M26-02 and M26-04."
     },
     {
       "key": "M27",
@@ -583,7 +583,7 @@
       "key": "M38",
       "title": "M38: Workout backdrop & ambience library",
       "phase": 5,
-      "description": "Selectable animated backdrops for every workout presentation: BackdropTheme contracts and mood taxonomy, the contrast scrim that guarantees foreground legibility, a bundled licence-recorded starter library, the renderer with still/subtle/active motion and auto-degrade, and seed-stable recipe-level selection. The backdrop carries no information and is fully independent of audio (D12). Spec §31; Puncheokie doc §19, §25."
+      "description": "Selectable animated backdrops for every workout presentation: BackdropTheme contracts and mood taxonomy, the contrast scrim that guarantees foreground legibility, a bundled licence-recorded starter library, the renderer with still/subtle/active motion and auto-degrade, and seed-stable recipe-level selection. The backdrop carries no information and is fully independent of audio (D12). Spec §31; punchCraft workouts doc §19, §25."
     },
     {
       "key": "M40",

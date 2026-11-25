@@ -238,7 +238,7 @@ export class InstrumentVoiceOutputOboe implements InstrumentVoice {
             return [key, await ctx.decodeAudioData(module)] as const
           } catch (error) {
             // One unreadable clip loses one note, never the instrument.
-            logger.warn('puncheokie.instrument.clipMissing', 'oboe decode failed', {
+            logger.warn('workout.instrument.clipMissing', 'oboe decode failed', {
               key: safe(key),
               error: safe(String(error)),
             })
@@ -264,7 +264,7 @@ export class InstrumentVoiceOutputOboe implements InstrumentVoice {
       warm.connect(ctx.destination)
       warm.start(0)
 
-      logger.info('puncheokie.instrument.oboeReady', 'oboe voice warmed', {
+      logger.info('workout.instrument.oboeReady', 'oboe voice warmed', {
         texture: safe(textureId),
         buffers: safe(this.buffers.size),
         sampleRate: safe(ctx.sampleRate),
@@ -391,7 +391,7 @@ export class InstrumentVoiceOutputOboe implements InstrumentVoice {
       const bank = INSTRUMENT_BANKS[this.texture]
       const clip = kind === 'bed' ? bank.beds[key] : bank.basses[key]
       if (clip === undefined) {
-        logger.warn('puncheokie.instrument.clipMissing', 'no bank entry for loop', {
+        logger.warn('workout.instrument.clipMissing', 'no bank entry for loop', {
           key: safe(key),
         })
         this.rollbackLane(kind, key)
@@ -403,7 +403,7 @@ export class InstrumentVoiceOutputOboe implements InstrumentVoice {
         // In a dev client this is an HTTP fetch from Metro, so a single
         // transient failure is expected. Roll the claim back or this chord
         // is gated out of `handleGesture` forever.
-        logger.warn('puncheokie.instrument.clipMissing', 'loop decode failed', {
+        logger.warn('workout.instrument.clipMissing', 'loop decode failed', {
           key: safe(key),
           error: safe(String(error)),
         })
@@ -437,7 +437,7 @@ export class InstrumentVoiceOutputOboe implements InstrumentVoice {
       if (kind === 'bed') this.bedLane = { source, key }
       else this.bassLane = { source, key }
     } catch (error) {
-      logger.warn('puncheokie.instrument.oboeFire', 'loop start failed', {
+      logger.warn('workout.instrument.oboeFire', 'loop start failed', {
         key: safe(key),
         error: safe(String(error)),
       })
@@ -503,7 +503,7 @@ export class InstrumentVoiceOutputOboe implements InstrumentVoice {
           level.connect(this.tap.analyser)
         } catch (error) {
           this.dropTap()
-          logger.warn('puncheokie.instrument.tapFailed', 'tap edge refused — tap disarmed', {
+          logger.warn('workout.instrument.tapFailed', 'tap edge refused — tap disarmed', {
             key: safe(poolKey),
             error: safe(String(error)),
           })
@@ -520,7 +520,7 @@ export class InstrumentVoiceOutputOboe implements InstrumentVoice {
       this.liveOneShots.push({ source, endsAt: now + buffer.duration })
       return true
     } catch (error) {
-      logger.warn('puncheokie.instrument.oboeFire', 'trigger failed', {
+      logger.warn('workout.instrument.oboeFire', 'trigger failed', {
         key: safe(poolKey),
         error: safe(String(error)),
       })
@@ -545,14 +545,14 @@ export class InstrumentVoiceOutputOboe implements InstrumentVoice {
       analyser.connect(mute)
       mute.connect(ctx.destination)
       this.tap = { analyser, frame: new Uint8Array(TAP_FFT_SIZE) }
-      logger.info('puncheokie.instrument.tapArmed', 'silent timing tap armed', {
+      logger.info('workout.instrument.tapArmed', 'silent timing tap armed', {
         fftSize: safe(TAP_FFT_SIZE),
         pollMs: safe(TAP_POLL_MS),
       })
     } catch (error) {
       // The instrument sounds without its tap; the run is simply unmeasured.
       this.tap = null
-      logger.warn('puncheokie.instrument.tapFailed', 'silent timing tap could not be built', {
+      logger.warn('workout.instrument.tapFailed', 'silent timing tap could not be built', {
         error: safe(String(error)),
       })
     }
@@ -629,7 +629,7 @@ export class InstrumentVoiceOutputOboe implements InstrumentVoice {
       ctxTimeAtFirstSample?: number | null
     },
   ): void {
-    logger.info('puncheokie.instrument.observed', 'instrument onset observed', {
+    logger.info('workout.instrument.observed', 'instrument onset observed', {
       eventId: safe(dispatch.eventId),
       hand: safe(dispatch.hand),
       keys: safe(dispatch.keys),
@@ -652,7 +652,7 @@ export class InstrumentVoiceOutputOboe implements InstrumentVoice {
     const ctx = this.ctx
     this.ctx = null
     void ctx?.close().catch(() => undefined)
-    logger.warn('puncheokie.instrument.unavailable', reason, {
+    logger.warn('workout.instrument.unavailable', reason, {
       ...(error === undefined ? {} : { error: safe(String(error)) }),
     })
   }

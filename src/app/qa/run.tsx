@@ -72,7 +72,7 @@ export default function QaRunLauncher(): React.JSX.Element {
 
     const parsed = parseQaRunParams(params as Record<string, string | string[] | undefined>)
     if (!parsed.ok) {
-      logger.warn('puncheokie.qa.run.invalid', 'QA run link rejected', {
+      logger.warn('workout.qa.run.invalid', 'QA run link rejected', {
         errors: safe(parsed.errors.join(' | ')),
       })
       setOutcome({ kind: 'invalid', errors: parsed.errors })
@@ -81,7 +81,7 @@ export default function QaRunLauncher(): React.JSX.Element {
     const request = parsed.request
 
     if (request.nonce !== undefined && request.nonce === lastNonce) {
-      logger.info('puncheokie.qa.run.duplicate', 'QA run re-sent; re-navigating only', {
+      logger.info('workout.qa.run.duplicate', 'QA run re-sent; re-navigating only', {
         nonce: safe(request.nonce),
       })
       router.replace('/(tabs)/punchcraft/live')
@@ -112,7 +112,7 @@ export default function QaRunLauncher(): React.JSX.Element {
     const autostart = request.autostart && qaEnabled
     const sim = qaEnabled ? request.sim : 'none'
     if (autostart !== request.autostart || sim !== request.sim) {
-      logger.warn('puncheokie.qa.run.blocked', 'QA mode is off; autostart/sim ignored', {
+      logger.warn('workout.qa.run.blocked', 'QA mode is off; autostart/sim ignored', {
         requestedAutostart: safe(request.autostart),
         requestedSim: safe(request.sim),
       })
@@ -133,7 +133,7 @@ export default function QaRunLauncher(): React.JSX.Element {
 
     const build = getBuildInfo()
     const { seed } = useWorkoutStore.getState().recipe
-    logger.info('puncheokie.qa.run', 'QA run staged from deep link', {
+    logger.info('workout.qa.run', 'QA run staged from deep link', {
       workout: safe(request.workout),
       sampleName: safe(sampleName ?? 'generated'),
       vocab: safe(request.vocab),

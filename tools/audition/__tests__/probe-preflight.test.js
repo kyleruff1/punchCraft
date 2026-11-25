@@ -17,7 +17,7 @@ function lcg(seed) {
 
 const repLine = (rep, playheadEpochMs, asset) =>
   [
-    `08-31 12:00:00.000 I/ReactNativeJS( 100): '[INFO] puncheokie.ruler.rep', 'rep timing', { asset: '${asset}',`,
+    `08-31 12:00:00.000 I/ReactNativeJS( 100): '[INFO] workout.ruler.rep', 'rep timing', { asset: '${asset}',`,
     `08-31 12:00:00.000 I/ReactNativeJS( 100):   rep: ${rep},`,
     `08-31 12:00:00.000 I/ReactNativeJS( 100):   statusEpochMs: ${playheadEpochMs - 95},`,
     `08-31 12:00:00.000 I/ReactNativeJS( 100):   playheadEpochMs: ${playheadEpochMs},`,

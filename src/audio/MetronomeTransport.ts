@@ -157,7 +157,7 @@ export class MetronomeTransport implements MetronomeTransportPort {
     this.anchorMonotonicMs = this.clock.now()
     this.anchorAbsoluteTick = 0
     this.state = 'running'
-    logger.info('puncheokie.transport', 'transport started', {
+    logger.info('workout.transport', 'transport started', {
       generation: safe(this.generation),
       baseBpm: safe(baseBpm),
       ticksPerSecond: safe(this.ticksPerSecond),
@@ -176,7 +176,7 @@ export class MetronomeTransport implements MetronomeTransportPort {
     this.anchorAbsoluteTick = 0
     this.baseBpm = 0
     this.ticksPerSecond = 0
-    logger.info('puncheokie.transport', 'transport stopped', {
+    logger.info('workout.transport', 'transport stopped', {
       generation: safe(this.generation),
     })
     this.notify()
@@ -281,7 +281,7 @@ export class MetronomeTransport implements MetronomeTransportPort {
         if (this.heldWorstTicks > errorTicks) this.heldWorstTicks = errorTicks
         const now2 = this.clock.now()
         if (now2 - this.lastHeldLogMs >= 1_000) {
-          logger.info('puncheokie.transport', 'transport held on backwards observations', {
+          logger.info('workout.transport', 'transport held on backwards observations', {
             generation: safe(this.generation),
             held: safe(this.heldCount),
             worstErrorTicks: safe(this.heldWorstTicks),
@@ -295,7 +295,7 @@ export class MetronomeTransport implements MetronomeTransportPort {
       this.generation += 1
       this.anchorMonotonicMs = now
       this.anchorAbsoluteTick = observedTickNow
-      logger.info('puncheokie.transport', 'transport re-anchored on audio observation', {
+      logger.info('workout.transport', 'transport re-anchored on audio observation', {
         generation: safe(this.generation),
         errorTicks: safe(errorTicks),
       })
@@ -347,7 +347,7 @@ export class MetronomeTransport implements MetronomeTransportPort {
     this.generation += 1
     this.anchorMonotonicMs = now
     this.anchorAbsoluteTick = currentTick
-    logger.info('puncheokie.transport', 'transport disrupted — generation bumped', {
+    logger.info('workout.transport', 'transport disrupted — generation bumped', {
       generation: safe(this.generation),
       reason: safe(reason),
       absoluteTick: safe(currentTick),
@@ -387,7 +387,7 @@ export class MetronomeTransport implements MetronomeTransportPort {
       } catch (error) {
         // Swallow: a rogue subscriber must not corrupt the
         // transport's own state or block other subscribers.
-        logger.warn('puncheokie.transport', 'subscriber threw', {
+        logger.warn('workout.transport', 'subscriber threw', {
           error: safe(String(error)),
         })
       }

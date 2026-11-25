@@ -91,7 +91,7 @@ describe('qa/run', () => {
     expect(useWorkoutStore.getState().selectedSampleKey).toBe('body-work')
     // The vocabulary reaches the RECIPE — the only thing the round-1 opener reads.
     expect(useWorkoutStore.getState().recipe.voiceVocabulary).toBe('names')
-    expect(logged('puncheokie.qa.run')).toHaveLength(1)
+    expect(logged('workout.qa.run')).toHaveLength(1)
 
     // The bug: a re-render with a fresh params object must not cancel the
     // pending navigation.
@@ -106,7 +106,7 @@ describe('qa/run', () => {
     mockParams = { workout: 'heavy-hands', sim: 'captured-jam', autostart: '1' }
     render()
     expect(useQaStore.getState().run).toMatchObject({ autostart: false, sim: 'none' })
-    expect(logged('puncheokie.qa.run.blocked')).toHaveLength(1)
+    expect(logged('workout.qa.run.blocked')).toHaveLength(1)
     advance(250)
     // A public link still selects the workout and lands on live; it just cannot start it.
     expect(useWorkoutStore.getState().selectedSampleKey).toBe('heavy-hands')
@@ -118,7 +118,7 @@ describe('qa/run', () => {
     mockParams = { workout: 'heavy-hands', autostart: '1' }
     render()
     expect(useQaStore.getState().run?.autostart).toBe(true)
-    expect(logged('puncheokie.qa.run.blocked')).toHaveLength(0)
+    expect(logged('workout.qa.run.blocked')).toHaveLength(0)
   })
 
   it('"generated" mints a fresh build and honours an explicit seed', () => {
@@ -131,7 +131,7 @@ describe('qa/run', () => {
   it('rejects an invalid link: logs, shows the errors, never navigates or stages', () => {
     mockParams = { workout: 'no-such-workout', autostart: 'maybe' }
     const tree = render()
-    expect(logged('puncheokie.qa.run.invalid')).toHaveLength(1)
+    expect(logged('workout.qa.run.invalid')).toHaveLength(1)
     expect(useQaStore.getState().run).toBeNull()
     advance(10_000)
     expect(mockReplace).not.toHaveBeenCalled()
@@ -147,7 +147,7 @@ describe('qa/run', () => {
     useQaStore.getState().consumeAutostart()
 
     render() // the driver re-sent the identical intent
-    expect(logged('puncheokie.qa.run.duplicate')).toHaveLength(1)
+    expect(logged('workout.qa.run.duplicate')).toHaveLength(1)
     // Not re-staged: the consumed latch survives, so the live screen cannot start twice.
     expect(useQaStore.getState().run?.autostartConsumed).toBe(true)
     expect(mockReplace).toHaveBeenCalledTimes(2)

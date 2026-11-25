@@ -256,7 +256,7 @@ describe('token-due', () => {
   it('does NOT fire a rest — a padded bar injects no phantom ring events', () => {
     // A rest holds a slot and a beat but is never thrown. It reaches
     // `fireDueTokens` like any other token, so without an explicit skip it
-    // would publish `token-due` — polluting `puncheokie.cue.tokenDue` (the
+    // would publish `token-due` — polluting `workout.cue.tokenDue` (the
     // cadence-lab drift signal) and the viz forensics recorder with ring
     // fires for punches that do not exist (GH #305).
     const padded: WorkoutToken[] = [

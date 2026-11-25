@@ -71,7 +71,7 @@ export function useRingBeatClock(
   const active = useSharedValue(false)
 
   const onPromote = (epochV: string, lateMs: number): void => {
-    logger.info('puncheokie.ring.promote', 'bar promoted', {
+    logger.info('workout.ring.promote', 'bar promoted', {
       cueId: safe(epochV),
       lateMs: safe(Math.round(lateMs * 10) / 10),
     })

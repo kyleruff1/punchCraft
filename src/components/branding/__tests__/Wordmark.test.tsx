@@ -18,7 +18,7 @@ const SIZES: WordmarkSize[] = ['sm', 'tab', 'md', 'lg']
 const EXPECTED_LABEL: Record<WordmarkApp, string> = {
   punchCraft: 'punchCraft',
   velocityLab: 'Velocity Lab',
-  puncheokie: 'Puncheokie',
+  puncheokie: 'Puncheoke',
 }
 
 function render(element: React.JSX.Element): ReactTestRenderer {

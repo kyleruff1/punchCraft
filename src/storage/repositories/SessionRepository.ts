@@ -53,7 +53,7 @@ export interface SessionRow {
   endedMonotonicMs: number | null
   activeDurationMs: number
   timerConfigJson: string | null
-  /** Nullable until a Puncheokie workout is generated for this session. */
+  /** Nullable until a punchCraft workouts workout is generated for this session. */
   generatedWorkoutId: string | null
   spotifyPlaylistId: string | null
   leftCalibrationId: string | null

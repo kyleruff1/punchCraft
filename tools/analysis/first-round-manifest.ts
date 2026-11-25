@@ -64,7 +64,7 @@ type ExpectedCoachEvent =
       kind: 'combo-announce'
       /**
        * The compiled slot's id, carried so the correlator can JOIN a
-       * `puncheokie.slotDispatcher.deferred` log line to the expectation it
+       * `workout.slotDispatcher.deferred` log line to the expectation it
        * suppressed. Without it a dropped combo-announce is indistinguishable
        * from one the app never tried to play (GH #305).
        */

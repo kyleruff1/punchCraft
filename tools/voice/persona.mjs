@@ -27,7 +27,7 @@
  * parameter rather than a pitch-contour trick. The expression, finish and
  * texture choices carried over; the blend did not.
  *
- * The rounds are documented in docs/puncheokie-voice-spike.md, with the
+ * The rounds are documented in docs/workouts-voice-spike.md, with the
  * measurements that settled each one.
  */
 

@@ -12,7 +12,7 @@ import { analyze, fitWorkAxis, OBSERVER_ONSET_SKEW_MS, renderReport, roundWindow
 
 const PID = '( 8286)'
 // The REAL ConsoleSink shape (src/diagnostics/logger.ts), copied from a
-// device capture: `'[INFO] puncheokie.voice.play', 'clip playing', { … }`.
+// device capture: `'[INFO] workout.voice.play', 'clip playing', { … }`.
 // The brackets hold the LEVEL, not the event code.
 const rec = (time, tag, fields) => {
   const entries = Object.entries(fields)
@@ -25,8 +25,8 @@ const rec = (time, tag, fields) => {
   ].join('\n')
 }
 
-const play = (time, fields) => rec(time, 'puncheokie.voice.play', fields)
-const observed = (time, fields) => rec(time, 'puncheokie.voice.observed', fields)
+const play = (time, fields) => rec(time, 'workout.voice.play', fields)
+const observed = (time, fields) => rec(time, 'workout.voice.observed', fields)
 
 /**
  * `shortfallMs` delays each call's ONSET so the audible end lands that much
@@ -45,7 +45,7 @@ const observed = (time, fields) => rec(time, 'puncheokie.voice.observed', fields
  */
 function leadInAt({ id, dispatchAtMs, monotonicTimeMs, durationMs, endByMs, onsetMs }) {
   return [
-    rec('10:00:40.000', 'puncheokie.clickScript.dispatch', { kind: 'lead-in', slot: `lead-in/x/${id}`, traceId: `lead-in/x/${id}#${dispatchAtMs}`, dispatchAtMs, lateMs: 3, durationMs, endByMs, firstNodeMs: endByMs + 500, monotonicTimeMs }),
+    rec('10:00:40.000', 'workout.clickScript.dispatch', { kind: 'lead-in', slot: `lead-in/x/${id}`, traceId: `lead-in/x/${id}#${dispatchAtMs}`, dispatchAtMs, lateMs: 3, durationMs, endByMs, firstNodeMs: endByMs + 500, monotonicTimeMs }),
     play('10:00:40.000', { asset: `li-${id}`, kind: 'click-script', label: `lead-in/x/${id}`, playId: `p-li-${id}`, traceId: `lead-in/x/${id}#${dispatchAtMs}`, path: 'armed', vocabulary: 'numbers', dispatchMs: monotonicTimeMs, durationMs }),
     observed('10:00:48.000', { playId: `p-li-${id}`, kind: 'click-script', label: `lead-in/x/${id}`, path: 'armed', traceId: `lead-in/x/${id}#${dispatchAtMs}`, outcome: 'ok', dispatchMs: monotonicTimeMs, onsetMs, endMs: onsetMs + durationMs + 170, onsetLatencyMs: onsetMs - monotonicTimeMs, observedDurationMs: durationMs + 170, expectedDurationMs: durationMs, silentByVolume: false }),
   ]
@@ -56,7 +56,7 @@ function capture({ truncateCall = false, dropObservation = false, shortfallMs = 
   const secondSlot = shortfallMs === null
     ? []
     : [55000, 58000, 61000].flatMap((at, i) => [
-        rec('10:01:10.000', 'puncheokie.clickScript.dispatch', { kind: 'call', slot: 'call/3-4', traceId: `call/3-4#${at}`, dispatchAtMs: at, lateMs: 2, durationMs: 1000, endByMs: at + 1750, firstNodeMs: at + 1250, breathMs: 250, lagMs: 71, monotonicTimeMs: 10000 + at }),
+        rec('10:01:10.000', 'workout.clickScript.dispatch', { kind: 'call', slot: 'call/3-4', traceId: `call/3-4#${at}`, dispatchAtMs: at, lateMs: 2, durationMs: 1000, endByMs: at + 1750, firstNodeMs: at + 1250, breathMs: 250, lagMs: 71, monotonicTimeMs: 10000 + at }),
         play('10:01:10.000', { asset: 'call-3-4', kind: 'click-script', label: 'call/3-4', playId: `p-call2-${i}`, traceId: `call/3-4#${at}`, path: 'armed', vocabulary: 'numbers', dispatchMs: 10000 + at, durationMs: 1000 }),
         observed('10:01:11.000', { playId: `p-call2-${i}`, kind: 'click-script', label: 'call/3-4', path: 'armed', traceId: `call/3-4#${at}`, outcome: 'ok', dispatchMs: 10000 + at, onsetMs: 10000 + at + 15 + extra, endMs: 10000 + at + 1050 + extra, onsetLatencyMs: 15 + extra, observedDurationMs: 1035, expectedDurationMs: 1000, silentByVolume: false }),
       ])
@@ -76,17 +76,17 @@ function capture({ truncateCall = false, dropObservation = false, shortfallMs = 
 
 function captureLines({ truncateCall, dropObservation, extra, secondSlot }) {
   return [
-    rec('10:00:00.000', 'puncheokie.qa.run', { workout: 'quick-one-two', vocab: 'numbers', dev: false, gitSha: 'abc1234' }),
-    rec('10:00:05.000', 'puncheokie.round.boundary', { transition: 'countdown-entered', roundIndex: 0, workElapsedMs: 0, monotonicTimeMs: 1000 }),
+    rec('10:00:00.000', 'workout.qa.run', { workout: 'quick-one-two', vocab: 'numbers', dev: false, gitSha: 'abc1234' }),
+    rec('10:00:05.000', 'workout.round.boundary', { transition: 'countdown-entered', roundIndex: 0, workElapsedMs: 0, monotonicTimeMs: 1000 }),
     // Round 0 opens at monotonic 10 000 with workElapsed 0 → offset 10 000.
-    rec('10:00:10.000', 'puncheokie.round.boundary', { transition: 'work-entered', roundIndex: 0, workElapsedMs: 0, monotonicTimeMs: 10000 }),
+    rec('10:00:10.000', 'workout.round.boundary', { transition: 'work-entered', roundIndex: 0, workElapsedMs: 0, monotonicTimeMs: 10000 }),
     play('10:00:10.000', { asset: 'bell', kind: 'instruction', label: 'bell', playId: 'p-bell-1', dispatchMs: 9990, durationMs: 1000 }),
     observed('10:00:11.000', { playId: 'p-bell-1', kind: 'instruction', label: 'bell', outcome: 'ok', dispatchMs: 9990, onsetMs: 10020, endMs: 11000, onsetLatencyMs: 30, observedDurationMs: 980, expectedDurationMs: 1000, silentByVolume: false }),
-    rec('10:00:15.000', 'puncheokie.cue.tokenDue', { roundIndex: 0, cueId: 'q12-b1#0', combination: '1-2', tokenIndex: 0, ordinal: 0, workElapsedMs: 5000, monotonicTimeMs: 15000, scheduledMs: 4990 }),
-    rec('10:00:16.000', 'puncheokie.cue.tokenDue', { roundIndex: 0, cueId: 'q12-b1#0', combination: '1-2', tokenIndex: 1, ordinal: 1, workElapsedMs: 6000, monotonicTimeMs: 16000, scheduledMs: 5995 }),
-    rec('10:00:17.000', 'puncheokie.cue.tokenDue', { roundIndex: 0, cueId: 'q12-b1#1', combination: '1-2', tokenIndex: 0, ordinal: 2, workElapsedMs: 7000, monotonicTimeMs: 17000, scheduledMs: 7000 }),
+    rec('10:00:15.000', 'workout.cue.tokenDue', { roundIndex: 0, cueId: 'q12-b1#0', combination: '1-2', tokenIndex: 0, ordinal: 0, workElapsedMs: 5000, monotonicTimeMs: 15000, scheduledMs: 4990 }),
+    rec('10:00:16.000', 'workout.cue.tokenDue', { roundIndex: 0, cueId: 'q12-b1#0', combination: '1-2', tokenIndex: 1, ordinal: 1, workElapsedMs: 6000, monotonicTimeMs: 16000, scheduledMs: 5995 }),
+    rec('10:00:17.000', 'workout.cue.tokenDue', { roundIndex: 0, cueId: 'q12-b1#1', combination: '1-2', tokenIndex: 0, ordinal: 2, workElapsedMs: 7000, monotonicTimeMs: 17000, scheduledMs: 7000 }),
     // Lead-in budgeted to end at work 28 000 (monotonic 38 000); it ends at 38 200.
-    rec('10:00:40.000', 'puncheokie.clickScript.dispatch', { kind: 'lead-in', slot: 'lead-in/quick-one-two/r1s2', traceId: 'lead-in/quick-one-two/r1s2#20000', dispatchAtMs: 20000, lateMs: 3, durationMs: 8000, endByMs: 28000, firstNodeMs: 28500, monotonicTimeMs: 30000 }),
+    rec('10:00:40.000', 'workout.clickScript.dispatch', { kind: 'lead-in', slot: 'lead-in/quick-one-two/r1s2', traceId: 'lead-in/quick-one-two/r1s2#20000', dispatchAtMs: 20000, lateMs: 3, durationMs: 8000, endByMs: 28000, firstNodeMs: 28500, monotonicTimeMs: 30000 }),
     play('10:00:40.000', { asset: 'li-1', kind: 'click-script', label: 'lead-in/quick-one-two/r1s2', playId: 'p-li-1', traceId: 'lead-in/quick-one-two/r1s2#20000', path: 'armed', vocabulary: 'numbers', dispatchMs: 30000, durationMs: 8000 }),
     observed('10:00:48.000', { playId: 'p-li-1', kind: 'click-script', label: 'lead-in/quick-one-two/r1s2', path: 'armed', traceId: 'lead-in/quick-one-two/r1s2#20000', outcome: 'ok', dispatchMs: 30000, onsetMs: 30030, endMs: 38200, onsetLatencyMs: 30, observedDurationMs: 8170, expectedDurationMs: 8000, silentByVolume: false }),
     // Three bars of the same call, each planned to end at work +1000 with the
@@ -94,29 +94,29 @@ function captureLines({ truncateCall, dropObservation, extra, secondSlot }) {
     ...[40000, 43000, 46000].flatMap((at, i) => [
       // `breathMs` is the INTENDED breath the runner logs; `endByMs` is the
       // give-up time, and `dispatchAtMs` already carries the lag compensation.
-      rec('10:00:50.000', 'puncheokie.clickScript.dispatch', { kind: 'call', slot: 'call/1-2', traceId: `call/1-2#${at}`, dispatchAtMs: at, lateMs: 2, durationMs: 1000, endByMs: at + 1750, firstNodeMs: at + 1250, breathMs: 250, lagMs: 71, monotonicTimeMs: 10000 + at }),
+      rec('10:00:50.000', 'workout.clickScript.dispatch', { kind: 'call', slot: 'call/1-2', traceId: `call/1-2#${at}`, dispatchAtMs: at, lateMs: 2, durationMs: 1000, endByMs: at + 1750, firstNodeMs: at + 1250, breathMs: 250, lagMs: 71, monotonicTimeMs: 10000 + at }),
       play('10:00:50.000', { asset: 'call-1-2', kind: 'click-script', label: 'call/1-2', playId: `p-call-${i}`, traceId: `call/1-2#${at}`, path: i === 0 ? 'fresh' : 'armed', vocabulary: 'numbers', dispatchMs: 10000 + at, durationMs: 1000 }),
       dropObservation && i === 1
         ? ''
         : observed('10:00:51.000', { playId: `p-call-${i}`, kind: 'click-script', label: 'call/1-2', path: i === 0 ? 'fresh' : 'armed', traceId: `call/1-2#${at}`, outcome: 'ok', dispatchMs: 10000 + at, onsetMs: 10000 + at + 15 + extra, endMs: 10000 + at + (truncateCall && i === 2 ? 600 : 1050) + extra, onsetLatencyMs: 15 + extra, observedDurationMs: truncateCall && i === 2 ? 585 : 1035, expectedDurationMs: 1000, silentByVolume: false }),
     ]),
     // A combo announce whose block's first ring lands 200 ms after its end.
-    rec('10:01:00.000', 'puncheokie.comboAnnounce.dispatch', { slotId: 'sp1-b4#0:rep-0:combo-announce:before:e1,e2', assetId: 'ca-1-2', atTick: 1200, monotonicTimeMs: 60000, traceId: 'sp1-b4#0:rep-0:combo-announce:before:e1,e2', durationMs: 900 }),
+    rec('10:01:00.000', 'workout.comboAnnounce.dispatch', { slotId: 'sp1-b4#0:rep-0:combo-announce:before:e1,e2', assetId: 'ca-1-2', atTick: 1200, monotonicTimeMs: 60000, traceId: 'sp1-b4#0:rep-0:combo-announce:before:e1,e2', durationMs: 900 }),
     play('10:01:00.000', { asset: 'ca-1-2', kind: 'combo-announce', label: '1-2', playId: 'p-ann-1', traceId: 'sp1-b4#0:rep-0:combo-announce:before:e1,e2', dispatchMs: 60000, durationMs: 900 }),
     observed('10:01:01.000', { playId: 'p-ann-1', kind: 'combo-announce', label: '1-2', traceId: 'sp1-b4#0:rep-0:combo-announce:before:e1,e2', outcome: 'ok', dispatchMs: 60000, onsetMs: 60040, endMs: 61000, onsetLatencyMs: 40, observedDurationMs: 960, expectedDurationMs: 900, silentByVolume: false }),
-    rec('10:01:01.200', 'puncheokie.cue.tokenDue', { roundIndex: 0, cueId: 'sp1-b4#0', combination: '1-2', tokenIndex: 0, ordinal: 3, workElapsedMs: 51200, monotonicTimeMs: 61200, scheduledMs: 51200 }),
+    rec('10:01:01.200', 'workout.cue.tokenDue', { roundIndex: 0, cueId: 'sp1-b4#0', combination: '1-2', tokenIndex: 0, ordinal: 3, workElapsedMs: 51200, monotonicTimeMs: 61200, scheduledMs: 51200 }),
     // Rest: recovery, then the warning ending 150 ms before the round-2 bell.
-    rec('10:04:10.000', 'puncheokie.round.boundary', { transition: 'rest-entered', roundIndex: 0, workElapsedMs: 240000, monotonicTimeMs: 250000 }),
+    rec('10:04:10.000', 'workout.round.boundary', { transition: 'rest-entered', roundIndex: 0, workElapsedMs: 240000, monotonicTimeMs: 250000 }),
     observed('10:04:30.000', { playId: 'recovery-1', kind: 'recovery', label: 'R-1', outcome: 'ok', dispatchMs: 250990, onsetMs: 251000, endMs: 270000, onsetLatencyMs: 10, observedDurationMs: 19000, expectedDurationMs: 19000, silentByVolume: false }),
     observed('10:05:10.000', { playId: 'warn-1', kind: 'round-warning', label: 'warn-round-2', outcome: 'ok', dispatchMs: 299980, onsetMs: 300000, endMs: 309900, onsetLatencyMs: 20, observedDurationMs: 9900, expectedDurationMs: 9900, silentByVolume: false }),
-    rec('10:05:10.000', 'puncheokie.round.boundary', { transition: 'work-entered', roundIndex: 1, workElapsedMs: 0, monotonicTimeMs: 310000 }),
+    rec('10:05:10.000', 'workout.round.boundary', { transition: 'work-entered', roundIndex: 1, workElapsedMs: 0, monotonicTimeMs: 310000 }),
     play('10:05:10.000', { asset: 'bell', kind: 'instruction', label: 'bell', playId: 'p-bell-2', dispatchMs: 309990, durationMs: 1000 }),
     observed('10:05:11.000', { playId: 'p-bell-2', kind: 'instruction', label: 'bell', outcome: 'ok', dispatchMs: 309990, onsetMs: 310050, endMs: 311050, onsetLatencyMs: 60, observedDurationMs: 1000, expectedDurationMs: 1000, silentByVolume: false }),
-    rec('10:05:12.000', 'puncheokie.cue.tokenDue', { roundIndex: 1, cueId: 'q12-b1#0', combination: '1-2', tokenIndex: 0, ordinal: 0, workElapsedMs: 2000, monotonicTimeMs: 312000, scheduledMs: 2000 }),
-    rec('10:05:13.000', 'puncheokie.instrument.observed', { eventId: 'e1', hand: 'left', keys: 'stab-60', outcome: 'ok', latencyMs: 1.1, pipelineMs: 4, peak: 40 }),
-    rec('10:05:13.100', 'puncheokie.instrument.observed', { eventId: 'e2', hand: 'right', keys: 'stab-62', outcome: 'masked', latencyMs: null, pipelineMs: 4, peak: 38 }),
-    rec('10:09:20.000', 'puncheokie.round.boundary', { transition: 'completed', roundIndex: 1, workElapsedMs: 240000, monotonicTimeMs: 550000 }),
-    rec('10:09:21.000', 'puncheokie.observer.stats', { watched: 9, openAtRelease: 0, maxHandlerMs: 0.4 }),
+    rec('10:05:12.000', 'workout.cue.tokenDue', { roundIndex: 1, cueId: 'q12-b1#0', combination: '1-2', tokenIndex: 0, ordinal: 0, workElapsedMs: 2000, monotonicTimeMs: 312000, scheduledMs: 2000 }),
+    rec('10:05:13.000', 'workout.instrument.observed', { eventId: 'e1', hand: 'left', keys: 'stab-60', outcome: 'ok', latencyMs: 1.1, pipelineMs: 4, peak: 40 }),
+    rec('10:05:13.100', 'workout.instrument.observed', { eventId: 'e2', hand: 'right', keys: 'stab-62', outcome: 'masked', latencyMs: null, pipelineMs: 4, peak: 38 }),
+    rec('10:09:20.000', 'workout.round.boundary', { transition: 'completed', roundIndex: 1, workElapsedMs: 240000, monotonicTimeMs: 550000 }),
+    rec('10:09:21.000', 'workout.observer.stats', { watched: 9, openAtRelease: 0, maxHandlerMs: 0.4 }),
     ...secondSlot,
   ]
     .filter(Boolean)
@@ -489,7 +489,7 @@ describe('verdicts', () => {
     expect(report.coverage.unobserved).toEqual([{ playId: 'p-call-1', kind: 'click-script', label: 'call/1-2' }])
   })
   it('a capture without observer records is soft, never a crash', () => {
-    const report = analyze(rec('10:00:00.000', 'puncheokie.voice.play', { asset: 'a', kind: 'clip' }), CONSTANTS)
+    const report = analyze(rec('10:00:00.000', 'workout.voice.play', { asset: 'a', kind: 'clip' }), CONSTANTS)
     expect(report.present).toBe(false)
     expect(report.verdict.exit).toBe(2)
     expect(report.verdict.soft[0]).toMatch(/no observer records/)

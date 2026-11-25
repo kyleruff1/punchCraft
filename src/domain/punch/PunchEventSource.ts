@@ -1,7 +1,7 @@
 /**
  * Punch-event source port (doc §27 step 2, spec §28).
  *
- * The seam that lets the whole Puncheokie live stack be built and tested
+ * The seam that lets the whole punchCraft workouts live stack be built and tested
  * before the tracker stream exists. `SimulatedPunchSource` (M32-01) and
  * `TrackerPunchEventSource` (M33-01) implement this same contract, so
  * swapping sources changes no consumer code.

@@ -190,13 +190,13 @@ describe('QA forceSim / simLoop (GH #291)', () => {
     expect(captured?.kind).toBe('simulated')
     expect(captured?.sim).not.toBeNull()
     // The top bar will read SIM under connected gloves; the log must explain why.
-    expect(records.filter((r) => r.code === 'puncheokie.source.forcedSim')).toHaveLength(1)
+    expect(records.filter((r) => r.code === 'workout.source.forcedSim')).toHaveLength(1)
   })
 
   it('is silent about it when no gloves were live anyway', () => {
     render({ forceSim: true })
     expect(captured?.kind).toBe('simulated')
-    expect(records.filter((r) => r.code === 'puncheokie.source.forcedSim')).toHaveLength(0)
+    expect(records.filter((r) => r.code === 'workout.source.forcedSim')).toHaveLength(0)
   })
 
   it('never upgrades away from the simulator while forced, even in the idle window', () => {

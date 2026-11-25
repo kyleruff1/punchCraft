@@ -313,7 +313,7 @@ describe('punchCraft landing — the workout home', () => {
   })
 })
 
-describe('Puncheokie landing — the instrument', () => {
+describe('punchCraft workouts landing — the instrument', () => {
   it('opens the jam and offers no workout routes', () => {
     const tree = render(<PuncheokieLanding />)
     expect(() => tree.root.findByProps({ testID: 'open-jam' })).not.toThrow()

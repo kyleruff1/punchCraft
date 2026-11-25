@@ -13,7 +13,7 @@
  *   am start -a android.intent.action.VIEW -d '<url>' com.kyleruff.punchcraft
  * (`-n <component>` reaches the activity but never the router). On the dev
  * client (`--launch=warm`, the default): a LAUNCHER cold start, wait for
- * `puncheokie.app.ready` (the root layout logs it when the Stack mounts;
+ * `workout.app.ready` (the root layout logs it when the Stack mounts;
  * `Running "main"` comes ~20 s earlier and an intent inside that window is
  * dropped), then the intent. On a release build (`--expect-release` implies
  * `--launch=cold`): cold-launch WITH the intent — no expo-dev-launcher, and
@@ -515,10 +515,10 @@ function sessionCounters(logcatText) {
     restScriptsLoaded: re(/recovery loaded/g),
     warnCeremonies: re(/round warning prepared/g),
     voiceClipMissing: count('voice.clipMissing'),
-    instrumentClipMissing: re(/puncheokie\.instrument\.clipMissing/g),
+    instrumentClipMissing: re(/workouts\.instrument\.clipMissing/g),
     playFailed: re(/voice\.playFailed/g),
     redbox: re(/AndroidRuntime/g),
-    qaBlocked: re(/puncheokie\.qa\.run\.blocked/g),
+    qaBlocked: re(/workouts\.qa\.run\.blocked/g),
   }
 }
 
@@ -608,9 +608,9 @@ async function driveOne(ctx, job, attempt = 1) {
 
     let tapped = false
     if (args.launch === 'warm') {
-      slog('   LAUNCHER cold start → waiting for puncheokie.app.ready')
+      slog('   LAUNCHER cold start → waiting for workout.app.ready')
       adbShell(`monkey -p ${PACKAGE} -c android.intent.category.LAUNCHER 1`, deviceId)
-      const ready = await waitForLogLine(dir, 'puncheokie.app.ready', APP_READY_TIMEOUT_MS)
+      const ready = await waitForLogLine(dir, 'workout.app.ready', APP_READY_TIMEOUT_MS)
       if (!ready) {
         fail('launch-failed: app.ready never logged (dev launcher picker up? Metro down?)')
         return finish()
@@ -626,15 +626,15 @@ async function driveOne(ctx, job, attempt = 1) {
     // `waitForLogLine` matches a single line by design. So wait for the code,
     // then confirm the nonce against the STITCHED record.
     const stagedRun = () =>
-      recordsWithTag(existsSync(join(dir, 'logcat.txt')) ? readFileSync(join(dir, 'logcat.txt'), 'utf8') : '', 'puncheokie.qa.run').find(
+      recordsWithTag(existsSync(join(dir, 'logcat.txt')) ? readFileSync(join(dir, 'logcat.txt'), 'utf8') : '', 'workout.qa.run').find(
         (r) => r.body.includes(nonce),
       )
-    let qaRun = await waitForLogLine(dir, 'puncheokie.qa.run', QA_RUN_TIMEOUT_MS)
+    let qaRun = await waitForLogLine(dir, 'workout.qa.run', QA_RUN_TIMEOUT_MS)
     let record = qaRun ? stagedRun() : undefined
     if (!record) {
       slog('   qa.run for this nonce not seen — re-sending the intent once')
       sendIntent(url, deviceId)
-      qaRun = await waitForLogLine(dir, 'puncheokie.qa.run.duplicate', QA_RUN_TIMEOUT_MS, (l) => l.includes(nonce)) ?? qaRun
+      qaRun = await waitForLogLine(dir, 'workout.qa.run.duplicate', QA_RUN_TIMEOUT_MS, (l) => l.includes(nonce)) ?? qaRun
       record = stagedRun()
     }
     if (!record) {
@@ -671,7 +671,7 @@ async function driveOne(ctx, job, attempt = 1) {
       }
     }
 
-    const armed = await waitForLogLine(dir, 'puncheokie.runner.start', RUNNER_START_TIMEOUT_MS)
+    const armed = await waitForLogLine(dir, 'workout.runner.start', RUNNER_START_TIMEOUT_MS)
     if (!armed) {
       fail('runner.start never logged')
       return finish()
@@ -685,7 +685,7 @@ async function driveOne(ctx, job, attempt = 1) {
     row.audioTracks.arm = audioTrackReading(deviceId, `${job.workoutId}-arm`)
 
     if (!tapped) {
-      const auto = await waitForLogLine(dir, 'puncheokie.qa.autostart', AUTOSTART_TIMEOUT_MS)
+      const auto = await waitForLogLine(dir, 'workout.qa.autostart', AUTOSTART_TIMEOUT_MS)
       if (!auto) {
         fail('no autostart: qa.autostart never logged')
         return finish()
@@ -693,7 +693,7 @@ async function driveOne(ctx, job, attempt = 1) {
     }
     const countdown = await waitForLogLine(
       dir,
-      'puncheokie.round.boundary',
+      'workout.round.boundary',
       COUNTDOWN_TIMEOUT_MS,
       (l) => l.includes("transition: 'countdown-entered'"),
     )
@@ -706,7 +706,7 @@ async function driveOne(ctx, job, attempt = 1) {
     const endNeedle = args.firstRoundOnly ? "transition: 'rest-entered'" : "transition: 'completed'"
     const ended = await waitForLogLine(
       dir,
-      'puncheokie.round.boundary',
+      'workout.round.boundary',
       budget,
       (l) => l.includes(endNeedle) || l.includes("transition: 'cancelled'"),
     )

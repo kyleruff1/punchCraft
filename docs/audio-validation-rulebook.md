@@ -3,7 +3,7 @@
 The checklist any validator — human or agent — walks before signing off on a render batch. Five rules, one pass workflow, one failure playbook. If a rule is not on this page, the batch does not need to satisfy it.
 
 Companion: `docs/audio-corpus.md` — the catalog of what exists and what each category should sound like.
-Roadmap: [M39 #278](https://github.com/kyleruff1/punchCraft-Puncheokie/issues/278).
+Roadmap: [M39 #278](https://github.com/kyleruff1/punchCraft-punchCraft workouts/issues/278).
 
 ## The five rules
 

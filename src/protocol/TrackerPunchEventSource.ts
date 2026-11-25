@@ -183,7 +183,7 @@ export class TrackerPunchEventSource implements PunchEventSource {
       this.armIfConnected(runtime)
     }
 
-    logger.info('puncheokie.tracker-source.start', 'tracker punch source armed', {
+    logger.info('workout.tracker-source.start', 'tracker punch source armed', {
       adapterId: safe(this.adapter.id),
       adapterVersion: safe(this.adapter.version),
       slots: safe(this.runtimes.length),
@@ -269,7 +269,7 @@ export class TrackerPunchEventSource implements PunchEventSource {
       })
       .catch((err: unknown) => {
         if (generation === runtime.generation) runtime.armed = false
-        logger.error('puncheokie.tracker-source.start.error', 'startPunchStream threw', {
+        logger.error('workout.tracker-source.start.error', 'startPunchStream threw', {
           hand: safe(runtime.hand),
           deviceId: deviceSensitive(runtime.deviceId),
           errorMessage: safe(err instanceof Error ? err.message : String(err)),
@@ -308,7 +308,7 @@ export class TrackerPunchEventSource implements PunchEventSource {
         },
       )
     } catch (err) {
-      logger.warn('puncheokie.tracker-source.watch.error', 'onConnectionChange threw', {
+      logger.warn('workout.tracker-source.watch.error', 'onConnectionChange threw', {
         hand: safe(runtime.hand),
         deviceId: deviceSensitive(runtime.deviceId),
         errorMessage: safe(err instanceof Error ? err.message : String(err)),

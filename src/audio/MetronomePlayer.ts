@@ -95,7 +95,7 @@ export class MetronomePlayer {
   /**
    * The silent timing observer (GH #291, C2), or null — distinct from the
    * transport position `observer` above. What it measures on a loop is the
-   * swap gap: `puncheokie.metronome.swap` dispatch → the new loop's first
+   * swap gap: `workout.metronome.swap` dispatch → the new loop's first
    * `playing:true`. A loop never ends on its own, so its observation closes
    * as `timeout` one period plus grace after onset (or `released` at stop);
    * either way the onset latency is on the record.
@@ -133,7 +133,7 @@ export class MetronomePlayer {
         this.playlist?.seekTo(0)
         this.playlist?.play()
       } catch (error) {
-        logger.warn('puncheokie.metronome', 'restart failed', {
+        logger.warn('workout.metronome', 'restart failed', {
           error: safe(String(error)),
         })
       }
@@ -158,7 +158,7 @@ export class MetronomePlayer {
       this.loaded = loop
       this.attachStatusListener(this.playlist)
       const playId = this.timing?.mintPlayId('metronome') ?? null
-      logger.info('puncheokie.metronome', 'loop started', {
+      logger.info('workout.metronome', 'loop started', {
         division: safe(loop.division),
         swing: safe(loop.swing),
         durationMs: safe(loop.durationMs),
@@ -188,7 +188,7 @@ export class MetronomePlayer {
       this.available = false
       this.playlist = null
       this.loaded = null
-      logger.warn('puncheokie.metronome', 'playlist creation failed — click disabled for this session', {
+      logger.warn('workout.metronome', 'playlist creation failed — click disabled for this session', {
         error: safe(String(error)),
       })
     }
@@ -219,7 +219,7 @@ export class MetronomePlayer {
             sampleMonotonicMs: obs.now(),
           })
         } catch (error) {
-          logger.warn('puncheokie.metronome', 'position observer threw', {
+          logger.warn('workout.metronome', 'position observer threw', {
             error: safe(String(error)),
           })
         }
@@ -232,7 +232,7 @@ export class MetronomePlayer {
         this.unsubscribeStatus = null
       }
     } catch (error) {
-      logger.warn('puncheokie.metronome', 'addListener unsupported — position reports disabled', {
+      logger.warn('workout.metronome', 'addListener unsupported — position reports disabled', {
         error: safe(String(error)),
       })
       this.unsubscribeStatus = null
@@ -280,7 +280,7 @@ export class MetronomePlayer {
       try {
         this.playlist.volume = this.volume
       } catch (error) {
-        logger.warn('puncheokie.metronome', 'setVolume failed', {
+        logger.warn('workout.metronome', 'setVolume failed', {
           error: safe(String(error)),
         })
       }

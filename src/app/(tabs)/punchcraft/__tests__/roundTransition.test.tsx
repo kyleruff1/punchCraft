@@ -221,7 +221,7 @@ describe('observer join fields on the runner records (GH #291, C0)', () => {
     const h = mount()
     h.begin()
     h.step(WORK_MS + TICK_INTERVAL_MS)
-    const boundaries = of('puncheokie.round.boundary')
+    const boundaries = of('workout.round.boundary')
     expect(boundaries.map((r) => field(r, 'transition'))).toEqual(
       expect.arrayContaining(['countdown-entered', 'work-entered', 'rest-entered']),
     )
@@ -236,7 +236,7 @@ describe('observer join fields on the runner records (GH #291, C0)', () => {
     const h = mount()
     h.begin()
     h.step(WORK_MS + TICK_INTERVAL_MS)
-    const rings = of('puncheokie.cue.tokenDue')
+    const rings = of('workout.cue.tokenDue')
     expect(rings.length).toBeGreaterThan(0)
     for (const r of rings) {
       const scheduled = field(r, 'scheduledMs') as number

@@ -14,8 +14,8 @@
  *    as plain ids and resolved by the repository layer.
  *
  *    The old §17.1 `program_id` column is deliberately absent: editable
- *    programs were retired by the §17.1 amendment (Puncheokie plan C5/D8), and
- *    a Puncheokie session points at a generated workout instead.
+ *    programs were retired by the §17.1 amendment (punchCraft workouts plan C5/D8), and
+ *    a punchCraft workouts session points at a generated workout instead.
  *
  * 2. `rounds` — work/rest boundaries per round. Every boundary is stored twice:
  *    the monotonic value is authoritative for ordering and duration, the ISO
@@ -81,7 +81,7 @@ export const PUNCH_REJECTION_REASONS = [
 export type PunchRejectionReason = (typeof PUNCH_REJECTION_REASONS)[number]
 
 /** Session modes (§17.1). */
-export const SESSION_MODES = ['velocity-test', 'punchcraft', 'puncheokie'] as const
+export const SESSION_MODES = ['velocity-test', 'punchcraft', 'workouts'] as const
 export type SessionMode = (typeof SESSION_MODES)[number]
 
 /** Session status values — the §18.1 state machine, persisted verbatim. */
@@ -105,7 +105,7 @@ export const MIGRATION_003: Migration = {
     db.execSync(`
       CREATE TABLE IF NOT EXISTS sessions (
         id TEXT PRIMARY KEY,
-        mode TEXT NOT NULL CHECK(mode IN ('velocity-test','punchcraft','puncheokie')),
+        mode TEXT NOT NULL CHECK(mode IN ('velocity-test','punchcraft','workouts')),
         status TEXT NOT NULL CHECK(status IN (
           'configuring','ready','countdown','work','paused','rest','finishing','completed','cancelled'
         )),

@@ -349,7 +349,7 @@ function decodeRecordV3(bytes: Uint8Array): DecodedRecord {
  * `punchTypeRaw` still carries the byte verbatim, so a future
  * per-device calibration can revisit this without a decoder version
  * bump being lossy. Consumers that need technique should take it from
- * the Puncheokie cue, not from the sensor — the tracker's dependable
+ * the punchCraft workouts cue, not from the sensor — the tracker's dependable
  * signal is hand + timing + velocity (doc §21 capability ladder, which
  * this pins to the "Hand" + "Velocity" tiers for FightCamp v1).
  *

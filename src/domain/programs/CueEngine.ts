@@ -473,7 +473,7 @@ export class CueEngine {
     cue.tokenOffsetsMs.forEach((offset, tokenIndex) => {
       // A rest occupies a slot and a beat but is not a ring fire. Without
       // this it would publish a `token-due` like any other token, which
-      // feeds `puncheokie.cue.tokenDue` (the cadence-lab drift signal) and
+      // feeds `workout.cue.tokenDue` (the cadence-lab drift signal) and
       // the viz forensics recorder — so every padded bar would inject
       // phantom ring events into both (GH #305).
       if (cue.tokens[tokenIndex]?.kind === 'rest') return

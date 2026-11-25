@@ -59,7 +59,7 @@ describe('create / getById', () => {
   it('round-trips every session field', () => {
     const created = repo.create({
       id: 's1',
-      mode: 'puncheokie',
+      mode: 'workouts',
       status: 'ready',
       startedAtIso: '2026-08-23T03:00:00.000Z',
       startedMonotonicMs: 12_345.5,
@@ -75,7 +75,7 @@ describe('create / getById', () => {
     expect(repo.getById('s1')).toEqual(created)
     expect(created).toEqual({
       id: 's1',
-      mode: 'puncheokie',
+      mode: 'workouts',
       status: 'ready',
       startedAt: '2026-08-23T03:00:00.000Z',
       endedAt: null,
@@ -121,8 +121,8 @@ describe('create / getById', () => {
 describe('list', () => {
   beforeEach(() => {
     repo.create({ id: 'old', mode: 'punchcraft', status: 'completed', startedMonotonicMs: 100 })
-    repo.create({ id: 'new', mode: 'puncheokie', status: 'completed', startedMonotonicMs: 900 })
-    repo.create({ id: 'never-started', mode: 'puncheokie', status: 'cancelled' })
+    repo.create({ id: 'new', mode: 'workouts', status: 'completed', startedMonotonicMs: 900 })
+    repo.create({ id: 'never-started', mode: 'workouts', status: 'cancelled' })
   })
 
   it('orders by the monotonic start, most recent first, unstarted last', () => {
@@ -130,7 +130,7 @@ describe('list', () => {
   })
 
   it('filters by mode and by status', () => {
-    expect(repo.list({ mode: 'puncheokie' }).map((s) => s.id)).toEqual(['new', 'never-started'])
+    expect(repo.list({ mode: 'workouts' }).map((s) => s.id)).toEqual(['new', 'never-started'])
     expect(repo.list({ status: 'cancelled' }).map((s) => s.id)).toEqual(['never-started'])
   })
 
@@ -220,7 +220,7 @@ describe('appendRound', () => {
 
 describe('appendPunchEvent', () => {
   beforeEach(() => {
-    repo.create({ id: 's1', mode: 'puncheokie', status: 'work' })
+    repo.create({ id: 's1', mode: 'workouts', status: 'work' })
   })
 
   it('round-trips every punch-event field, including the migration-002 columns', () => {
@@ -315,7 +315,7 @@ describe('appendPunchEvent', () => {
 
 describe('quality counters', () => {
   it('accumulates counters additively', () => {
-    repo.create({ id: 's1', mode: 'puncheokie', status: 'work' })
+    repo.create({ id: 's1', mode: 'workouts', status: 'work' })
     repo.addQualityCounters('s1', { unmatchedEvents: 2 })
     repo.addQualityCounters('s1', { unmatchedEvents: 3, rejectedEvents: 1 })
     expect(repo.getById('s1')?.quality).toEqual({
@@ -327,7 +327,7 @@ describe('quality counters', () => {
   })
 
   it('round-trips per-tracker gap totals and replaces them on re-upsert', () => {
-    repo.create({ id: 's1', mode: 'puncheokie', status: 'work' })
+    repo.create({ id: 's1', mode: 'workouts', status: 'work' })
     repo.upsertTrackerQuality({
       sessionId: 's1',
       trackerKey: 'EA:69:2D:9C:FD:53',
@@ -436,8 +436,8 @@ describe('delete', () => {
          characteristic_uuid, value_base64, value_hex, connection_generation)
         VALUES ('frame-1','cap1',1,'t','notification','svc','chr','AA==','00',1);
     `)
-    repo.create({ id: 's1', mode: 'puncheokie', status: 'completed' })
-    repo.create({ id: 's2', mode: 'puncheokie', status: 'completed' })
+    repo.create({ id: 's1', mode: 'workouts', status: 'completed' })
+    repo.create({ id: 's2', mode: 'workouts', status: 'completed' })
     repo.appendRound({ id: 'r1', sessionId: 's1' })
     repo.appendPunchEvent(punch({ roundId: 'r1', captureId: 'cap1' }))
     repo.upsertTrackerQuality({ sessionId: 's1', trackerKey: 'EA:69:2D:9C:FD:53' })

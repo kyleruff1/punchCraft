@@ -1112,7 +1112,7 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
         // when the coach's voice said the token and when its ring lit. Kyle's
         // ear read the library at ~75 % clean, drift set-dependent — no way
         // to find which combos drift without this signal.
-        logger.info('puncheokie.cue.tokenDue', 'ring token fired', {
+        logger.info('workout.cue.tokenDue', 'ring token fired', {
           roundIndex: safe(sessionRef.current?.snapshot()?.roundIndex ?? -1),
           cueId: safe(event.cue.id),
           // `formatCombo`, NOT `tokens.join('-')`: tokens are objects, so
@@ -1348,7 +1348,7 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
             // A late or recovered event reordered a cue the athlete already
             // saw feedback for. Worth a log: it is rare and it means the
             // tokens they watched did not match the recorded result.
-            logger.info('puncheokie.match.corrected', 'settled match differed from live feedback', {
+            logger.info('workout.match.corrected', 'settled match differed from live feedback', {
               cue: safe(event.result.cueId),
               corrections: safe(event.corrections.length),
             })
@@ -1421,7 +1421,7 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
         })
         report({ status: 'persisted', cancelled, session })
       } catch (error) {
-        logger.error('puncheokie.session.endWriteFailed', 'finished workout was not written', {
+        logger.error('workout.session.endWriteFailed', 'finished workout was not written', {
           error: safe(String(error)),
           cueResults: safe(cueRowsRef.current.length),
         })
@@ -1466,7 +1466,7 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
           workout.recipe.coachTempo.baseBpm,
         )
       if (!loop) {
-        logger.warn('puncheokie.metronome', 'no loop for tempo', {
+        logger.warn('workout.metronome', 'no loop for tempo', {
           division: safe(workout.recipe.coachTempo.division),
           swing: safe(workout.recipe.coachTempo.swing),
           baseBpm: safe(workout.recipe.coachTempo.baseBpm),
@@ -1525,7 +1525,7 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
           running: s?.phase === 'work',
         })
       }
-      logger.info('puncheokie.round.boundary', 'session phase boundary', {
+      logger.info('workout.round.boundary', 'session phase boundary', {
         transition: safe(transition.type),
         roundIndex: safe(
           transition.type === 'work-entered'
@@ -1784,7 +1784,7 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
           voice.policy.vocabulary === 'names' ? 'technique' : 'numeric',
         onSkipped: (slot, reason) => {
           logger.warn(
-            'puncheokie.slotDispatcher.skipped',
+            'workout.slotDispatcher.skipped',
             'coach slot dropped without playing',
             { slotId: safe(slot.slotId), roundIndex: safe(slot.roundIndex), reason: safe(reason) },
           )
@@ -1806,7 +1806,7 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
           const clip = findComboAnnounceById(assetId)
           if (!clip) {
             logger.warn(
-              'puncheokie.slotDispatcher.assetMissing',
+              'workout.slotDispatcher.assetMissing',
               'compiled coach slot references an unknown combo-announce id',
               { assetId: safe(assetId), slotId: safe(slotId) },
             )
@@ -1831,7 +1831,7 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
             // heavy-hands and pace-pusher lost expectation #1 exactly this way,
             // and Kyle heard the block open in silence (GH #305).
             logger.info(
-              'puncheokie.slotDispatcher.deferred',
+              'workout.slotDispatcher.deferred',
               'coach lane busy — combo-announce re-queued for a later tick',
               { slotId: safe(slotId), audibleUntilMs: safe(audibleUntilMs) },
             )
@@ -1840,7 +1840,7 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
           // The score's own dispatch moment, joined to the audio record by
           // slotId. `atTick` was discarded here before, which left the
           // announce path with no scheduled time to measure lateness against.
-          logger.info('puncheokie.comboAnnounce.dispatch', 'combo-announce dispatched', {
+          logger.info('workout.comboAnnounce.dispatch', 'combo-announce dispatched', {
             slotId: safe(slotId),
             assetId: safe(assetId),
             atTick: safe(atTick),
@@ -1900,7 +1900,7 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
       slotDispatcher.enqueueAll(enqueuableSlots)
       announcer.setScoreOwnsCombos(true)
       logger.info(
-        'puncheokie.slotDispatcher.armed',
+        'workout.slotDispatcher.armed',
         'score-authoritative combo-announce dispatcher armed',
         {
           workout: safe(workout.id),
@@ -1983,7 +1983,7 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
       enabled: __DEV__ || process.env.EXPO_PUBLIC_VIZ_FORENSICS === '1' || isQaEnabled(),
       now: () => clock.now(),
       emit: (batch: readonly VizRecord[]) => {
-        logger.info('puncheokie.viz.batch', 'visual transition batch', {
+        logger.info('workout.viz.batch', 'visual transition batch', {
           count: safe(batch.length),
           records: safe(JSON.stringify(batch)),
         })
@@ -2053,7 +2053,7 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
               // A skipped CALL is routine (busy lane, next call seconds
               // away); a skipped LEAD-IN lost real coaching — warn.
               if (entry.kind === 'lead-in') {
-                logger.warn('puncheokie.clickScript.skipped', 'lead-in window expired before the lane freed', {
+                logger.warn('workout.clickScript.skipped', 'lead-in window expired before the lane freed', {
                   slot: safe(entry.slot),
                   workElapsedMs: safe(snapshot.workElapsedMs),
                 })
@@ -2102,7 +2102,7 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
               // cached.
               { oneShot: entry.kind !== 'call' },
             )
-            logger.info('puncheokie.clickScript.dispatch', 'click script dispatched', {
+            logger.info('workout.clickScript.dispatch', 'click script dispatched', {
               kind: safe(entry.kind),
               slot: safe(entry.slot),
               traceId: safe(traceId),
@@ -2141,7 +2141,7 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
               swap.loop,
               clickAudibleRef.current ? workout.recipe.metronome.volume : 0,
             )
-            logger.info('puncheokie.metronome.swap', 'section subdivision swap', {
+            logger.info('workout.metronome.swap', 'section subdivision swap', {
               dispatchAtMs: safe(swap.dispatchAtMs),
               division: safe(swap.loop.division),
               baseBpm: safe(swap.loop.baseBpm),
@@ -2159,7 +2159,7 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
       vizRef.current?.flush()
     }, TICK_INTERVAL_MS)
 
-    logger.info('puncheokie.runner.start', 'workout runner armed', {
+    logger.info('workout.runner.start', 'workout runner armed', {
       workout: safe(workout.id),
       rounds: safe(workout.schedule.length),
       source: safe(source.id),

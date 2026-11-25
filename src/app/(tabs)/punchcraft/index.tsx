@@ -14,7 +14,7 @@ import { useSelectedSampleKey, useWorkoutStore } from '@state/useWorkoutStore'
  *
  * This is where a workout is built or chosen and then run: recipe, the
  * designed-workout library, the live screen, and the summary all live under
- * this tab. Puncheokie is a separate mode and is not shipped yet.
+ * this tab. punchCraft workouts is a separate mode and is not shipped yet.
  */
 export default function PunchCraftLanding() {
   const samples = listSampleWorkouts()

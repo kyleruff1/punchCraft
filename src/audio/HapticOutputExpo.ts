@@ -46,7 +46,7 @@ export class HapticOutputExpo implements HapticOutputPort {
     if (!this.enabled) return
     void this.fire(kind).catch((error: unknown) => {
       // A missed buzz is not worth interrupting a workout — log and move on.
-      logger.warn('puncheokie.haptic.failed', 'haptic did not fire', {
+      logger.warn('workout.haptic.failed', 'haptic did not fire', {
         kind: safe(kind),
         error: safe(String(error)),
       })
@@ -57,7 +57,7 @@ export class HapticOutputExpo implements HapticOutputPort {
     if (!this.enabled) return
     const tier = punchBuzzOf(this.scaler.scale(hand, velocityRaw))
     void Haptics.impactAsync(PUNCH_STYLE[tier]).catch((error: unknown) => {
-      logger.warn('puncheokie.haptic.failed', 'punch buzz did not fire', {
+      logger.warn('workout.haptic.failed', 'punch buzz did not fire', {
         kind: safe(tier),
         error: safe(String(error)),
       })

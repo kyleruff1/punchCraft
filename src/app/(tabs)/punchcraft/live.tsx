@@ -722,7 +722,7 @@ export default function LiveScreen(): React.JSX.Element {
     const delayMs = qaRun.autostartDelayMs ?? QA_AUTOSTART_SETTLE_MS
     const timer = setTimeout(() => {
       useQaStore.getState().consumeAutostart()
-      logger.info('puncheokie.qa.autostart', 'QA autostart pressed Hit It', {
+      logger.info('workout.qa.autostart', 'QA autostart pressed Hit It', {
         workout: safe(workout.id),
         nonce: safe(qaRun.nonce ?? null),
         delayMs: safe(delayMs),
@@ -743,7 +743,7 @@ export default function LiveScreen(): React.JSX.Element {
     const script = qaRun.sim
     const bpm = qaRun.simBpm ?? simBpmForWorkout(script, workout)
     sim.playScript(script, bpm)
-    logger.info('puncheokie.qa.sim', 'auto sim script started', {
+    logger.info('workout.qa.sim', 'auto sim script started', {
       script: safe(script),
       bpm: safe(bpm),
       roundIndex: safe(live.roundIndex),

@@ -89,7 +89,7 @@ mkdirSync(sessionDir, { recursive: true })
 execFileSync('adb', ['-s', deviceId, 'logcat', '-c'])
 const logcatPath = join(sessionDir, 'logcat.txt')
 const logcat = spawn('adb', ['-s', deviceId, 'logcat', '-v', 'time',
-  'ReactNativeJS:V', 'puncheokie:V', 'AndroidRuntime:E', 'System.err:W', '*:S'])
+  'ReactNativeJS:V', 'workouts:V', 'AndroidRuntime:E', 'System.err:W', '*:S'])
 const chunks = []
 logcat.stdout.on('data', (d) => chunks.push(d))
 

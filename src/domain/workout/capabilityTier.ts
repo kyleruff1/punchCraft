@@ -1,7 +1,7 @@
 /**
  * Capability tier resolution (M32-02, doc §3, doc §21).
  *
- * Puncheokie must never claim more than the connected tracker's data
+ * punchCraft workouts must never claim more than the connected tracker's data
  * supports. This module is the single place that decides how much may be
  * scored, and the single place that decides what a sequence score is
  * allowed to be called.

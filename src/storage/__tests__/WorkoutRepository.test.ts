@@ -131,7 +131,7 @@ describe('recipes', () => {
 
 describe('generated workouts', () => {
   it('round-trips a workout and its realized stream through a session link', () => {
-    const session = sessions.create({ id: 'ses-1', mode: 'puncheokie' })
+    const session = sessions.create({ id: 'ses-1', mode: 'workouts' })
     const realized = plannedStream(threeRoundFundamentals)
     repo.saveGeneratedWorkout(threeRoundFundamentals, realized, session.id)
 
@@ -205,7 +205,7 @@ describe('generated workouts', () => {
   })
 
   it('replaces the realized stream after adaptation and refuses to blank it', () => {
-    sessions.create({ id: 'ses-1', mode: 'puncheokie' })
+    sessions.create({ id: 'ses-1', mode: 'workouts' })
     repo.saveGeneratedWorkout(threeRoundFundamentals, plannedStream(threeRoundFundamentals), 'ses-1')
 
     const shortened: RealizedTokenStream = [{ blockId: 'blk-1', tokens: [] }]
@@ -225,11 +225,11 @@ describe('generated workouts', () => {
     // Migration 007 splits per-session runs onto workout_runs, so two sessions
     // through the same plan produce two runs and one plan row — and each
     // session's realized stream is preserved.
-    const first = sessions.create({ id: 'ses-1', mode: 'puncheokie' })
+    const first = sessions.create({ id: 'ses-1', mode: 'workouts' })
     const firstStream = plannedStream(threeRoundFundamentals)
     repo.saveGeneratedWorkout(threeRoundFundamentals, firstStream, first.id)
 
-    const second = sessions.create({ id: 'ses-2', mode: 'puncheokie' })
+    const second = sessions.create({ id: 'ses-2', mode: 'workouts' })
     const shortened: RealizedTokenStream = [
       { blockId: 'blk-1', tokens: threeRoundFundamentals.schedule[0]!.blocks[0]!.tokens.slice(0, 1) },
     ]
@@ -258,7 +258,7 @@ describe('generated workouts', () => {
   })
 
   it('raises a typed error rather than returning null when blocks_json is corrupt', () => {
-    sessions.create({ id: 'ses-1', mode: 'puncheokie' })
+    sessions.create({ id: 'ses-1', mode: 'workouts' })
     repo.saveGeneratedWorkout(threeRoundFundamentals, plannedStream(threeRoundFundamentals), 'ses-1')
     db.execSync(`UPDATE generated_workouts SET blocks_json = '{"nope": 1}'`)
 
@@ -276,7 +276,7 @@ describe('generated workouts', () => {
 
 describe('adaptations', () => {
   beforeEach(() => {
-    sessions.create({ id: 'ses-1', mode: 'puncheokie' })
+    sessions.create({ id: 'ses-1', mode: 'workouts' })
     repo.saveGeneratedWorkout(threeRoundFundamentals, plannedStream(threeRoundFundamentals), 'ses-1')
   })
 
@@ -340,7 +340,7 @@ describe('adaptations', () => {
 
 describe('cue results', () => {
   beforeEach(() => {
-    sessions.create({ id: 'ses-1', mode: 'puncheokie' })
+    sessions.create({ id: 'ses-1', mode: 'workouts' })
     repo.saveGeneratedWorkout(threeRoundFundamentals, plannedStream(threeRoundFundamentals), 'ses-1')
   })
 
@@ -434,7 +434,7 @@ describe('cue results', () => {
 
   it('lets an outer transaction survive a failed batch and commit its own work', () => {
     db.execSync('BEGIN')
-    sessions.create({ id: 'ses-2', mode: 'puncheokie' })
+    sessions.create({ id: 'ses-2', mode: 'workouts' })
     expect(() =>
       repo.writeCueResults([cueRow({ generatedWorkoutId: 'no-such-workout' })]),
     ).toThrow()

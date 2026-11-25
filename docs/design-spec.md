@@ -1,6 +1,6 @@
 # punchCraft — Product and Engineering Design Specification
 
-> Canonical design specification for punchCraft / Velocity Lab / Puncheokie. Platform facts were checked on 2026-08-22 (see §29). This document is the source of truth for the roadmap in [roadmap.md](roadmap.md) and the backlog in [`tools/backlog/backlog-issues.json`](../tools/backlog/backlog-issues.json) (labels, milestones, and the project definition live in [`backlog-static.json`](../tools/backlog/backlog-static.json)). Puncheokie's workout engine and live UX are specified in [puncheokie-ux-workout-engine.md](puncheokie-ux-workout-engine.md), which supersedes parts of §13, §17.1, §22 Phase 5, and §27 — see the §13 banner and §32.
+> Canonical design specification for punchCraft / Velocity Lab / punchCraft workouts. Platform facts were checked on 2026-08-22 (see §29). This document is the source of truth for the roadmap in [roadmap.md](roadmap.md) and the backlog in [`tools/backlog/backlog-issues.json`](../tools/backlog/backlog-issues.json) (labels, milestones, and the project definition live in [`backlog-static.json`](../tools/backlog/backlog-static.json)). punchCraft workouts's workout engine and live UX are specified in [workouts-ux-engine.md](workouts-ux-engine.md), which supersedes parts of §13, §17.1, §22 Phase 5, and §27 — see the §13 banner and §32.
 
 ## 1. Executive summary
 
@@ -8,7 +8,7 @@ punchCraft is an Android-first mobile application that restores useful life to a
 
 - **Velocity Lab** — device connection, protocol diagnostics, live Bluetooth listening, calibration, and data export.
 - **punchCraft** — configurable timed or free-form bag sessions with left/right punch counts, tracker-reported velocity, round metrics, and session history.
-- **Puncheokie** — programmable punch-sequence workouts using numbered boxing combinations, regular or switch stance, and an optional user-connected Spotify playlist for background listening.
+- **punchCraft workouts** — programmable punch-sequence workouts using numbered boxing combinations, regular or switch stance, and an optional user-connected Spotify playlist for background listening.
 
 The first engineering milestone is not a polished workout interface. It is a reliable Bluetooth listener inside Velocity Lab that can:
 
@@ -70,7 +70,7 @@ The first product version shall:
 - calculate stable, reproducible metrics from the stored event stream;
 - execute programmed numbered combinations in regular and switch stances;
 - optionally retrieve a user's Spotify playlists through OAuth; and
-- continue to run punchCraft and non-Spotify Puncheokie workouts without internet access.
+- continue to run punchCraft and non-Spotify punchCraft workouts workouts without internet access.
 
 ### 3.2 Engineering goals
 
@@ -158,7 +158,7 @@ flowchart LR
       S[Session and metrics engine]
       W[Workout cue engine]
       DB[(SQLite)]
-      UI[Velocity Lab / punchCraft / Puncheokie]
+      UI[Velocity Lab / punchCraft / punchCraft workouts]
     end
     A --> B --> P --> E
     E --> C --> S
@@ -188,7 +188,7 @@ The app will expose three primary bottom tabs:
 
 1. Velocity Lab
 2. punchCraft
-3. Puncheokie
+3. punchCraft workouts
 
 Settings, history, data export, and developer diagnostics should be presented as nested screens or a top-level menu rather than adding more permanent tabs during the first release.
 
@@ -379,7 +379,7 @@ Before starting, punchCraft shall display:
 - active calibration profile per hand;
 - capability summary;
 - battery value if available;
-- Spotify status only when launched from Puncheokie; and
+- Spotify status only when launched from punchCraft workouts; and
 - an explicit warning if the session will run in degraded mode.
 
 Examples of degraded modes:
@@ -500,7 +500,7 @@ Averages shall exclude events marked malformed, duplicate, clipped, outside the 
 - average velocity by punch type;
 - straight-versus-power balance;
 - combination recognition;
-- expected-versus-observed technique category in Puncheokie; and
+- expected-versus-observed technique category in punchCraft workouts; and
 - technique-specific fatigue trends.
 
 ### 9.4 Custom output index
@@ -985,21 +985,21 @@ Every confirmed capture should become a fixture containing:
 
 The replay harness must run without Bluetooth hardware. This allows protocol work on the Windows PC and prevents UI or dependency changes from silently breaking decoding.
 
-## 13. Puncheokie functional design
+## 13. punchCraft workouts functional design
 
-> **Superseded in part (2026-08-23).** The Puncheokie workout model, recipe/generator/seed, cue lifecycle, cadence, live screen, Voice Coach, and persistence are specified in [puncheokie-ux-workout-engine.md](puncheokie-ux-workout-engine.md) (v0.2), whose "Status and supersession" table lists exactly which parts of §6, §13, §15.2, §16, §17.1, §18, §19.4, §22 Phase 5, and §27 it replaces. §13.1–13.6 remain as the original rationale and as the definition of the capability tiers and the **hand-sequence match** rule, which still apply. In particular: `PunchProgram`/`ProgramRound`/`PunchCue` (§13.4) are replaced by `WorkoutRecipe` → generated `WorkoutBlock[]`/`WorkoutToken[]`; stance values are `orthodox`/`southpaw`/`switch`, not `regular`/`switch`; defense/footwork/coach tokens are display-only and unscored.
+> **Superseded in part (2026-08-23).** The punchCraft workouts workout model, recipe/generator/seed, cue lifecycle, cadence, live screen, Voice Coach, and persistence are specified in [workouts-ux-engine.md](workouts-ux-engine.md) (v0.2), whose "Status and supersession" table lists exactly which parts of §6, §13, §15.2, §16, §17.1, §18, §19.4, §22 Phase 5, and §27 it replaces. §13.1–13.6 remain as the original rationale and as the definition of the capability tiers and the **hand-sequence match** rule, which still apply. In particular: `PunchProgram`/`ProgramRound`/`PunchCue` (§13.4) are replaced by `WorkoutRecipe` → generated `WorkoutBlock[]`/`WorkoutToken[]`; stance values are `orthodox`/`southpaw`/`switch`, not `regular`/`switch`; defense/footwork/coach tokens are display-only and unscored.
 
-Puncheokie is a programmed workout mode. The name is a play on "karaoke": the athlete follows displayed punch combinations while listening to personal music.
+punchCraft workouts is a programmed workout mode. The name is a play on "karaoke": the athlete follows displayed punch combinations while listening to personal music.
 
 ### 13.1 Core user flow
 
-1. Open Puncheokie.
+1. Open punchCraft workouts.
 2. Choose or create a punch program.
 3. Choose the athlete's default stance.
 4. Optionally connect Spotify and select a playlist.
 5. Confirm tracker readiness and calibration.
 6. Open the playlist in Spotify or use an approved playback-control option.
-7. Return to Puncheokie.
+7. Return to punchCraft workouts.
 8. Start the workout countdown.
 9. Follow visual and haptic punch cues.
 10. Review completion, count, hand matching, velocity, and round metrics.
@@ -1023,7 +1023,7 @@ The user's "regular" stance may be configured as orthodox or southpaw. "Switch" 
 
 ### 13.3 Capability-aware scoring
 
-Puncheokie must not claim technique recognition beyond the tracker data.
+punchCraft workouts must not claim technique recognition beyond the tracker data.
 
 | Available event fields | Supported validation |
 |---|---|
@@ -1120,7 +1120,7 @@ The live cue screen shall show:
 - sequence-match status; and
 - optional velocity-zone status.
 
-Use visual and haptic cues by default. The Voice Coach (spoken cues; [puncheokie-ux-workout-engine.md](puncheokie-ux-workout-engine.md)) is fully available when no third-party playback is active. While Spotify or any other third-party playback is active, the Voice Coach is gated behind an explicit user toggle that defaults to OFF and whose label states that it speaks over the user's music; the app never enables it automatically. This gate stays in place until the Spotify policy review in §22 Phase 7 task 10 is complete and, if necessary, written permission is obtained.
+Use visual and haptic cues by default. The Voice Coach (spoken cues; [workouts-ux-engine.md](workouts-ux-engine.md)) is fully available when no third-party playback is active. While Spotify or any other third-party playback is active, the Voice Coach is gated behind an explicit user toggle that defaults to OFF and whose label states that it speaks over the user's music; the app never enables it automatically. This gate stays in place until the Spotify policy review in §22 Phase 7 task 10 is complete and, if necessary, written permission is obtained.
 
 ### 13.6 Event-to-cue matching
 
@@ -1197,7 +1197,7 @@ As of 2026-08-22, Spotify Development Mode has material constraints:
 
 The February 2026 Development Mode changes also restrict playlist contents for playlists the user does not own or collaborate on. The UI must therefore handle a followed playlist whose metadata is visible but whose items are unavailable. See references R16 and R17.
 
-Design consequence: Spotify support is an experimental/personal feature for the first product version. It must not be a hard dependency for punchCraft or Puncheokie.
+Design consequence: Spotify support is an experimental/personal feature for the first product version. It must not be a hard dependency for punchCraft or punchCraft workouts.
 
 ### 14.4 MVP playback option: content link
 
@@ -1207,7 +1207,7 @@ The safest initial playback path is:
 2. deep-link to the installed Spotify Android app;
 3. let the user start playback in Spotify;
 4. return to punchCraft; and
-5. run the Puncheokie program on its independent timer.
+5. run the punchCraft workouts program on its independent timer.
 
 Spotify documents content linking into the installed Android app. See reference R18.
 
@@ -1238,11 +1238,11 @@ The initial design therefore imposes these constraints:
 - Spotify playback is user-selected background listening;
 - no song-specific cue choreography;
 - no audio analysis;
-- no overlay of app-generated audio on Spotify playback by default — the Voice Coach is OFF whenever third-party playback is active and speaks over it only after an explicit per-user opt-in (§13.5, Puncheokie doc D1);
+- no overlay of app-generated audio on Spotify playback by default — the Voice Coach is OFF whenever third-party playback is active and speaks over it only after an explicit per-user opt-in (§13.5, punchCraft workouts doc D1);
 - no commercial launch of integrated streaming functionality without policy/legal review; and
 - clear separation between Spotify metadata and punchCraft-owned workout data.
 
-Before public distribution, review the current Spotify Developer Policy and obtain clarification or approval if the intended Puncheokie behavior could be treated as synchronization.
+Before public distribution, review the current Spotify Developer Policy and obtain clarification or approval if the intended punchCraft workouts behavior could be treated as synchronization.
 
 ### 14.7 Spotify data handling
 
@@ -1548,13 +1548,13 @@ Contains the fields described in Section 10 plus activation and invalidation met
 **`sessions`**
 
 - `id`
-- `mode`: `velocity-test`, `punchcraft`, or `puncheokie`
+- `mode`: `velocity-test`, `punchcraft`, or `workouts`
 - `status`
 - `started_at`
 - `ended_at`
 - `active_duration_ms`
 - `timer_config_json`
-- `generated_workout_id` nullable (Puncheokie)
+- `generated_workout_id` nullable (punchCraft workouts)
 - `spotify_playlist_id`
 - `left_calibration_id`
 - `right_calibration_id`
@@ -1632,7 +1632,7 @@ Stores normalized events and retains source frame references, raw values, calibr
 - `decoder_version`
 - `calculation_version`
 
-**`combo_results`** (one row per combination instance; see [puncheokie-ux-workout-engine.md](puncheokie-ux-workout-engine.md) §28)
+**`combo_results`** (one row per combination instance; see [workouts-ux-engine.md](workouts-ux-engine.md) §28)
 
 - `id`
 - `session_id`
@@ -1649,7 +1649,7 @@ Stores normalized events and retains source frame references, raw values, calibr
 - `started_at_monotonic_ms`
 - `window_close_monotonic_ms`
 
-> `punch_programs`, `program_rounds`, and `punch_cues` (spec v1.0) are superseded by the tables above and are not created. See [puncheokie-ux-workout-engine.md](puncheokie-ux-workout-engine.md) D8.
+> `punch_programs`, `program_rounds`, and `punch_cues` (spec v1.0) are superseded by the tables above and are not created. See [workouts-ux-engine.md](workouts-ux-engine.md) D8.
 
 **`spotify_playlists`**
 
@@ -1689,7 +1689,7 @@ stateDiagram-v2
     cancelled --> [*]
 ```
 
-**Puncheokie composition.** Puncheokie adds no states to this machine. Its cue lifecycle ([puncheokie-ux-workout-engine.md](puncheokie-ux-workout-engine.md), D5–D6) nests inside `work`: `paused` suspends every cue and flags punches `duringPause`; `rest` hosts the three rest presentation sub-phases; a token's acceptance window is clamped to the enclosing active work interval (§18.2), so it never extends into `rest`, `paused`, or `finishing`; and the cue-level `gap` state is unrelated to the BLE `recovering` state of §11.5/§19.3.
+**punchCraft workouts composition.** punchCraft workouts adds no states to this machine. Its cue lifecycle ([workouts-ux-engine.md](workouts-ux-engine.md), D5–D6) nests inside `work`: `paused` suspends every cue and flags punches `duringPause`; `rest` hosts the three rest presentation sub-phases; a token's acceptance window is clamped to the enclosing active work interval (§18.2), so it never extends into `rest`, `paused`, or `finishing`; and the cue-level `gap` state is unrelated to the BLE `recovering` state of §11.5/§19.3.
 
 ### 18.2 Event acceptance
 
@@ -1767,7 +1767,7 @@ For a tracker that begins advertising again within range:
 - screen-wake option during active sessions;
 - minimal touch targets during glove/wrap use;
 - confirmation before destructive stop/discard; and
-- landscape/tablet layout after the phone-width baseline works — except the Puncheokie live screen, which is landscape-first on the tablet ([puncheokie-ux-workout-engine.md](puncheokie-ux-workout-engine.md) D7); its phone-width layout is the §22 Phase 7 task 8 follow-up.
+- landscape/tablet layout after the phone-width baseline works — except the punchCraft workouts live screen, which is landscape-first on the tablet ([workouts-ux-engine.md](workouts-ux-engine.md) D7); its phone-width layout is the §22 Phase 7 task 8 follow-up.
 
 ### 19.5 Safety language
 
@@ -2041,9 +2041,9 @@ This is the first functional product milestone.
 
 **Definition of done:** A timed multi-round bag session can be completed, saved, reopened, and deterministically recalculated from stored events.
 
-### Phase 5 — Puncheokie workout engine without Spotify
+### Phase 5 — punchCraft workouts workout engine without Spotify
 
-Specified in detail by [puncheokie-ux-workout-engine.md](puncheokie-ux-workout-engine.md); its §27 is the implementation sequence and the list below is the coarse map.
+Specified in detail by [workouts-ux-engine.md](workouts-ux-engine.md); its §27 is the implementation sequence and the list below is the coarse map.
 
 **Objectives**
 
@@ -2066,7 +2066,7 @@ Specified in detail by [puncheokie-ux-workout-engine.md](puncheokie-ux-workout-e
 12. Implement adaptive / goal-seeking adjustments with every decision recorded for deterministic recalculation (D8).
 13. Implement the deterministic seeded `WorkoutGenerator`, versioned by `generator_version`, with golden-output tests.
 14. Build the workout summary: completion over punch tokens, hand-sequence match, tracker-reported velocity when available, extras always visible.
-15. Implement strike confirmation and gratification (Puncheokie doc §28): per-strike node flash with a four-cue haptic vocabulary, the progressive combo affirmation border, the capability-aware five-signal plausibility model with four confidence tiers, bounded celebration levels with a Focus mode, and `combo_results` persistence versioned by `CONFIDENCE_VERSION` (D11).
+15. Implement strike confirmation and gratification (punchCraft workouts doc §28): per-strike node flash with a four-cue haptic vocabulary, the progressive combo affirmation border, the capability-aware five-signal plausibility model with four confidence tiers, bounded celebration levels with a Focus mode, and `combo_results` persistence versioned by `CONFIDENCE_VERSION` (D11).
 16. Implement the workout backdrop and ambience library (§31): `BackdropTheme` contracts and mood taxonomy, the scrim that guarantees foreground contrast, a bundled and licence-recorded starter library, the renderer with its `still`/`subtle`/`active` motion levels and auto-degrade, and recipe-level selection that resolves through the deterministic seed. The backdrop is independent of audio in every respect (D17).
 
 **Definition of done:** The user can pick a preset or tune a recipe, run the generated workout in landscape on the tablet with visual, haptic, and — when no third-party audio is playing, or after an explicit opt-in — spoken cues, switch stance, pause and resume, and receive capability-appropriate, hand-sequence-match-labeled results that can be regenerated from the stored recipe, seed, generator version, and realized token stream, all without Spotify.
@@ -2095,7 +2095,7 @@ Specified in detail by [puncheokie-ux-workout-engine.md](puncheokie-ux-workout-e
 11. Add Spotify disconnect/data removal.
 12. Review current Spotify policy before enabling public distribution.
 
-**Definition of done:** An allowlisted user can connect Spotify, choose an accessible playlist, open it in the Spotify app, return to Puncheokie, and run a program without Spotify controlling the workout clock.
+**Definition of done:** An allowlisted user can connect Spotify, choose an accessible playlist, open it in the Spotify app, return to punchCraft workouts, and run a program without Spotify controlling the workout clock.
 
 ### Phase 7 — Hardening and release preparation
 
@@ -2206,7 +2206,7 @@ Acceptance criteria:
 | Expo/BLE dependency incompatibility | Build instability | Minimal spike, exact version lock, preserve known-good APK |
 | Android background restrictions | Events lost when app backgrounds | Foreground-only MVP, keep-awake, explicit warning, later native service |
 | Spotify Development Mode limits | Feature cannot scale publicly | Keep optional; target personal prototype; separate provider interface |
-| Spotify synchronization policy | Public Puncheokie design may be non-compliant | Independent workout clock; no beat sync; policy/legal review before release |
+| Spotify synchronization policy | Public punchCraft workouts design may be non-compliant | Independent workout clock; no beat sync; policy/legal review before release |
 | User interprets velocity as force | Safety and trust issue | Precise labels, no force/energy claims, method disclosure |
 | Tracker battery degradation | Session interruptions | Battery/status display where possible, pre-session readiness, replacement-hardware abstraction |
 | Device support changes in Android | Future BLE regression | Protocol fixtures, physical regression test, version pinning |
@@ -2223,23 +2223,23 @@ Acceptance criteria:
 | Store raw frames before decoding | Accepted | Enables replay and correction of wrong assumptions |
 | Local-first SQLite storage | Accepted | No backend needed for core product |
 | Velocity is labeled tracker-reported until validated | Accepted | Avoids false precision |
-| Puncheokie engine works without Spotify | Accepted | Prevents provider dependency |
+| punchCraft workouts engine works without Spotify | Accepted | Prevents provider dependency |
 | Spotify MVP uses playlist metadata and deep link | Proposed | Lowest complexity and policy exposure |
 | Spotify playback control is deferred | Proposed | Requires native bridge/scopes and policy review |
 | Background BLE is deferred | Accepted | Foreground reliability comes first |
-| Puncheokie v0.2 design doc is canonical for Puncheokie | Accepted 2026-08-23 | Recipe + generator + seed, WorkoutBlock/Token model, landscape-first live UX; §13 retained for rationale and capability tiers |
+| punchCraft workouts v0.2 design doc is canonical for punchCraft workouts | Accepted 2026-08-23 | Recipe + generator + seed, WorkoutBlock/Token model, landscape-first live UX; §13 retained for rationale and capability tiers |
 | Voice Coach is opt-in over third-party playback | Accepted 2026-08-23 | Spoken cues are valuable without music; over Spotify they are OFF by default behind an explicit toggle pending the §22 Phase 7 policy review (D1) |
-| Stance enum is orthodox / southpaw / switch | Accepted 2026-08-23 | "regular" was ambiguous; §13.2 and the Puncheokie doc §2 now agree (D2) |
+| Stance enum is orthodox / southpaw / switch | Accepted 2026-08-23 | "regular" was ambiguous; §13.2 and the punchCraft workouts doc §2 now agree (D2) |
 | Cadence BPM is authored on the monotonic clock, never derived from audio | Accepted 2026-08-23 | Keeps "no beat sync" (§14.6) literally true while allowing rhythmic cues (D3) |
 | Defense / footwork / coach tokens are display-only and unscored | Accepted 2026-08-23 | The tracker observes punches only (H11); scoring anything else would be fabricated (D4) |
 | Cue states nest inside §18.1 `work`; the cue-level gap state is `gap` | Accepted 2026-08-23 | Avoids collisions with session `completed`/`cancelled` and BLE `recovering` (D5, D6) |
-| Puncheokie live screen is landscape-first | Accepted 2026-08-23 | Target device is the tablet (§5.1); phone-width follows in Phase 7 (D7) |
+| punchCraft workouts live screen is landscape-first | Accepted 2026-08-23 | Target device is the tablet (§5.1); phone-width follows in Phase 7 (D7) |
 | Adaptive plans persist the realized token stream and decisions | Accepted 2026-08-23 | Required for deterministic recalculation (§8.6, §19.1) (D8) |
 | Recipe + generator + seed replace editable programs and the editor | Accepted 2026-08-23 | Deterministic regeneration, smaller UI surface; persistence is parameters + version + seed (D9, D10) |
 | Strike confirmation is graded, capability-aware and never punitive | Accepted 2026-08-23 | The tracker cannot prove technique, so confirmation reports a confidence tier; signals the tier cannot supply are omitted, never zeroed, so a missing capability never reads as athlete failure (D11) |
 | The workout backdrop is fully independent of audio | Accepted 2026-08-23 | An animated visual playing alongside a streaming service is exactly the §14.6 synchronisation question; the backdrop loops on its own clock, is selected before playback, derives nothing from the track, and renders identically in silence. Any playback-to-backdrop coupling needs the §14.6 review first (D17, §31.1) |
 | Backdrop carries no information and is always defeatable | Accepted 2026-08-23 | It sits under a contrast scrim with a measurable floor (§31.3), auto-degrades under thermal or frame pressure, honours reduced motion, and can be switched off without affecting the workout (§31.4) |
-| Global orientation is `default`; the Puncheokie live route locks landscape on focus | Accepted 2026-08-23 | Records the mechanism behind D7's landscape-first deviation from §19.4's phone-first rule. `app.config.ts` sets `orientation: 'default'` so the OS follows the device everywhere, and only the live route calls `ScreenOrientation.lockAsync(LANDSCAPE)` in a `useFocusEffect`, releasing with `unlockAsync()` on blur — so no other route changes presentation. Prebuild emits `android:screenOrientation="unspecified"` with `configChanges` covering `orientation\|screenSize\|screenLayout\|smallestScreenSize`, so rotation delivers a configuration change to the existing activity rather than recreating it, and both React and Zustand state survive. Verified on the Lenovo TB125FU in the M32-05 spike (#182) |
+| Global orientation is `default`; the punchCraft workouts live route locks landscape on focus | Accepted 2026-08-23 | Records the mechanism behind D7's landscape-first deviation from §19.4's phone-first rule. `app.config.ts` sets `orientation: 'default'` so the OS follows the device everywhere, and only the live route calls `ScreenOrientation.lockAsync(LANDSCAPE)` in a `useFocusEffect`, releasing with `unlockAsync()` on blur — so no other route changes presentation. Prebuild emits `android:screenOrientation="unspecified"` with `configChanges` covering `orientation\|screenSize\|screenLayout\|smallestScreenSize`, so rotation delivers a configuration change to the existing activity rather than recreating it, and both React and Zustand state survive. Verified on the Lenovo TB125FU in the M32-05 spike (#182) |
 
 ## 26. Open technical questions
 
@@ -2263,7 +2263,7 @@ These questions should be answered through Velocity Lab evidence rather than spe
 16. Does firmware differ between the two trackers?
 17. What Android version is on the target tablet?
 18. Does the chosen Expo SDK and BLE library combination handle both trackers reliably?
-19. Is Puncheokie intended only for personal use or eventual public distribution?
+19. Is punchCraft workouts intended only for personal use or eventual public distribution?
 20. Will Spotify remain optional, or must another music-provider abstraction be introduced?
 21. Does transient may-duck audio focus reliably duck Spotify on the target tablet without pausing it, and does Spotify restore volume after each Voice Coach utterance?
 22. What spoken-cue lead time (ms before a token window opens) is needed per cadence profile, given text-to-speech start latency on the tablet?
@@ -2296,7 +2296,7 @@ The MVP includes:
 - local history and export; and
 - reconnect/degraded-mode handling.
 
-**Puncheokie**
+**punchCraft workouts**
 
 - preset and recipe-driven generated workouts with numbered combinations (no free-form editor);
 - orthodox, southpaw, and switch stance;
@@ -2320,7 +2320,7 @@ Potential future adapters:
 - `ReplayFileAdapter`
 - `MockTrainingAdapter`
 
-This preserves the value of punchCraft, calibration, metrics, and Puncheokie even after the legacy trackers fail physically.
+This preserves the value of punchCraft, calibration, metrics, and punchCraft workouts even after the legacy trackers fail physically.
 
 ## 29. Reference sources and current platform constraints
 
@@ -2364,11 +2364,11 @@ Begin Phase 1 by creating the smallest possible installable Velocity Lab develop
 - raw frame persistence; and
 - JSON export.
 
-Do not begin punchCraft metric polish, Puncheokie workout generation, or Spotify authorization until the app can capture a repeatable tracker frame for one controlled punch.
+Do not begin punchCraft metric polish, punchCraft workouts workout generation, or Spotify authorization until the app can capture a repeatable tracker frame for one controlled punch.
 
 ## 31. Workout backdrop and ambience
 
-Every workout presentation — the punchCraft live session (§8.3) and the Puncheokie live screen (Puncheokie doc §19) — renders its interface over a selectable, looping animated backdrop drawn from a curated library organised by mood. The backdrop sets the feel of the room. It never carries information: no state, count, cue or warning is ever expressed by the backdrop alone.
+Every workout presentation — the punchCraft live session (§8.3) and the punchCraft workouts live screen (punchCraft workouts doc §19) — renders its interface over a selectable, looping animated backdrop drawn from a curated library organised by mood. The backdrop sets the feel of the room. It never carries information: no state, count, cue or warning is ever expressed by the backdrop alone.
 
 ### 31.1 Independence from audio
 
@@ -2424,7 +2424,7 @@ The backdrop is the lowest-priority consumer of the device. It must not disturb 
 - The cue pipeline's p95 latency (§19.2) must be unchanged, within measurement noise, with the heaviest backdrop running versus none.
 - The backdrop renders off the JavaScript thread wherever the chosen technology allows it, so a dropped backdrop frame can never delay a cue, a timer tick, or a punch acknowledgement.
 - **Auto-degrade** on sustained frame drops, thermal throttling, or battery saver: `active` falls back to `subtle`, then to `still` (a single frame or flat gradient). Degrading is silent and never interrupts the workout.
-- Reduced motion (§19.4, Puncheokie doc §25) forces `still`.
+- Reduced motion (§19.4, punchCraft workouts doc §25) forces `still`.
 - An explicit off switch is always available, and `{ kind: 'gradient' }` is the guaranteed-available floor on every device.
 
 ### 31.5 Selection and reproducibility
@@ -2440,6 +2440,6 @@ The starter library ships bundled with the application; there is no backend and 
 | Date | Version | Change |
 |---|---|---|
 | 2026-08-22 | 1.0 | Initial specification (as PunchLab). |
-| 2026-08-23 | 1.1 | Product renamed punchCraft (PR #166). Puncheokie v0.2 design landed ([puncheokie-ux-workout-engine.md](puncheokie-ux-workout-engine.md)): §13 banner added; §13.3, §13.5, §14.1, §14.6, §19.4 amended; §6, §15.2, §16, §17.1, §18.1 updated; §22 Phase 5 rewritten; §25 and §26 entries added; this section added. |
-| 2026-08-23 | 1.2 | Puncheokie v0.3 (doc §28 strike confirmation, combo plausibility and gratification): `combo_results` added to §17.1; `domain/feedback/` and `haptics/` added to §16; §22 Phase 5 task 15 added; §25 gains the D11 decision. |
+| 2026-08-23 | 1.1 | Product renamed punchCraft (PR #166). punchCraft workouts v0.2 design landed ([workouts-ux-engine.md](workouts-ux-engine.md)): §13 banner added; §13.3, §13.5, §14.1, §14.6, §19.4 amended; §6, §15.2, §16, §17.1, §18.1 updated; §22 Phase 5 rewritten; §25 and §26 entries added; this section added. |
+| 2026-08-23 | 1.2 | punchCraft workouts v0.3 (doc §28 strike confirmation, combo plausibility and gratification): `combo_results` added to §17.1; `domain/feedback/` and `haptics/` added to §16; §22 Phase 5 task 15 added; §25 gains the D11 decision. |
 | 2026-08-23 | 1.3 | New §31 Workout backdrop and ambience (selectable animated loops, audio independence, contrast scrim, motion and battery budget, seed-stable selection, bundled licensed library); `presentation/backdrops/` added to §16; §22 Phase 5 task 16 added; §25 gains D17; §26 gains questions 26–28; revision history renumbered to §32. |

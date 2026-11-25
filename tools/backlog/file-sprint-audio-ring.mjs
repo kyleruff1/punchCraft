@@ -6,7 +6,7 @@
  * Creates ONE parent tracking issue plus the opening set of sub-issues
  * (A0..A15), links each sub-issue to the parent via the `addSubIssue`
  * GraphQL mutation, and adds every issue to Project #5 with the correct
- * field values (Phase 5, Area Puncheokie, Priority, Size, Sprint 1).
+ * field values (Phase 5, Area punchCraft workouts, Priority, Size, Sprint 1).
  *
  * IDEMPOTENT by exact title: a re-run finds each existing issue and only
  * fills whatever step (labels, milestone, sub-issue link, project item,
@@ -14,10 +14,10 @@
  * each test pass that appends a new observed defect gets its own entry
  * added here + a second run of the script.
  *
- * Repo:      kyleruff1/punchCraft-Puncheokie
+ * Repo:      kyleruff1/punchCraft-punchCraft workouts
  * Milestone: 34 (M34: Voice Coach)  — verified live
  * Project:   #5  (PVT_kwHOAvpEDc4BhJtG)
- * Labels:    task, phase:5, area:puncheokie, P0|P1|P2, sprint-1 (all verified live)
+ * Labels:    task, phase:5, area:workouts, P0|P1|P2, sprint-1 (all verified live)
  *
  * Usage:
  *   node tools/backlog/file-sprint-audio-ring.mjs           # runs it
@@ -32,7 +32,7 @@ import { promisify } from 'node:util'
 
 const execFile = promisify(execFileCb)
 const DRY = process.argv.includes('--dry-run')
-const REPO = 'kyleruff1/punchCraft-Puncheokie'
+const REPO = 'kyleruff1/punchCraft-punchCraft workouts'
 const MILESTONE_NUM = 34
 const MILESTONE_TITLE = 'M34: Voice Coach'
 const OWNER = '@me'
@@ -50,7 +50,7 @@ const FIELD = {
 }
 const OPT = {
   Phase5: projectSchema.fields.Phase.options['Phase 5'].id,
-  AreaPuncheokie: projectSchema.fields.Area.options.Puncheokie.id,
+  AreapunchCraft workouts: projectSchema.fields.Area.options.punchCraft workouts.id,
   P0: projectSchema.fields.Priority.options.P0.id,
   P1: projectSchema.fields.Priority.options.P1.id,
   P2: projectSchema.fields.Priority.options.P2.id,
@@ -62,12 +62,12 @@ const OPT = {
 const SPRINT1_ITER = projectSchema.fields.Sprint.iterations['Sprint 1'].id
 
 /** Common labels every sub-issue carries. */
-const BASE_LABELS = ['task', 'phase:5', 'area:puncheokie', 'sprint-1']
+const BASE_LABELS = ['task', 'phase:5', 'area:workouts', 'sprint-1']
 
 /** Parent tracking issue. */
 const PARENT = {
   title: 'M34-A Audio & ring integrity — the double-sided engine',
-  labels: ['story', 'phase:5', 'area:puncheokie', 'P0', 'sprint-1'],
+  labels: ['story', 'phase:5', 'area:workouts', 'P0', 'sprint-1'],
   priority: 'P0',
   size: 'L',
   body:
@@ -440,7 +440,7 @@ async function setIteration(itemId, fieldId, iterId) {
 async function applyBoardFields(issueUrl, priority, size) {
   const itemId = await addToProject(issueUrl)
   await setSingleSelect(itemId, FIELD.Phase, OPT.Phase5)
-  await setSingleSelect(itemId, FIELD.Area, OPT.AreaPuncheokie)
+  await setSingleSelect(itemId, FIELD.Area, OPT.AreapunchCraft workouts)
   await setSingleSelect(itemId, FIELD.Priority, OPT[priority])
   const sizeOpt = { XS: OPT.SizeXS, S: OPT.SizeS, M: OPT.SizeM, L: OPT.SizeL }[size]
   if (sizeOpt) await setSingleSelect(itemId, FIELD.Size, sizeOpt)

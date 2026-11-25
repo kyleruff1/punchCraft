@@ -275,7 +275,7 @@ export function parseRepLines(text) {
   const reps = []
   const lines = String(text).split(/\r?\n/)
   for (let i = 0; i < lines.length; i += 1) {
-    if (!lines[i].includes('puncheokie.ruler.rep')) continue
+    if (!lines[i].includes('workout.ruler.rep')) continue
     // The record spans continuation lines; gather until the closing brace.
     // Bounded, so a log whose record was cut off at the end of the file does
     // not swallow the remaining megabyte looking for a brace that never comes.

@@ -74,7 +74,7 @@ let REPO = args.get('repo')
 if (!REPO) {
   const url = sh(['git', 'remote', 'get-url', 'origin'], { allowFail: true }).stdout.trim()
   const m = url.match(/github\.com[/:]([^/]+)\/([^/.]+)(?:\.git)?$/)
-  REPO = m ? `${m[1]}/${m[2]}` : 'kyleruff1/punchCraft-Puncheokie'
+  REPO = m ? `${m[1]}/${m[2]}` : 'kyleruff1/punchCraft-punchCraft workouts'
 }
 const [REPO_OWNER, REPO_NAME] = REPO.split('/')
 const OWNER = PROJECT?.project?.owner || '@me'
