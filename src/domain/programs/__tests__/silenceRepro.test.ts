@@ -32,6 +32,10 @@ describe('burst blocks keep the coach speaking (mid-round silence regression)', 
     expect(bursts.length).toBeGreaterThan(0)
 
     const clock = createFakeClock()
+    // The port is handed MONOTONIC deadlines; the burst windows below are on
+    // the round's work clock. The drive moves both in lockstep, so calls are
+    // recorded relative to where the monotonic clock stood at the bell.
+    const roundStartedAtMs = clock.now()
     const phraseCalls: Array<{ at: number; combination: string }> = []
     const output: VoiceOutputPort = {
       playAsset: () => undefined,
@@ -40,7 +44,7 @@ describe('burst blocks keep the coach speaking (mid-round silence regression)', 
       tone: () => undefined,
       setVolumes: () => undefined,
       playCombination: (combination, _cadence, atMs) => {
-        phraseCalls.push({ at: atMs ?? clock.now(), combination })
+        phraseCalls.push({ at: (atMs ?? clock.now()) - roundStartedAtMs, combination })
         return true
       },
       combinationDurationMs: () => 1200,

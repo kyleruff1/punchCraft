@@ -18,7 +18,12 @@ interface Harness {
   clock: FakeClock
   source: SimulatedPunchSource
   events: TrackerPunchEvent[]
-  /** Delivery times, which is what latency and jitter actually move. */
+  /**
+   * Delivery times, which is what latency and jitter actually move —
+   * measured from when the source started. The clock's own origin is
+   * arbitrary (and is not zero), so a script offset can only be compared
+   * with a delivery time taken relative to the start.
+   */
   times: () => number[]
 }
 
@@ -32,8 +37,14 @@ function harness(options: Partial<ConstructorParameters<typeof SimulatedPunchSou
     ...options,
   })
   source.subscribe((event) => events.push(event))
+  const startedAtMs = clock.now()
   source.start()
-  return { clock, source, events, times: () => events.map((e) => e.receivedMonotonicTimeMs) }
+  return {
+    clock,
+    source,
+    events,
+    times: () => events.map((e) => e.receivedMonotonicTimeMs - startedAtMs),
+  }
 }
 
 describe('script catalogue', () => {
@@ -148,6 +159,7 @@ describe('jitter and drops are deterministic under a seed', () => {
     const events: TrackerPunchEvent[] = []
     const source = new SimulatedPunchSource({ clock, seed: 's', jitterMs: 50, latencyMs: 50 })
     source.subscribe((e) => events.push(e))
+    const startedAtMs = clock.now()
     source.start()
     source.playScript('alternating-1-2')
     clock.advance(20_000)
@@ -155,7 +167,8 @@ describe('jitter and drops are deterministic under a seed', () => {
     const expected = SIM_SCRIPTS['alternating-1-2'].map((s) => s.offsetMs + 50)
     expect(events).toHaveLength(expected.length)
     events.forEach((event, i) => {
-      expect(Math.abs(event.receivedMonotonicTimeMs - expected[i]!)).toBeLessThanOrEqual(50)
+      const deliveredAfterMs = event.receivedMonotonicTimeMs - startedAtMs
+      expect(Math.abs(deliveredAfterMs - expected[i]!)).toBeLessThanOrEqual(50)
     })
   })
 
@@ -175,7 +188,7 @@ describe('taps', () => {
     h.clock.advance(100)
     expect(h.events).toHaveLength(1)
     expect(h.events[0]?.hand).toBe('right')
-    expect(h.events[0]?.receivedMonotonicTimeMs).toBe(40)
+    expect(h.times()[0]).toBe(40)
   })
 
   it('is never dropped — a tap is a direct instruction, not traffic', () => {
