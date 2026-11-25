@@ -16,16 +16,41 @@ Where this document says a line number, it was read at `6129f24b`.
 `tsc --noEmit` exit 0; `guard:playlist-sample-rate` exit 0;
 `guard:velocity-terminology` **exit 1** (see T-2).
 
-> **Status, later the same day.** Kyle chose to go straight at the HIGH
-> findings rather than instruments-first. **H-1 … H-4 are fixed and committed
-> on `review/handoff-cycle`**, one commit each (`a360b4e8`, `4da51af0`,
-> `e5184e05`, `e9749377`; nothing pushed) — each has a "Status" note below
-> saying what was done and what is still unverified. Two of the write-ups in this document were wrong in
-> ways that changed the work, and are corrected in place: the **H-3 fix** (the
-> "3 lines" would not have fixed it) and the **H-4 root cause** (not the repair
-> cap). T-1 and T-2 are untouched, so a bare `npx jest` still finds nothing in
-> a worktree. After the fixes: 184 suites / 4,299 tests green, `tsc` and
-> `eslint` clean.
+> **Status at the end of 2026-11-25.** Everything in §2 and §3 marked HIGH or
+> MEDIUM is now fixed and committed on `review/handoff-cycle` — one commit
+> per fix, nothing pushed. Each finding below carries a "Status"
+> note saying what was done and what is still unverified.
+>
+> | | Commit |
+> |---|---|
+> | H-1 clock domains | `a360b4e8` |
+> | H-3 shared BLE monitor | `4da51af0` |
+> | H-2 Android back | `e5184e05` |
+> | H-4 duration keeps intensity | `e9749377` |
+> | P-2 guard allowlist | `dd3a75f0` |
+> | N-1 deduplicated punch | `7de47b95` |
+> | T-1 jest in a worktree | `525d191e` |
+> | T-2 click-path gates | `a1986900` |
+> | fake clock origin | `745894ef` |
+> | H-4 root cause (round filler) | `7be9d2ed` |
+> | M-1 / M-4 paused and post-stop punches | `b068fd29` |
+> | M-2 coach off | `16417f3a` |
+> | M-6 mid-rest vocabulary flip | `32b65fa9` |
+> | M-5 repeated cue | `65946d40` |
+> | M-3 Discard | `0663a33e` |
+>
+> **Three of this document's own write-ups were wrong** in ways that changed
+> the work, and are corrected in place: the **H-3 fix** (the "3 lines" would
+> not have fixed it), the **H-4 root cause** (not the repair cap), and
+> **T-2** (the gates I said were suppressed could never fire at all; the real
+> gaps were elsewhere). A fourth claim is simply false: `tools/analysis/` does
+> have tests.
+>
+> **Verified at this state:** 186 suites / 4,428 tests / 22 snapshots green
+> with a bare `npx jest`; `tsc` and `eslint` clean; both guards pass.
+> **Not verified:** anything on the tablet, and the QA suite has not been
+> re-driven since its verdicts were tightened. The checklist is §7.
+
 
 ---
 
@@ -103,6 +128,9 @@ scanner reading prose"). The second rationale is this case exactly. Add
 `docs/handoff/05-toolchain-and-methods.md` with a comment in the same register.
 Rephrasing is the wrong fix — it would mean the doc cannot name the banned
 tokens.
+
+**Status: done** (`dd3a75f0`). The one file is allowlisted with a comment; the
+guard is green, which also unblocks PR #390's CI.
 
 ### P-3 · `README.md` is misfiled as stale
 
@@ -191,6 +219,11 @@ correctly as `'<rootDir>/.claude/worktrees/'`.
 
 **Fix:** `'/.claude/worktrees/'` → `'<rootDir>/.claude/worktrees/'`.
 
+**Status: done** (`525d191e`). A bare `npx jest` from this worktree now finds
+and runs every suite. Checked the other direction too, against the pattern
+jest builds when `rootDir` is `F:\punchCraft`: it still ignores a nested
+worktree's tests and keeps its own.
+
 The package could not have found this — it ran from `F:\punchCraft`. But any
 Claude Code session defaults to a worktree, so the "baseline gate" instruction in
 `07:§0` silently reports success-looking failure to every future session. Worth
@@ -200,8 +233,42 @@ backslash paths, so it reports "2 failed suites" that are just helper files.
 
 ### T-2 · The verifier cannot hard-fail on any of the 22 workouts it verifies · **HIGH**
 
-This one undermines the evidentiary base of the whole project, including parts of
-the handoff package.
+> **Correction — the mechanism below is wrong, and so was the fix.** The
+> headline overstated it too: the verifier *could* already fail a shipped
+> sample, on a missing or duplicated lead-in.
+>
+> The three gates are not merely suppressed on the 22 click-path workouts;
+> they are **inert**. `notArmed` needs a `combo-announce` in the manifest, and
+> none of the 44 manifests has one — every coach event in them is a `lead-in`.
+> `deferred` and `assetMissing` are counted from `slotDispatcher.*` records
+> that only the score path writes, and those workouts do not run it. Flipping
+> the suppression polarity, as proposed at the end of this section, would
+> have changed no verdict at all.
+>
+> What the verifier genuinely did not check on the click path:
+>
+> - **Per-bar loop calls** — about seventy a round, most of what the coach
+>   says. `callsDispatched / expectedCallBars` was printed, with "LOW" under
+>   90%, and never touched the verdict.
+> - **Playback failures.** `voice.playFailed` and `voice.clipMissing` were
+>   parsed and then dropped.
+> - **Identity.** Nothing tied a capture to its manifest's workout or
+>   timeline — this part of the original text stands.
+>
+> **Status: fixed** (`a1986900`), **pending one suite drive.** The runner logs
+> `workout.timeline.provenance` for every workout; on the click path it
+> compiles the score for its hash only when `__DEV__ || isQaEnabled()`, inside
+> a `try`. The verifier reads that record (falling back to
+> `slotDispatcher.armed`), checks the workout against `runner.start`, treats
+> an unverified capture as WARN rather than PASS, FAILs on a clip that did
+> not load or play inside the round, FAILs when no loop call was dispatched
+> where some were expected, and WARNs under the existing 90% line.
+> `provenance.test.tsx` checks, for all 22 samples, that the hash the runner
+> logs is the hash the checked-in manifest carries — so the first drive
+> should not read STALE across the board, but only a drive can say.
+
+*(Original text, kept for the record:)* This one undermines the evidentiary
+base of the whole project, including parts of the handoff package.
 
 `verify-first-round.mjs:576` suppresses three gates when provenance is not
 provable:
@@ -355,9 +422,15 @@ stored).
   real runner into real SQLite at four clock origins and requires identical
   rows. Mutation-checked: restoring the old behaviour makes it fail by exactly
   5 080 ms at origin 0 (the countdown) and 3 605 080 ms at one hour.
-- The global `createFakeClock` default was **not** flipped — that is the
-  instrument work Kyle deferred. It is still the way to find instances nobody
-  has looked for.
+- **The global `createFakeClock` default has since been flipped** (`745894ef`)
+  to a named, non-round constant. It surfaced 12 failures in three suites
+  (`rhythmMapParity`, `silenceRepro`, `SimulatedPunchSource`), every one a
+  fixture reading a monotonic stamp as round time, and no further product
+  defect. One thing it could not see and I noticed reading:
+  `SimulatedPunchSource.ts:259` stamps `trackerTimestampMs` with the monotonic
+  receive time — a simulated event's "device epoch" field holds app uptime.
+  Harmless today (sim events are never `recovered`), but it is the same
+  confusion in miniature.
 
 ### H-2 · Android hardware back silently discards the whole workout · **HIGH**
 
@@ -502,11 +575,26 @@ the recipe screen; (3) revisit the repair cap, which is a tuning question.
   and in the summary when rounds would run dry (`coverageConflict`). A low goal
   set with the stepper still produces silent tails; the athlete is now told
   before starting rather than finding out on the bag.
-- **(3)** The generator is untouched. The one-line change above alters
-  generated workouts at any goal where a phase's gap clamps high (30 min @ 900
-  moved in the probe), so it needs a `GENERATOR_VERSION` bump and your ear on
-  how a low-volume round should sound: more reps at the widest gap, or a long
-  coast tail.
+- **(3)** ~~The generator is untouched.~~ **Fixed at Kyle's direction**
+  (`7be9d2ed`): when a phase's gap hits its ceiling the reps now come from the
+  time budget. `GENERATOR_VERSION` is `1.3.0` — and since the version seeds
+  selection, **every** generated workout differs from its 1.2.0 plan for the
+  same seed, not only low-goal ones. Of 1,152 sampled cells (4 durations × 12
+  goals × 4 cadences × 3 seeds × 2 option sets), **775 failed the coverage
+  audit before and 8 do now**. `roundFill.test.ts` holds D26 at every goal
+  from 50 upward for three cadences; the old suite sampled only the default.
+  - **The 8 that remain are the real repair cap.** All sprint cadence, around
+    250 punches a round, 5–7 s short. At that tempo one repair pass adds under
+    a second and the loop is bounded by count (24 two-rep passes, then 6
+    single reps), not by time. Pinned in a test, not changed — re-bounding it
+    changes how a round ends.
+  - **The warning from (2) is re-aimed.** A low goal no longer runs a round
+    dry, so "raise the goal" would be advice that changes nothing. What still
+    does is too narrow a content pool — one enabled punch, or combinations
+    capped at one or two, leaves 12–29 s tails. `coverageConflict` now fires at
+    10 s rather than the audit's 5 s, points at those two controls, and says
+    to enable more punches.
+  - Still wants your ear: how a low-goal round sounds now that it is full.
 
 ### M-group · Six confirmed MEDIUMs
 
@@ -518,6 +606,16 @@ the recipe screen; (3) revisit the repair cap, which is a tuning question.
 | M-4 | **Post-terminal counter creep.** `emergencyStop`'s `source.stop()` is a no-op on the real-tracker path, and `onPunch` has no terminal-phase gate, so counters climb under the "Stopped"/"Workout complete" overlay. Two-line fix in the runner, source-agnostic — it also covers the natural-finish window `source.stop()` never addressed. | Yes |
 | M-5 | **`repeatCue()` reps are never written to `cue_results`.** The injected cue lives only in `CueEngine.runtimes` with a synthetic id, while every consumer is keyed off the static timeline (`cuesById`, `_useWorkoutRunner.ts:1328`). Nothing is overwritten — the row simply never reaches persistence. Latent and worse: `source.repeatIndex + 1` duplicates the *next natural* rep's key on every shipped block. | No; silent record loss |
 | M-6 | **A mid-rest vocabulary flip kills the rest script.** Root cause is *not* the unreset `started` latch named in the original finding: `prepare()` accepts a scriptId swap while a playlist is in flight, and `CeremonyPlaylist.build()` unconditionally disposes the sounding playlist (`CeremonyPlaylist.ts:122`) before the latch (`RecoveryPlayer.ts:97-98`) blocks the replacement from ever starting. The voice stops mid-word — cleanly, since teardown pauses before destroying — and the rest of the rest head is silent. | Yes — your ear would catch it |
+
+**Status: all six fixed.**
+
+| # | Commit | What changed | Left open |
+|---|---|---|---|
+| M-1, M-4 | `b068fd29` | `onPunch` returns early while the session is `paused`, `completed` or `cancelled`: nothing counts, matches or buzzes. | Punches before the first bell and through a rest still count, as before. |
+| M-2 | `16417f3a` | The recipe's minimal cap is a ceiling; `'off'` survives it. | — |
+| M-6 | `32b65fa9` | `RecoveryPlayer.prepare` ignores a different script once the walkthrough has started. | The new vocabulary applies from the next rest, not mid-rest. |
+| M-5 | `65946d40` | `cue-settled` carries its cue, so a repeated rep's rows are written; the copy takes the next free repeat index. Mutation-checked: with the old index the session write fails on the primary key. | A repeated cue still has no entry in the spine or walk plan. Repeating any rep but a block's last also makes it start on top of the natural next rep, and the engine closes one of them at once — unexamined. |
+| M-3 | `0663a33e` | `WorkoutRunner.discardSession()` deletes the session the run wrote; Discard calls it, Save just leaves. | The `generated_workouts` row is left (its id is shared across sessions of the same workout). |
 
 ### Package target re-verdicts
 
@@ -567,14 +665,25 @@ those are no longer credited — but does not close it. The fix is small and
 local to `persistWorkoutSession`: have a cue result fall back to the surviving
 row's id, or to `null`, when its punch was deduplicated.
 
+**Status: fixed** (`7de47b95`). `appendPunchEvent` reports `storedId` — the row
+that represents the punch, the survivor's when it was dropped — and
+`persistWorkoutSession` points each cue result at it. Both slots keep their
+credit and the session is saved. Whether hardware can trigger it is still
+unestablished; it no longer matters for the record.
+
 ### Not reviewed — the honest gaps
 
 Three subsystems nobody was assigned, ranked by where a real defect is most
 likely:
 
-1. **`tools/analysis/` correlators** — 918 + 492 + 1000 + 1383 lines, **no test
-   anywhere in the repo**. T-2 came out of a first look at this layer; it is the
-   layer the whole review implicitly trusted as ground truth.
+1. **`tools/analysis/` correlators** — 918 + 492 + 1000 + 1383 lines. ~~No test
+   anywhere in the repo~~ — **that was false.** `tools/analysis/__tests__/` has
+   four suites (1,506 lines at the time): `verify-first-round`, `verify-suite`,
+   `observed-timing`, `logcat-tag-aliases`, and jest runs them. What is true
+   is narrower: the *click-path* behaviour of `verify-first-round` had no
+   test, which is how its gates went unexamined (see the T-2 correction). It
+   is still the layer the whole review trusted as ground truth, and
+   `token-forensics.mjs` and the two drive scripts remain untested.
 2. **The QA deep-link privilege model.** `src/app/qa/run.tsx:93-94` is a
    self-authorizing gate: it sets `enabled` from the request, then reads it back
    as the authorization. So `punchcraft://qa/run?workout=…&autostart=1&sim=…&qa=1`
@@ -797,3 +906,57 @@ blind fix to a clock-base error is how this project loses another session.
    personal device?
 6. **`roundFill`'s repair cap** (H-4 piece 3) — a tuning question I won't touch
    without your ear.
+
+**Where these stand at the end of 2026-11-25.** (1) Answered: HIGHs first, then
+N-1, the instruments and the MEDIUMs — all done. (2) Half answered: the
+allowlist is in, so PR #390 can go green; whether to merge it before this
+branch is still yours. (6) Answered for the clamp, which was the actual cause
+and is fixed; the repair cap proper turned out to be a much smaller, separate
+residual at sprint cadence (see H-4) and is still a listening question.
+(3), (4) and (5) are open.
+
+---
+
+## 7. What only the tablet, or a suite drive, can verify
+
+Nothing below is proven by jest. Every item needs a Metro restart **and** a
+cold app restart first — `F:` has no fast refresh.
+
+**Bluetooth (H-3) — the one that matters most.**
+- Gloves connected → Velocity Lab → Live → back → start a workout → punches
+  count. Then the same through Velocity Lab → Probe.
+- With a glove that drops and reconnects while a Velocity Lab screen is open,
+  leave the screen: the workout still counts.
+
+**On the bag.**
+- H-1: an on-beat matched punch now gives the stronger buzz. It never has
+  before; decide whether you want it.
+- H-2: back mid-round stops the workout and shows the dialog; a second back
+  leaves; the session is in the database as cancelled.
+- M-1: pause mid-combination and throw — counters do not move, no buzz, and
+  the combination is not credited on resume.
+- M-4: after Stop, and after a natural finish, counters do not move.
+- M-2: "Voice coach: Off" with any library workout — no bell, no sound.
+- M-3: Stop → Discard removes the session; Stop → Save keeps it.
+- M-6: flip numbers ⇄ techniques while the rest walkthrough is speaking — it
+  finishes in the vocabulary it started in.
+- M-5: hold Repeat mid-combination, finish the round — the session saves.
+
+**Recipe screen.**
+- Duration 20 → 60 shows a goal of 2,700 and the same intensity label.
+- Advanced → enable only punches 1 and 2 and cap combinations at 2 → the
+  warning appears in the summary and beside the punch toggles. (Whether a
+  given build runs dry depends on its seed; it did for the one I tried.)
+
+**By ear.**
+- A generated workout at a low goal (try 60 minutes at 900): every round is
+  now full to the bell. Is that the round you want, or too dense?
+- Any generated workout: generator 1.3.0 reseeds selection, so a saved seed
+  no longer gives the workout it used to.
+
+**The QA suite (T-2).** One full drive to re-baseline the ledger. Expect:
+every capture to carry a `workout.timeline.provenance` record and read
+"verified"; no workout to read STALE; verdicts that were PASS to become WARN
+where loop-call coverage is under 90%, and FAIL where a clip failed to load
+or play. A capture from a build without QA enabled reads WARN (unverified)
+by design.
