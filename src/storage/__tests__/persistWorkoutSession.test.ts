@@ -231,3 +231,82 @@ describe('an empty but valid workout', () => {
     expect(result.cueResultCount).toBe(0)
   })
 })
+
+describe('a deduplicated punch does not cost the session', () => {
+  // `punch_events` drops a row that collides with one already stored on
+  // (device, tracker timestamp, type byte, reading). `cue_results
+  // .observed_event_id` is a real foreign key. Put together: two credited
+  // punches that collide, and the second cue result names a punch that was
+  // never written — the key fails and the whole workout rolls back.
+
+  const punch = (id: string) => ({
+    id,
+    sourceFrameId: `frame-${id}`,
+    deviceId: 'LEFT',
+    hand: 'left' as const,
+    receivedMonotonicTimeMs: 5_000,
+    receivedWallTimeIso: '2026-08-23T10:00:00.000Z',
+    velocityRaw: 50,
+    velocityUnit: 'tracker-unit' as const,
+    recovered: false,
+    decoderId: 'fake',
+    decoderVersion: '1',
+    qualityFlags: [],
+  })
+
+  const collidingPair = () => ({
+    punchEvents: [punch('e1'), punch('e2')],
+    cueResults: [
+      cueRow({ tokenIndex: 0, observedEventId: 'e1' }),
+      cueRow({ tokenIndex: 1, observedEventId: 'e2' }),
+    ],
+  })
+
+  it('writes the session', () => {
+    const h = harness()
+    expect(() => persist(h, collidingPair())).not.toThrow()
+    expect(h.count('sessions')).toBe(1)
+    expect(h.count('cue_results')).toBe(2)
+  })
+
+  it('points both cue results at the one punch that was stored', () => {
+    const h = harness()
+    persist(h, collidingPair())
+
+    expect(h.count('punch_events')).toBe(1)
+    const named = (
+      h.db.raw
+        .prepare('SELECT observed_event_id AS id FROM cue_results ORDER BY token_index')
+        .all() as Array<{ id: string | null }>
+    ).map((row) => row.id)
+    expect(named).toEqual(['e1', 'e1'])
+  })
+
+  it('still counts the dropped copy as a suppressed duplicate', () => {
+    const h = harness()
+    const { sessionId } = persist(h, collidingPair())
+    expect(h.sessions.getById(sessionId)?.quality.duplicatesSuppressed).toBe(1)
+  })
+
+  it('leaves a cue result alone when its punch was not part of this write', () => {
+    // Not ours to redirect: if the id really is missing, the foreign key
+    // should say so rather than the row being quietly rewritten.
+    const h = harness()
+    expect(() =>
+      persist(h, { cueResults: [cueRow({ observedEventId: 'never-written' })] }),
+    ).toThrow()
+    expect(h.count('sessions')).toBe(0)
+  })
+
+  it('changes nothing when no punches collide', () => {
+    const h = harness()
+    persist(h, {
+      punchEvents: [punch('e1'), { ...punch('e2'), velocityRaw: 51 }],
+      cueResults: [
+        cueRow({ tokenIndex: 0, observedEventId: 'e1' }),
+        cueRow({ tokenIndex: 1, observedEventId: 'e2' }),
+      ],
+    })
+    expect(h.count('punch_events')).toBe(2)
+  })
+})

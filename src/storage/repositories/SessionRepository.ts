@@ -140,6 +140,18 @@ export interface AppendPunchEventResult {
   /** False when the compound-key dedup index (migration 002) dropped the row. */
   inserted: boolean
   duplicate: boolean
+  /**
+   * The id of the row that now represents this punch: its own when it was
+   * inserted, the surviving row's when the dedup index dropped it.
+   *
+   * Anything that goes on to reference the punch by id — `cue_results
+   * .observed_event_id` is a real foreign key — must use this rather than the
+   * id it passed in. A dropped row's own id exists nowhere, and naming it
+   * fails the key and takes the whole transaction with it. `null` only if the
+   * insert was ignored and no surviving row can be found, which a caller
+   * should treat as "no punch to point at".
+   */
+  storedId: string | null
 }
 
 export interface SessionMetricRow {
@@ -625,7 +637,7 @@ export class SessionRepository {
 
     if (!inserted) {
       this.addQualityCounters(input.sessionId, { duplicatesSuppressed: 1 })
-      return { inserted: false, duplicate: true }
+      return { inserted: false, duplicate: true, storedId: this.survivorOf(input) }
     }
     if (input.rejectionReason) {
       this.addQualityCounters(input.sessionId, {
@@ -633,7 +645,39 @@ export class SessionRepository {
         ...(input.rejectionReason === 'decoder-invalid' ? { malformedEvents: 1 } : {}),
       })
     }
-    return { inserted: true, duplicate: false }
+    return { inserted: true, duplicate: false, storedId: input.id }
+  }
+
+  /**
+   * The row an ignored insert collided with.
+   *
+   * `INSERT OR IGNORE` drops a row for either of two reasons: its id is
+   * already there, or the migration 002 dedup index says the same punch is
+   * (same device, tracker timestamp, type byte and reading). The key below
+   * is that index's own expression, COALESCEs included.
+   */
+  private survivorOf(input: SessionPunchEventInput): string | null {
+    const sameId = this.select<{ id: string }>('SELECT id FROM punch_events WHERE id = ?', [
+      input.id,
+    ])[0]
+    if (sameId) return sameId.id
+
+    return (
+      this.select<{ id: string }>(
+        `SELECT id FROM punch_events
+          WHERE COALESCE(device_address, '') = COALESCE(?, '')
+            AND COALESCE(tracker_timestamp_ms, -1) = COALESCE(?, -1)
+            AND COALESCE(punch_type_raw, -1) = COALESCE(?, -1)
+            AND COALESCE(velocity_raw, -1) = COALESCE(?, -1)
+          LIMIT 1`,
+        [
+          input.deviceAddress ?? null,
+          input.trackerTimestampMs ?? null,
+          input.punchTypeRaw ?? null,
+          input.velocityRaw ?? null,
+        ],
+      )[0]?.id ?? null
+    )
   }
 
   /** Events in monotonic order. Rejected events are included by default (§18.2). */

@@ -27,6 +27,8 @@ import { createMigratedDb } from '@storage/__tests__/helpers/memoryDb'
 import { SessionRepository } from '@storage/repositories/SessionRepository'
 import { WorkoutRepository } from '@storage/repositories/WorkoutRepository'
 import { defaultRecipe } from '@domain/workout/WorkoutRecipe'
+import { bpmForRecipe } from '@domain/workout/cadence'
+import { expandTimeline } from '@domain/programs/CueTimeline'
 import { resetLive, useLiveStore } from '@state/useWorkoutStore'
 import type { WorkoutPersistence } from '@storage/getWorkoutPersistence'
 import type { GeneratedWorkout } from '@domain/workout/GeneratedWorkout'
@@ -289,6 +291,39 @@ describe('a completed workout lands in the database', () => {
       const found = p.raw.prepare('SELECT id FROM punch_events WHERE id = ?').get(id)
       expect(found).toBeDefined()
     }
+    h.unmount()
+  })
+
+  it('still saves when one glove lands two punches the database cannot tell apart', () => {
+    // `punch_events` drops a row that matches one already stored on device,
+    // tracker timestamp, type byte and reading — and this source reports no
+    // tracker timestamp, so two left punches with the same reading collide.
+    // Each answered a different combination, so two cue results name them.
+    // The second one named a punch that was never written; the foreign key
+    // failed and the whole workout rolled back.
+    const second = expandTimeline(WORKOUT, 'orthodox', bpmForRecipe(WORKOUT.recipe))[0]!.cues[1]!
+    const p = realPersistence()
+    const h = mount(p)
+    h.begin()
+    h.emit('left')
+    // Into the second combination's window, then the same punch again.
+    h.step(second.scheduledStartMs)
+    h.emit('left')
+    h.step(WORK_MS + REST_MS + WORK_MS)
+
+    expect(h.outcomes[0]?.status).toBe('persisted')
+    expect(p.count('punch_events')).toBe(1)
+
+    const credited = p.raw
+      .prepare(
+        `SELECT observed_event_id AS id FROM cue_results
+          WHERE outcome = 'matched' ORDER BY repeat_index`,
+      )
+      .all() as Array<{ id: string | null }>
+    // Both combinations keep their credit, each pointing at the stored punch.
+    expect(credited).toHaveLength(2)
+    expect(new Set(credited.map((row) => row.id)).size).toBe(1)
+    expect(credited[0]?.id).not.toBeNull()
     h.unmount()
   })
 

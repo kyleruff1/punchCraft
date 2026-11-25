@@ -248,6 +248,52 @@ describe('appendPunchEvent', () => {
     expect(stored.velocityUnit).toBe('tracker-unit')
   })
 
+  describe('storedId — which row represents the punch', () => {
+    it('is the punch\'s own id when the row is inserted', () => {
+      expect(repo.appendPunchEvent(punch()).storedId).toBe('evt-1')
+    })
+
+    it('is the surviving row when the dedup index drops a re-delivered punch', () => {
+      // Same device, tracker timestamp, type byte and reading: the same
+      // punch, delivered twice under two ids. The second row is dropped, so
+      // its own id exists nowhere — a foreign key naming it would fail.
+      repo.appendPunchEvent(punch({ id: 'first' }))
+      const second = repo.appendPunchEvent(punch({ id: 'second' }))
+
+      expect(second).toMatchObject({ inserted: false, duplicate: true, storedId: 'first' })
+      expect(repo.listPunchEvents('s1').map((e) => e.id)).toEqual(['first'])
+    })
+
+    it('finds the survivor when the key columns are NULL', () => {
+      // A source that reports no tracker timestamp, type byte or reading.
+      // The index COALESCEs its NULLs so they collide; the lookup has to
+      // match the same way or it would report no survivor at all.
+      const bare = {
+        trackerTimestampMs: undefined,
+        punchTypeRaw: undefined,
+        velocityRaw: undefined,
+      }
+      repo.appendPunchEvent(punch({ id: 'first', ...bare }))
+      expect(repo.appendPunchEvent(punch({ id: 'second', ...bare })).storedId).toBe('first')
+    })
+
+    it('is the same id when the very same event is appended twice', () => {
+      repo.appendPunchEvent(punch())
+      expect(repo.appendPunchEvent(punch())).toMatchObject({
+        inserted: false,
+        storedId: 'evt-1',
+      })
+    })
+
+    it('does not confuse two punches that differ in any key column', () => {
+      repo.appendPunchEvent(punch({ id: 'a' }))
+      expect(repo.appendPunchEvent(punch({ id: 'b', velocityRaw: 6 }))).toMatchObject({
+        inserted: true,
+        storedId: 'b',
+      })
+    })
+  })
+
   it('links an event to a round and filters by it', () => {
     const round = repo.appendRound({ id: 'r1', sessionId: 's1' })
     repo.appendPunchEvent(punch({ id: 'in-round', roundId: round.id }))
@@ -289,11 +335,16 @@ describe('appendPunchEvent', () => {
   })
 
   it('suppresses a compound-key duplicate and counts it instead of raising', () => {
-    expect(repo.appendPunchEvent(punch({ id: 'a' }))).toEqual({ inserted: true, duplicate: false })
+    expect(repo.appendPunchEvent(punch({ id: 'a' }))).toEqual({
+      inserted: true,
+      duplicate: false,
+      storedId: 'a',
+    })
     // Same device + tracker timestamp + type byte + velocity byte = one punch.
     expect(repo.appendPunchEvent(punch({ id: 'b', sourceFrameId: 'frame-2' }))).toEqual({
       inserted: false,
       duplicate: true,
+      storedId: 'a',
     })
     expect(repo.listPunchEvents('s1')).toHaveLength(1)
     expect(repo.getById('s1')?.quality.duplicatesSuppressed).toBe(1)

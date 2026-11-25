@@ -138,8 +138,16 @@ export function persistWorkoutSession(
     })
 
     // Before the cue results, so the foreign key they carry resolves.
+    //
+    // `storedIdOf` is that resolution made explicit. A punch the dedup index
+    // drops (migration 002: same device, tracker timestamp, type byte and
+    // reading as one already stored) has no row of its own, so a cue result
+    // naming its id would fail the foreign key and roll back the whole
+    // session — the athlete finishes a workout and nothing is saved. Each cue
+    // result is pointed at the row that actually represents its punch.
+    const storedIdOf = new Map<string, string | null>()
     for (const event of punchEvents) {
-      sessions.appendPunchEvent({
+      const appended = sessions.appendPunchEvent({
         sessionId: session.id,
         id: event.id,
         sourceFrameId: event.sourceFrameId,
@@ -167,12 +175,20 @@ export function persistWorkoutSession(
         decoderVersion: event.decoderVersion,
         qualityFlags: event.qualityFlags ?? [],
       })
+      storedIdOf.set(event.id, appended.storedId)
     }
 
     if (cueResults.length > 0) {
       workouts.writeCueResults(
         cueResults.map((row) => ({
           ...row,
+          // An id this call did not write is left alone: the caller may be
+          // pointing at a punch stored earlier, and if it is not, the foreign
+          // key should say so.
+          observedEventId:
+            row.observedEventId !== null && storedIdOf.has(row.observedEventId)
+              ? (storedIdOf.get(row.observedEventId) ?? null)
+              : row.observedEventId,
           sessionId: session.id,
           generatedWorkoutId,
         })),
