@@ -24,7 +24,7 @@
  * (spec §13.5, D1).
  */
 import React, { useCallback, useMemo, useRef, useState } from 'react'
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
+import { BackHandler, Image, Pressable, StyleSheet, Text, View } from 'react-native'
 import { Stack, useFocusEffect, useIsFocused, useNavigation, useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as ScreenOrientation from 'expo-screen-orientation'
@@ -47,7 +47,14 @@ import { nextRoundPreview } from '@domain/session/restPhases'
 import { systemMonotonicClock } from '@domain/time/MonotonicClock'
 import { getSampleWorkout } from '@domain/workout/samples'
 import { generateWorkout } from '@domain/workout/generateWorkout'
-import { resetLive, setLive, useLive, useRecipe, useSelectedSampleKey } from '@state/useWorkoutStore'
+import {
+  getLive,
+  resetLive,
+  setLive,
+  useLive,
+  useRecipe,
+  useSelectedSampleKey,
+} from '@state/useWorkoutStore'
 import { useBackdropQuality } from '@state/useBackdropSettingsStore'
 import { useQaStore } from '@state/useQaStore'
 import { logger, safe } from '@diagnostics/logger'
@@ -60,7 +67,7 @@ import {
   type SharedWorkClock,
 } from '@domain/timing/SharedWorkClock'
 import { VoiceOutputExpo } from '@audio/VoiceOutputExpo'
-import { shouldHoldAudio } from './_audioHold'
+import { isWorkoutActive, shouldHoldAudio } from './_audioHold'
 import { findComboAnnounce } from '@audio/voiceAssets/comboAnnounceManifest'
 import { IntroPlayer } from '@audio/IntroPlayer'
 import { RecoveryPlayer } from '@audio/RecoveryPlayer'
@@ -665,10 +672,43 @@ export default function LiveScreen(): React.JSX.Element {
 
   const startedRef = useRef(false)
 
+  // The latest runner, for a callback that must not be rebuilt when the
+  // runner's identity changes — see `stopForExit`.
+  const runnerRef = useRef(runner)
+  runnerRef.current = runner
+
+  /**
+   * The one way out of a live workout: stop it — which writes the session —
+   * then ask about it. Returns whether there was a workout to stop.
+   *
+   * Shared by the Exit button and Android's back button, so the two cannot
+   * drift apart. The phase is read from the store at call time rather than
+   * from a render: the back handler is registered once per focus and would
+   * otherwise act on whatever phase the screen had when it gained focus.
+   * For the same reason this takes the runner through a ref and has no
+   * dependencies — the focus effect below owns the orientation lock and the
+   * tab bar, and re-running it mid-workout would flicker both.
+   */
+  const stopForExit = useCallback((): boolean => {
+    if (!isWorkoutActive(getLive().phase)) return false
+    runnerRef.current.emergencyStop()
+    setConfirmingStop(true)
+    return true
+  }, [])
+
   useFocusEffect(
     useCallback(() => {
       void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE)
       void activateKeepAwakeAsync(LIVE_KEEP_AWAKE_TAG)
+
+      // Android's back button (or back gesture) was the one exit this screen
+      // did not own. The tab bar is hidden and there is no header, but back
+      // still popped the route — and the runner's cleanup is deliberately
+      // passive, so the workout vanished: no session written, no summary,
+      // nothing logged as lost. Send it down the same stop-then-confirm path
+      // as Exit. With no workout running there is nothing to protect, and
+      // returning false lets the route pop as it always did.
+      const backPress = BackHandler.addEventListener('hardwareBackPress', stopForExit)
 
       // Hide the tab bar: doc §19 requires settings and recipe navigation to
       // be unreachable during a workout, and a visible tab bar is a one-tap
@@ -678,6 +718,7 @@ export default function LiveScreen(): React.JSX.Element {
       parent?.setOptions({ tabBarStyle: { display: 'none' } })
 
       return () => {
+        backPress.remove()
         // Restore the shared style object, not `undefined`: an explicit
         // undefined overrides the navigator-level tabBarStyle in the
         // options merge and leaves the bar unstyled (it collapses to a
@@ -693,7 +734,7 @@ export default function LiveScreen(): React.JSX.Element {
           // Already released; nothing to do.
         }
       }
-    }, [navigation]),
+    }, [navigation, stopForExit]),
   )
 
   const cues = runner.readCues()
@@ -1048,12 +1089,7 @@ export default function LiveScreen(): React.JSX.Element {
           // `cancelled` — leave directly. On a running/paused workout the
           // same confirm the Stop button uses runs, so a mid-session tap
           // does not silently lose the athlete's work.
-          if (live.phase === 'idle' || isOver) {
-            router.back()
-            return
-          }
-          runner.emergencyStop()
-          setConfirmingStop(true)
+          if (!stopForExit()) router.back()
         }}
         style={styles.exitButton}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 8 }}

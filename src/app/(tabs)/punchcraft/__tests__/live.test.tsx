@@ -12,7 +12,7 @@
  */
 import React from 'react'
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer'
-import { StyleSheet } from 'react-native'
+import { BackHandler, StyleSheet } from 'react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { readFileSync } from 'node:fs'
 
@@ -136,6 +136,34 @@ import type { LiveState } from '@state/useWorkoutStore'
 
 const mounted: ReactTestRenderer[] = []
 
+/**
+ * Every handler the screen has registered for Android's back button and not
+ * yet removed, newest last. Spied rather than left to React Native's own
+ * mock so a test can press back and read what the handler answered — `true`
+ * means "handled, do not pop the route".
+ */
+type BackPressHandler = Parameters<typeof BackHandler.addEventListener>[1]
+const backHandlers: BackPressHandler[] = []
+jest.spyOn(BackHandler, 'addEventListener').mockImplementation((_event, handler) => {
+  backHandlers.push(handler)
+  return {
+    remove: () => {
+      const index = backHandlers.lastIndexOf(handler)
+      if (index >= 0) backHandlers.splice(index, 1)
+    },
+  }
+})
+
+/** Press hardware back; returns whether the screen swallowed it. */
+function pressBack(): boolean {
+  let handled = false
+  act(() => {
+    // The press carries an event object the screen has no use for.
+    handled = backHandlers.at(-1)?.({} as Parameters<BackPressHandler>[0]) === true
+  })
+  return handled
+}
+
 // The screen reads the bottom safe-area inset (the control strip must
 // clear the Android taskbar), so renders need a provider with metrics.
 const SAFE_AREA_METRICS = {
@@ -177,6 +205,7 @@ function nodes(tree: ReactTestRenderer, testID: string): ReactTestInstance[] {
 beforeEach(() => {
   jest.clearAllMocks()
   mockCleanups.length = 0
+  backHandlers.length = 0
   mockIsFocused = true
   act(() => {
     useLiveStore.getState().resetLive()
@@ -239,6 +268,78 @@ describe('navigation is unreachable during a workout (doc §19)', () => {
     // merge and collapses the bar to a few pixels (the "no navigation
     // bar after a workout" bug).
     expect(mockParent.setOptions).toHaveBeenLastCalledWith({ tabBarStyle: TAB_BAR_STYLE })
+  })
+})
+
+describe('hardware back during a workout', () => {
+  // The tab bar is hidden and the screen draws no header, so Android's back
+  // button was the one way off this screen nothing guarded. It popped the
+  // route; the runner's cleanup is passive by design, so the session was
+  // never written — the workout simply disappeared.
+
+  it.each(['countdown', 'work', 'rest', 'paused'] as const)(
+    'stops the workout and asks about it, rather than leaving, during %s',
+    (phase) => {
+      const tree = render()
+      drive({ phase })
+      expect(nodes(tree, 'stop-confirm')).toHaveLength(0)
+
+      expect(pressBack()).toBe(true)
+
+      // The same path as the Exit button: the stop is immediate and the
+      // session is written; only its fate is still open.
+      expect(textOf(tree.root.findByProps({ testID: 'stop-confirm' }))).toContain(
+        'Keep this session?',
+      )
+      expect(useLiveStore.getState().live.phase).toBe('cancelled')
+    },
+  )
+
+  it.each(['idle', 'completed', 'cancelled'] as const)(
+    'lets the route pop when there is nothing to lose (%s)',
+    (phase) => {
+      const tree = render()
+      drive({ phase })
+
+      expect(pressBack()).toBe(false)
+      expect(nodes(tree, 'stop-confirm')).toHaveLength(0)
+    },
+  )
+
+  it('lets a second press leave once the workout has been stopped', () => {
+    render()
+    drive({ phase: 'work' })
+    expect(pressBack()).toBe(true)
+    // Stopped and saved; the dialog is up. Back now means "leave".
+    expect(pressBack()).toBe(false)
+  })
+
+  it('acts on the phase at the moment of the press, not at focus', () => {
+    // Registered while idle, pressed mid-round. A handler that captured the
+    // phase it was created with would let the route pop.
+    render()
+    expect(pressBack()).toBe(false)
+    drive({ phase: 'work' })
+    expect(pressBack()).toBe(true)
+  })
+
+  it('stops listening when the screen loses focus', () => {
+    render()
+    expect(backHandlers.length).toBeGreaterThan(0)
+    act(() => {
+      for (const cleanup of mockCleanups.splice(0)) cleanup()
+    })
+    expect(backHandlers).toHaveLength(0)
+  })
+
+  it('leaves through the Exit button exactly as before', () => {
+    const tree = render()
+    drive({ phase: 'work' })
+    act(() => {
+      tree.root.findByProps({ testID: 'exit-workout' }).props.onPress()
+    })
+    expect(nodes(tree, 'stop-confirm')).toHaveLength(1)
+    expect(useLiveStore.getState().live.phase).toBe('cancelled')
   })
 })
 
