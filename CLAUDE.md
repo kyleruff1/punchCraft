@@ -35,6 +35,24 @@ Read [docs/design-spec.md](docs/design-spec.md) — and, for anything punchCraft
 - Every confirmed capture becomes a replay fixture; the replay harness must run on Windows without Bluetooth hardware.
 - Physical BLE behavior is verified on the tablet, never on the emulator.
 
-## Toolchain facts (2026-08-22)
+## Toolchain facts (verified 2026-11-25)
 
-Windows 11, Node 24, npm 11, JDK 17, Android SDK at `C:/Users/kyler/android-sdk` (platform 35, build-tools 34.0.0, NDK 27.2 — Story 1 installs what the locked Expo SDK requests), `gh` authenticated as `kyleruff1`. Details in [docs/dev-setup.md](docs/dev-setup.md).
+Repo lives at **`F:\punchCraft`**. (`C:\Users\kyler\punchlab` is the retired location — it is no longer a git repo and holds only stray schematics.)
+
+Windows 11, Node 24, npm 11, JDK 17, `gh` authenticated as `kyleruff1`. Stack is pinned exactly (`.npmrc` `save-exact=true`): Expo 57.0.15, React Native 0.86.2, React 19.2.3, and **`@sfourdrinier/react-native-ble-plx` 3.9.3** — a fork, chosen because upstream was unverified on the New Architecture. Details in [docs/dev-setup.md](docs/dev-setup.md).
+
+Three environment facts that cost real time if unknown:
+
+1. **Metro cannot watch `F:`.** Fast refresh never fires. Every edit batch needs a Metro restart *and* a cold app restart; a `(1 module)` delta in the Metro log means you are testing OLD code.
+2. **`adb shell wm size` lies** — it reports portrait while the app runs landscape. Taps use the current frame with no rotation math; `uiautomator dump` bounds are authoritative. Prefix adb with `MSYS_NO_PATHCONV=1` in Git Bash.
+3. **`.claude/` is gitignored** (line 58), so the `cadence-lab` and `qa-audio-verify` skills — the only written runbooks for the verification loop — are NOT in the repo and a fresh clone has neither.
+
+## Start here for a new session
+
+[docs/handoff/00-START-HERE.md](docs/handoff/00-START-HERE.md) — orientation, architecture map, the coach-vocabulary and beat-mapping references, the verification runbook, ranked review targets, and the roadmap for non-boxing workout types. It also lists the four sources in this repo that are known-stale and will mislead you (this file's own GitHub section among them — see below).
+
+## Known drift (2026-11-25)
+
+- The **PR-per-change workflow below was abandoned mid-September**: the last 15 commits on `main` went in directly, with no PR. An open issue is therefore *not* evidence of unbuilt work — verify against the code.
+- `README.md`, `tools/voice/README.md`, `docs/audio-corpus.md` and `docs/audio-validation-rulebook.md` all describe the per-punch phrase-clip pipeline as the live path. It was **retired** in V2 Phase 5-iv (`369a2c6`). `src/domain/coach/callPlacement.ts`'s doc comments are the current, mic-measured record.
+- The **bonding requirement** — trackers must be paired as "FightCam" or every link dies at ~37 s — is the most important operational fact about the hardware and is still missing from `docs/protocol/hypotheses.md`.
