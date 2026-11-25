@@ -55,7 +55,12 @@ export const FOCUS_BANDS: Record<WorkoutFocus, { min: number; max: number }> = {
   movement: { min: 0.65, max: 0.8 },
 }
 
-const roundTo50 = (n: number): number => Math.round(n / 50) * 50
+/** Goals are authored in multiples of 50, and the recipe's stepper moves the same way. */
+export const GOAL_STEP = 50
+/** The stepper's ceiling. */
+export const GOAL_MAX = 20_000
+
+const roundTo50 = (n: number): number => Math.round(n / GOAL_STEP) * GOAL_STEP
 
 /**
  * Suggested punch goal for a duration, tier and focus.
@@ -71,6 +76,33 @@ export function suggestGoal(
   focus: WorkoutFocus,
 ): number {
   return roundTo50(GOAL_TIERS[tier][minutes] * FOCUS_FACTORS[focus])
+}
+
+/**
+ * Carry a punch goal across a change of duration, keeping its intensity.
+ *
+ * A goal only means something against a duration: 900 punches is Steady for
+ * twenty minutes and far below Technique for sixty. Changing the duration
+ * while keeping the number therefore changes the workout the athlete asked
+ * for — and at the low end it produces rounds the generator cannot fill, so
+ * the coach goes quiet for the last minute of each (20 → 60 minutes at the
+ * default goal left 605 s of a 2 880 s work block silent, measured).
+ *
+ * Every row of `GOAL_TIERS` is exactly linear in minutes, so scaling by the
+ * ratio keeps the athlete on the tier they chose. It also keeps a goal they
+ * fine-tuned with the stepper, or one scaled for a focus, where it sat
+ * relative to that tier — which snapping to the tier's cell would discard.
+ *
+ * The result is rounded to the stepper's step, so it is a value the athlete
+ * could have dialled in themselves, and held inside the stepper's range.
+ */
+export function rescaleGoalForDuration(
+  goal: number,
+  from: WorkoutDurationMinutes,
+  to: WorkoutDurationMinutes,
+): number {
+  if (from === to) return goal
+  return Math.min(GOAL_MAX, Math.max(GOAL_STEP, roundTo50((goal * to) / from)))
 }
 
 export interface ImpliedTargets {

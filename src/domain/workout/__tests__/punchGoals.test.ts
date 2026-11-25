@@ -9,10 +9,13 @@
 
 import {
   FOCUS_BANDS,
+  GOAL_MAX,
+  GOAL_STEP,
   GOAL_TIERS,
   TIER_LABELS,
   impliedTargets,
   intensityLabel,
+  rescaleGoalForDuration,
   suggestGoal,
   type IntensityTier,
   type WorkoutFocus,
@@ -176,5 +179,81 @@ describe('intensityLabel', () => {
   it('clamps beyond both ends of the table', () => {
     expect(intensityLabel(1, 20).tier).toBe('technique')
     expect(intensityLabel(999_999, 20).tier).toBe('extreme')
+  })
+})
+
+describe('rescaleGoalForDuration — a duration change keeps the intensity', () => {
+  it.each(TIERS)('maps every %s cell onto the same tier at every other duration', (tier) => {
+    // The matrix is exactly linear in minutes, so this is exact — no cell
+    // drifts to a neighbouring tier through rounding.
+    for (const from of DURATIONS) {
+      for (const to of DURATIONS) {
+        expect(rescaleGoalForDuration(GOAL_TIERS[tier][from], from, to)).toBe(GOAL_TIERS[tier][to])
+      }
+    }
+  })
+
+  it.each(TIERS)('keeps a %s goal described as the same tier', (tier) => {
+    for (const from of DURATIONS) {
+      for (const to of DURATIONS) {
+        const carried = rescaleGoalForDuration(GOAL_TIERS[tier][from], from, to)
+        expect(intensityLabel(carried, to).tier).toBe(tier)
+      }
+    }
+  })
+
+  it('carries the default recipe from 20 to 60 minutes as 2,700, not 900', () => {
+    // The case that prompted this: 900 punches kept across the change is 75
+    // a round over twelve rounds, which the generator cannot fill.
+    const start = suggestGoal(20, 'steady', 'balanced')
+    expect(start).toBe(900)
+    expect(rescaleGoalForDuration(start, 20, 60)).toBe(2_700)
+    expect(rescaleGoalForDuration(start, 20, 60)).toBe(suggestGoal(60, 'steady', 'balanced'))
+  })
+
+  it.each(FOCUSES)('keeps a %s-scaled suggestion a suggestion at the new duration', (focus) => {
+    for (const tier of TIERS) {
+      for (const from of DURATIONS) {
+        for (const to of DURATIONS) {
+          const carried = rescaleGoalForDuration(suggestGoal(from, tier, focus), from, to)
+          // Both sides are rounded to 50, so allow the one step that rounding
+          // twice can cost.
+          expect(Math.abs(carried - suggestGoal(to, tier, focus))).toBeLessThanOrEqual(GOAL_STEP)
+        }
+      }
+    }
+  })
+
+  it('keeps the punches-per-minute of a goal the athlete fine-tuned', () => {
+    // 1,100 at 20 minutes is 55 a minute — between Steady and Hard, and it
+    // should stay exactly there rather than snap to either.
+    expect(rescaleGoalForDuration(1_100, 20, 40)).toBe(2_200)
+    expect(rescaleGoalForDuration(1_100, 20, 60)).toBe(3_300)
+  })
+
+  it('returns the goal untouched when the duration does not change', () => {
+    for (const minutes of DURATIONS) {
+      expect(rescaleGoalForDuration(1_234, minutes, minutes)).toBe(1_234)
+    }
+  })
+
+  it('always lands on a value the stepper could reach', () => {
+    for (const from of DURATIONS) {
+      for (const to of DURATIONS) {
+        for (const goal of [50, 350, 950, 1_250, 7_777, 20_000]) {
+          const carried = rescaleGoalForDuration(goal, from, to)
+          if (from !== to) expect(carried % GOAL_STEP).toBe(0)
+          expect(carried).toBeGreaterThanOrEqual(GOAL_STEP)
+          expect(carried).toBeLessThanOrEqual(GOAL_MAX)
+        }
+      }
+    }
+  })
+
+  it('round-trips a tier goal through a longer duration and back', () => {
+    for (const tier of TIERS) {
+      const start = GOAL_TIERS[tier][20]
+      expect(rescaleGoalForDuration(rescaleGoalForDuration(start, 20, 60), 60, 20)).toBe(start)
+    }
   })
 })

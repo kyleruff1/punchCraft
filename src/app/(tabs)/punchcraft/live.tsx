@@ -68,10 +68,10 @@ import {
 } from '@domain/timing/SharedWorkClock'
 import { VoiceOutputExpo } from '@audio/VoiceOutputExpo'
 import { isWorkoutActive, shouldHoldAudio } from './_audioHold'
-import { findComboAnnounce } from '@audio/voiceAssets/comboAnnounceManifest'
+import { fillOptionsForRecipe } from '@audio/fillOptionsForRecipe'
 import { IntroPlayer } from '@audio/IntroPlayer'
 import { RecoveryPlayer } from '@audio/RecoveryPlayer'
-import { CALLOUT_CLIPS, themeClipFor } from '@audio/voiceAssets/calloutManifest'
+import { themeClipFor } from '@audio/voiceAssets/calloutManifest'
 import { INTRO_SEGMENTS } from '@audio/voiceAssets/introManifest'
 import { RECOVERY_SCRIPTS, type RecoveryScript } from '@audio/voiceAssets/recoveryManifest'
 import { findClickScript } from '@audio/voiceAssets/clickScriptManifest'
@@ -299,52 +299,10 @@ export default function LiveScreen(): React.JSX.Element {
   // memoized on the recipe so it stays stable for the length of a run and only
   // rebuilds when the recipe changes. Either way the workout carries its own
   // stance, so a switch-by-round sample opens in the stance it prescribes.
-  // The clip gate (M1/M3): the generator's build-up ladders only emit
-  // notations the phrase library can actually say. A notation with no
-  // rendered clip drops that ladder from selection rather than sending the
-  // coach to the per-word fallback for a whole round.
-  const generated = useMemo(() => {
-    const vocabulary = recipe.voiceVocabulary === 'names' ? 'techniques' : 'numbers'
-    return generateWorkout(recipe, {
-      // M39-V2 Phase 5-iv: the per-punch phrase corpus retired; the
-      // gate now reads from the combo-announce library, which is the
-      // V2 source of truth for "coach can speak this combination."
-      voiceReady: (notation) => findComboAnnounce(notation, vocabulary) !== undefined,
-      // Set Ceremonies: price a pre-set call-out from MEASURED clip
-      // lengths so the fill can reserve exactly the lead-in the coach
-      // needs. Any missing clip prices to undefined — the ceremony is
-      // skipped, never guessed.
-      ...(recipe.voiceMode === 'off'
-        ? {}
-        : {
-            setupCallouts: {
-              reserveMsFor: (asset: string, notation?: string, tail?: string) => {
-                const sentence = (
-                  CALLOUT_CLIPS as Record<string, { durationMs: number }>
-                )[asset]?.durationMs
-                if (sentence === undefined) return undefined
-                let total = sentence
-                if (notation !== undefined) {
-                  // Phase 5-iv: read the announce clip's measured length
-                  // instead of the retired per-punch phrase clip.
-                  const recite = findComboAnnounce(notation, vocabulary)?.durationMs
-                  if (recite === undefined) return undefined
-                  total += recite + 250
-                }
-                if (tail !== undefined) {
-                  const tailMs = (
-                    CALLOUT_CLIPS as Record<string, { durationMs: number }>
-                  )[tail]?.durationMs
-                  if (tailMs === undefined) return undefined
-                  total += tailMs + 250
-                }
-                // Finish-quiet margin plus start slack.
-                return total + 800
-              },
-            },
-          }),
-    })
-  }, [recipe])
+  // The generator options (which ladders have clips, what a ceremony costs)
+  // come from the one shared builder, so the recipe screen warns about the
+  // workout this screen actually runs.
+  const generated = useMemo(() => generateWorkout(recipe, fillOptionsForRecipe(recipe)), [recipe])
   const sample = selectedSampleKey ? getSampleWorkout(selectedSampleKey) : undefined
   const workout = sample ? sample.workout : generated
 

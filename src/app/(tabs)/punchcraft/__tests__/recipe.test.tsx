@@ -36,7 +36,7 @@ import PunchCraftLanding from '../index'
 import PuncheokieLanding from '../../puncheokie/index'
 import { useWorkoutStore } from '@state/useWorkoutStore'
 import { listSampleWorkouts } from '@domain/workout/samples'
-import { GOAL_TIERS } from '@domain/workout/punchGoals'
+import { GOAL_TIERS, intensityLabel } from '@domain/workout/punchGoals'
 
 const store = () => useWorkoutStore.getState()
 
@@ -131,6 +131,117 @@ describe('primary controls dispatch the right patch', () => {
     expect(store().recipe.totalPunchGoal).toBe(before + 50)
     press(tree, 'goal-stepper-minus')
     expect(store().recipe.totalPunchGoal).toBe(before)
+  })
+})
+
+describe('changing the duration keeps the intensity', () => {
+  // The Duration picker used to change only `durationMinutes`. The goal
+  // stayed where it was — so one tap from 20 to 60 minutes turned a Steady
+  // workout into one far below Technique, at 75 punches a round, which the
+  // generator cannot fill: the coach went quiet for most of the last minute
+  // of every round.
+
+  it('scales the default goal with the duration', () => {
+    const tree = render(<RecipeScreen />)
+    expect(store().recipe.totalPunchGoal).toBe(900)
+
+    pickOption(tree, 'duration', '60')
+    expect(store().recipe.durationMinutes).toBe(60)
+    expect(store().recipe.totalPunchGoal).toBe(2_700)
+  })
+
+  it.each(['technique', 'steady', 'hard', 'high-volume', 'extreme'] as const)(
+    'leaves a %s workout a %s workout at every duration',
+    (tier) => {
+      const tree = render(<RecipeScreen />)
+      pickOption(tree, 'goal', tier)
+
+      for (const minutes of [60, 30, 40, 20] as const) {
+        pickOption(tree, 'duration', minutes)
+        expect(store().recipe.totalPunchGoal).toBe(GOAL_TIERS[tier][minutes])
+        expect(intensityLabel(store().recipe.totalPunchGoal, minutes).tier).toBe(tier)
+      }
+    },
+  )
+
+  it('keeps a goal the athlete fine-tuned in proportion', () => {
+    const tree = render(<RecipeScreen />)
+    press(tree, 'goal-toggle')
+    press(tree, 'goal-stepper-plus')
+    press(tree, 'goal-stepper-plus')
+    expect(store().recipe.totalPunchGoal).toBe(1_000)
+
+    pickOption(tree, 'duration', '40')
+    expect(store().recipe.totalPunchGoal).toBe(2_000)
+  })
+
+  it('comes back to where it started', () => {
+    const tree = render(<RecipeScreen />)
+    pickOption(tree, 'duration', '60')
+    pickOption(tree, 'duration', '20')
+    expect(store().recipe.totalPunchGoal).toBe(900)
+  })
+})
+
+describe('rounds that would run out of combinations', () => {
+  const dryNotice = (tree: ReactTestRenderer): ReactTestInstance[] =>
+    tree.root.findAllByProps({ testID: 'conflict-rounds-run-dry' }, { deep: false })
+
+  it('says nothing for the default recipe', () => {
+    const tree = render(<RecipeScreen />)
+    expect(dryNotice(tree)).toHaveLength(0)
+  })
+
+  it('says nothing after an ordinary duration change', () => {
+    const tree = render(<RecipeScreen />)
+    pickOption(tree, 'duration', '60')
+    expect(dryNotice(tree)).toHaveLength(0)
+  })
+
+  it('warns, in the summary, when the goal is too low to fill the rounds', () => {
+    // Reachable with the stepper, and by anything that sets the recipe
+    // directly. The generator has always known; now the athlete does too,
+    // before the workout rather than during it.
+    act(() => {
+      store().setRecipe({ durationMinutes: 60, totalPunchGoal: 900 })
+    })
+    const tree = render(<RecipeScreen />)
+
+    const card = tree.root.findByProps({ testID: 'recipe-summary-card' })
+    const text = textOf(card)
+    expect(text).toContain('Warning')
+    expect(text).toContain('out of combinations before the bell')
+    // Never a dead end: it says what to change.
+    expect(text).toContain('Raise the punch goal')
+  })
+
+  it('shows it beside the goal control too, where the athlete can act on it', () => {
+    act(() => {
+      store().setRecipe({ durationMinutes: 60, totalPunchGoal: 900 })
+    })
+    const tree = render(<RecipeScreen />)
+    press(tree, 'goal-toggle')
+    expect(dryNotice(tree).length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('clears as soon as the goal is raised', () => {
+    act(() => {
+      store().setRecipe({ durationMinutes: 60, totalPunchGoal: 900 })
+    })
+    const tree = render(<RecipeScreen />)
+    expect(dryNotice(tree).length).toBeGreaterThan(0)
+
+    pickOption(tree, 'goal', 'steady')
+    expect(dryNotice(tree)).toHaveLength(0)
+  })
+
+  it('stays quiet when a library workout is selected — the recipe is not what runs', () => {
+    act(() => {
+      store().setRecipe({ durationMinutes: 60, totalPunchGoal: 900 })
+      store().selectSample(listSampleWorkouts()[0]!.key)
+    })
+    const tree = render(<RecipeScreen />)
+    expect(dryNotice(tree)).toHaveLength(0)
   })
 })
 
