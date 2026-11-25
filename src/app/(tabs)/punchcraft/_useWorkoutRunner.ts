@@ -1167,6 +1167,21 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
 
   const onPunch = useCallback(
     (event: TrackerPunchEvent): void => {
+      // A punch belongs to the workout only while the workout is running.
+      //
+      // The gloves keep reporting whatever the session is doing, and every
+      // line below used to run regardless. Paused: the counters climbed
+      // under the "Paused" overlay, the tablet buzzed, and a punch that
+      // landed in a cue window still open from before the pause was credited
+      // when the round resumed. Finished or stopped: the same under "Workout
+      // complete", where `source.stop()` cannot help because the app-wide
+      // tracker stream deliberately ignores it.
+      //
+      // Before the first bell and through a rest nothing changes: those
+      // punches count toward the session as they always have.
+      const phase = sessionRef.current?.snapshot().phase
+      if (phase === 'paused' || phase === 'completed' || phase === 'cancelled') return
+
       const counts = countsRef.current
       counts.total += 1
       if (event.hand === 'left') counts.left += 1

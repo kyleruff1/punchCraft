@@ -443,3 +443,96 @@ describe('persistence is optional', () => {
     h.unmount()
   })
 })
+
+describe("punches outside a running workout are not the workout's", () => {
+  // The gloves keep reporting whatever the session is doing. The runner used
+  // to treat every one of those punches as part of the workout: counters
+  // climbed under the "Paused" overlay and under "Workout complete", the
+  // tablet buzzed, and a punch thrown during a pause could be credited to a
+  // combination when the round resumed.
+
+  const total = (): number => useLiveStore.getState().live.counts.total
+
+  it('counts nothing while paused, and picks up again on resume', () => {
+    const h = mount(null)
+    h.begin()
+    h.emit('left')
+    expect(total()).toBe(1)
+
+    act(() => {
+      h.runner.pause()
+    })
+    h.emit('left')
+    h.emit('right')
+    expect(total()).toBe(1)
+
+    act(() => {
+      h.runner.resume()
+    })
+    h.emit('right')
+    expect(total()).toBe(2)
+    h.unmount()
+  })
+
+  it('does not credit a punch thrown during a pause when the round resumes', () => {
+    // The first combination's window is open when the athlete pauses, and
+    // the punch thrown in the pause is exactly the one it is waiting for.
+    const p = realPersistence()
+    const h = mount(p)
+    h.begin()
+    act(() => {
+      h.runner.pause()
+    })
+    h.emit('left')
+    act(() => {
+      h.runner.resume()
+    })
+    h.step(WORK_MS + REST_MS + WORK_MS)
+
+    expect(h.outcomes[0]?.status).toBe('persisted')
+    const matched = p.raw
+      .prepare("SELECT COUNT(*) AS n FROM cue_results WHERE outcome = 'matched'")
+      .get() as { n: number }
+    expect(matched.n).toBe(0)
+    h.unmount()
+  })
+
+  it('counts nothing after the workout is stopped', () => {
+    const h = mount(null)
+    h.begin()
+    h.emit('left')
+    act(() => {
+      h.runner.emergencyStop()
+    })
+    const atStop = total()
+
+    h.emit('left')
+    h.emit('right')
+    expect(total()).toBe(atStop)
+    h.unmount()
+  })
+
+  it('counts nothing after the workout finishes on its own', () => {
+    const h = mount(null)
+    runToEnd(h)
+    const atBell = total()
+
+    h.emit('left')
+    expect(total()).toBe(atBell)
+    h.unmount()
+  })
+
+  it('still counts a punch thrown in the rest between rounds', () => {
+    // Deliberately unchanged: the session is running, and those punches have
+    // always counted toward it.
+    const h = mount(null)
+    h.begin()
+    h.step(WORK_MS)
+    expect(useLiveStore.getState().live.phase).toBe('rest')
+    const before = total()
+
+    h.emit('left')
+    expect(total()).toBe(before + 1)
+    h.unmount()
+  })
+})
