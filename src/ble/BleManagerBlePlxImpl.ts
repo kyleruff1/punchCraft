@@ -145,6 +145,28 @@ function nowMonotonicMs(): number {
 }
 
 type SubKey = string
+
+/** One subscriber to a monitor. An object, so membership has an identity. */
+interface MonitorListener {
+  onFrame: (frame: RawBleFrame) => void
+}
+
+/**
+ * One native notify/indicate monitor and everyone listening to it — see
+ * `monitorCharacteristic`.
+ */
+interface MonitorEntry {
+  /** Null only between construction and the native call returning. */
+  sub: PlxSubscription | null
+  /** The connection generation this monitor was installed on. */
+  generation: number
+  listeners: Set<MonitorListener>
+  /** Shared by every listener: the subscription has one outcome. */
+  result: SubscriptionResult
+  setupOutcome: Promise<SubscriptionResult>
+  /** The native monitor has ended; it is never joined again. */
+  dead: boolean
+}
 function subKey(deviceId: string, serviceUuid: string, characteristicUuid: string): SubKey {
   return `${deviceId}:${serviceUuid}:${characteristicUuid}`
 }
@@ -163,7 +185,7 @@ export class BleManagerBlePlxImpl implements BleManagerFacade {
   private readonly generations = new Map<string, number>()
   private readonly connectionListeners = new Map<string, Set<(s: ConnectionStatus) => void>>()
   private readonly disconnectSubs = new Map<string, PlxSubscription>()
-  private readonly monitorSubs = new Map<SubKey, PlxSubscription>()
+  private readonly monitors = new Map<SubKey, MonitorEntry>()
 
   /** Overridable getter — the capture pipeline swaps this in when a real
    * capture opens; until then frames are tagged 'ephemeral'. */
@@ -497,6 +519,38 @@ export class BleManagerBlePlxImpl implements BleManagerFacade {
     }
   }
 
+  /**
+   * Subscribe to a characteristic's notifications.
+   *
+   * ## One native monitor per characteristic, many listeners
+   *
+   * Several parts of the app legitimately want the same characteristic at
+   * once: the app-wide keepalive holds each glove's punch stream for the
+   * app's whole life, and the Velocity Lab screens (Live, Probe, the BLE
+   * spike) subscribe to the same one on the same facade. So a subscription is
+   * shared: the first caller installs the native monitor, later callers on
+   * the same connection JOIN it, and each handle removes only its own
+   * listener. The native monitor goes away with its last listener.
+   *
+   * This used to be one slot per characteristic with no notion of who held
+   * it. A second subscriber removed the incumbent's native monitor and took
+   * the slot, and any handle's `unsubscribe()` removed whoever held the slot
+   * at that moment. Opening Velocity Lab therefore silently killed the
+   * keepalive's punch stream — which only re-arms on a connection change —
+   * and every workout afterwards counted zero punches with both glove lamps
+   * lit and nothing logged.
+   *
+   * Sharing also keeps persist-before-parse honest (CLAUDE.md rule 1): a
+   * frame reaches the sink once, however many listeners there are.
+   *
+   * ## What is never joined
+   *
+   * A monitor installed on an earlier connection (`generation` is bumped on
+   * every connect), or one whose callback has reported an error, is dead: it
+   * will deliver nothing more. The next subscriber replaces it rather than
+   * joining it — the one case the old "drop the prior subscription" rule was
+   * right about, re-arming after a reconnect.
+   */
   async monitorCharacteristic(
     deviceId: string,
     serviceUuid: string,
@@ -504,6 +558,14 @@ export class BleManagerBlePlxImpl implements BleManagerFacade {
     onFrame: (frame: RawBleFrame) => void,
   ): Promise<SubscriptionHandle> {
     const manager = this.ensure()
+    const key = subKey(deviceId, serviceUuid, characteristicUuid)
+    // One object per subscription, so two owners passing the same function
+    // still hold two distinct memberships.
+    const listener: MonitorListener = { onFrame }
+
+    const live = this.joinableMonitor(key, deviceId)
+    if (live) return this.joinMonitor(key, live, listener)
+
     // Peek at the characteristic's properties to record the correct direction
     // in the SubscriptionResult, even if no frame ever arrives.
     let direction: 'notification' | 'indication' = 'notification'
@@ -517,10 +579,26 @@ export class BleManagerBlePlxImpl implements BleManagerFacade {
       // Non-fatal — direction defaults to 'notification'.
     }
 
-    const key = subKey(deviceId, serviceUuid, characteristicUuid)
-    // Drop any prior subscription for the same key before installing a new one.
-    const prior = this.monitorSubs.get(key)
-    if (prior) { try { prior.remove() } catch { /* ignore */ } this.monitorSubs.delete(key) }
+    // Re-check: another caller may have installed the monitor during the
+    // await above. From here to `monitors.set` nothing yields, so two
+    // installs for one key cannot interleave.
+    const installedMeanwhile = this.joinableMonitor(key, deviceId)
+    if (installedMeanwhile) return this.joinMonitor(key, installedMeanwhile, listener)
+
+    // Whatever still holds the key is dead or belongs to a connection that
+    // is gone. Its listeners were subscribed to that connection and get
+    // nothing more, exactly as before; they re-subscribe if they want this one.
+    const stale = this.monitors.get(key)
+    if (stale) {
+      logger.info('ble.monitor.replaced', 'replaced a stale monitor for this characteristic', {
+        deviceId: deviceSensitive(deviceId),
+        characteristicUuid: deviceSensitive(characteristicUuid),
+        staleGeneration: safe(stale.generation),
+        generation: safe(this.currentGeneration(deviceId)),
+        staleListeners: safe(stale.listeners.size),
+      })
+      this.retireMonitor(key, stale)
+    }
 
     // Definitive setup outcome — resolves on the FIRST callback fired by
     // ble-plx. If that callback carries an error, we know the CCCD write
@@ -530,6 +608,20 @@ export class BleManagerBlePlxImpl implements BleManagerFacade {
     let setupObserved = false
     let resolveOutcome: (r: SubscriptionResult) => void = () => {}
     const setupOutcome = new Promise<SubscriptionResult>((resolve) => { resolveOutcome = resolve })
+    const result: SubscriptionResult = {
+      serviceUuid,
+      characteristicUuid,
+      direction,
+      success: true,
+    }
+    const entry: MonitorEntry = {
+      sub: null,
+      generation: this.currentGeneration(deviceId),
+      listeners: new Set([listener]),
+      result,
+      setupOutcome,
+      dead: false,
+    }
 
     try {
       const sub = manager.monitorCharacteristicForDevice(
@@ -541,19 +633,27 @@ export class BleManagerBlePlxImpl implements BleManagerFacade {
           const monotonicTimeMs = performance.now()
           const wallTimeIso = new Date().toISOString()
 
-          if (!setupObserved) {
-            setupObserved = true
-            if (err) {
+          if (err) {
+            // An error ends this native monitor for good: the link dropped,
+            // the CCCD write failed, or we removed it ourselves (ble-plx
+            // reports that as "operation was cancelled"). Nothing may join
+            // it after this.
+            this.markMonitorDead(key, entry)
+            if (!setupObserved) {
+              setupObserved = true
               result.success = false
               result.errorMessage = err.message
               resolveOutcome(result)
-              return
             }
+            return
+          }
+
+          if (!setupObserved) {
             // First callback carries data → subscription confirmed.
+            setupObserved = true
             resolveOutcome(result)
           }
 
-          if (err) return
           if (!characteristic || characteristic.value == null) return
           const valueBase64 = characteristic.value
           let valueHex: string
@@ -583,26 +683,37 @@ export class BleManagerBlePlxImpl implements BleManagerFacade {
           }
           // PERSIST BEFORE DELIVERY (CLAUDE.md §1, §11.9, §12.4). The frame
           // reaches durable storage before any subscriber — decoder, probe UI
-          // or spike harness — is even aware of it. Doing this here rather
-          // than at each call site is what makes the guarantee structural:
-          // a new screen cannot forget to persist. The sink's contract is
-          // that capture() is synchronous and never throws, but we guard
-          // anyway because a storage fault must never break frame delivery.
+          // or spike harness — is even aware of it, and exactly once however
+          // many of them are listening. Doing this here rather than at each
+          // call site is what makes the guarantee structural: a new screen
+          // cannot forget to persist. The sink's contract is that capture()
+          // is synchronous and never throws, but we guard anyway because a
+          // storage fault must never break frame delivery.
           try {
             this.frameSink?.capture(frame)
           } catch {
             /* sink contract violation — never break the native callback */
           }
-          onFrame(frame)
+          // A snapshot, so a listener that unsubscribes while handling a
+          // frame cannot disturb the walk; and each in its own try, so one
+          // listener throwing cannot starve the others of the frame.
+          for (const each of [...entry.listeners]) {
+            try {
+              each.onFrame(frame)
+            } catch (listenerErr) {
+              logger.warn('ble.monitor.listener.threw', 'a frame listener threw', {
+                deviceId: deviceSensitive(deviceId),
+                characteristicUuid: deviceSensitive(characteristicUuid),
+                errorMessage: safe(listenerErr instanceof Error ? listenerErr.message : String(listenerErr)),
+              })
+            }
+          }
         },
       )
-      this.monitorSubs.set(key, sub)
-      const result: SubscriptionResult = {
-        serviceUuid,
-        characteristicUuid,
-        direction,
-        success: true,
-      }
+      entry.sub = sub
+      // A monitor that failed synchronously is already dead; registering it
+      // would only hand the next subscriber something to replace.
+      if (!entry.dead) this.monitors.set(key, entry)
       // Settle optimistically after the quiet window if nothing else has.
       setTimeout(() => {
         if (!setupObserved) {
@@ -610,28 +721,76 @@ export class BleManagerBlePlxImpl implements BleManagerFacade {
           resolveOutcome(result)
         }
       }, SETUP_OUTCOME_QUIET_MS)
-      return {
-        result,
-        setupOutcome,
-        unsubscribe: () => {
-          const s = this.monitorSubs.get(key)
-          if (s) {
-            try { s.remove() } catch { /* ignore */ }
-            this.monitorSubs.delete(key)
-          }
-        },
-      }
+      return this.monitorHandle(key, entry, listener)
     } catch (e) {
-      const result: SubscriptionResult = {
+      const failed: SubscriptionResult = {
         serviceUuid,
         characteristicUuid,
         direction,
         success: false,
         errorMessage: (e as Error)?.message ?? String(e),
       }
-      resolveOutcome(result)
-      return { result, setupOutcome, unsubscribe: () => { /* no-op — nothing installed */ } }
+      resolveOutcome(failed)
+      return {
+        result: failed,
+        setupOutcome: Promise.resolve(failed),
+        unsubscribe: () => { /* no-op — nothing installed */ },
+      }
     }
+  }
+
+  /** The monitor on `key` a new subscriber may share, if there is one. */
+  private joinableMonitor(key: SubKey, deviceId: string): MonitorEntry | null {
+    const entry = this.monitors.get(key)
+    if (!entry || entry.dead) return null
+    // Installed on an earlier connection: the native side tore it down with
+    // the link, whether or not an error callback ever said so.
+    if (entry.generation !== this.currentGeneration(deviceId)) return null
+    return entry
+  }
+
+  private joinMonitor(key: SubKey, entry: MonitorEntry, listener: MonitorListener): SubscriptionHandle {
+    entry.listeners.add(listener)
+    logger.info('ble.monitor.joined', 'a second listener joined an existing monitor', {
+      characteristicUuid: deviceSensitive(entry.result.characteristicUuid),
+      listeners: safe(entry.listeners.size),
+    })
+    return this.monitorHandle(key, entry, listener)
+  }
+
+  /**
+   * The handle for one listener's membership of one monitor.
+   *
+   * `unsubscribe` removes THAT listener and nothing else. It is safe to call
+   * twice, after the monitor died, or after a reconnect replaced the entry —
+   * a handle from a dead connection must never reach the monitor that
+   * succeeded it.
+   */
+  private monitorHandle(key: SubKey, entry: MonitorEntry, listener: MonitorListener): SubscriptionHandle {
+    return {
+      result: entry.result,
+      setupOutcome: entry.setupOutcome,
+      unsubscribe: () => {
+        if (!entry.listeners.delete(listener)) return
+        if (entry.listeners.size > 0) return
+        this.retireMonitor(key, entry)
+      },
+    }
+  }
+
+  /** The native monitor reported an error: it will deliver nothing more. */
+  private markMonitorDead(key: SubKey, entry: MonitorEntry): void {
+    entry.dead = true
+    // Identity, not key: the callback of a monitor we already replaced can
+    // arrive late (ble-plx reports our own `remove()` as an error), and it
+    // must not unregister its successor.
+    if (this.monitors.get(key) === entry) this.monitors.delete(key)
+  }
+
+  /** Tear down a monitor nobody is listening to, or that is being replaced. */
+  private retireMonitor(key: SubKey, entry: MonitorEntry): void {
+    this.markMonitorDead(key, entry)
+    try { entry.sub?.remove() } catch { /* already removed by the native side */ }
   }
 
   async monitorAllNotifiable(
@@ -802,10 +961,11 @@ export class BleManagerBlePlxImpl implements BleManagerFacade {
 
   async destroy(): Promise<void> {
     await this.stopScan().catch(() => {})
-    for (const sub of this.monitorSubs.values()) {
-      try { sub.remove() } catch { /* ignore */ }
+    for (const entry of this.monitors.values()) {
+      entry.dead = true
+      try { entry.sub?.remove() } catch { /* ignore */ }
     }
-    this.monitorSubs.clear()
+    this.monitors.clear()
     for (const sub of this.disconnectSubs.values()) {
       try { sub.remove() } catch { /* ignore */ }
     }
