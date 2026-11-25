@@ -32,7 +32,7 @@ import { bpmForRecipe, CADENCE_PROFILES as CADENCE } from '@domain/workout/caden
 import { metronomeLoopFor, type MetronomeLoop } from '@audio/voiceAssets/metronomeAssets'
 import type { CueMatchResult } from '@domain/programs/CueMatcher'
 import type { CueScore } from '@domain/programs/cueScoring'
-import { expandTimeline, type CueInstance, type ExpectedPunch } from '@domain/programs/CueTimeline'
+import { expandTimeline, type CueInstance } from '@domain/programs/CueTimeline'
 import { beatOrdinalAt } from '@domain/programs/beatProjection'
 import { CALLOUT_CLIPS } from '@audio/voiceAssets/calloutManifest'
 import {
@@ -230,25 +230,6 @@ export const STORE_THROTTLE_MS = 250
  * more than needed even at flurry cadence.
  */
 export const RECENT_EVENT_WINDOW = 256
-
-/**
- * Was a matched punch on the beat?
- *
- * Mirrors the matcher's own timing math — the punch's time against the token's
- * scheduled moment (`scheduledStartMs + tokenOffsetsMs[tokenIndex]`) — using
- * the same tight window the score uses (`TIMING_TIGHT_MS`, much tighter than
- * the acceptance window). Gates the "good hit" haptic so a right-hand punch
- * thrown late still counts for the combo but does not earn the reward buzz.
- */
-function onTimeForMatch(
-  cue: CueInstance | undefined,
-  expected: ExpectedPunch,
-  eventTimeMs: number,
-): boolean {
-  if (!cue) return false
-  const dueMs = cue.scheduledStartMs + (cue.tokenOffsetsMs[expected.tokenIndex] ?? 0)
-  return Math.abs(eventTimeMs - dueMs) <= TIMING_TIGHT_MS
-}
 
 /**
  * `SessionTransition` → `SessionPhaseEvent`.
@@ -1238,7 +1219,15 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
 
       // The matcher decides what this punch answered; the runner only
       // counts. Its callback drives notifyMatch and the in-cue tally.
-      matcherRef.current?.onPunchEvent(event)
+      //
+      // The punch is stamped on the monotonic clock (app uptime); every cue
+      // is written on the round's work clock. This is the one place the two
+      // meet, and the session clock — the only thing that knows both — does
+      // the conversion. Nothing downstream subtracts one from the other.
+      const landedAtWorkMs =
+        sessionRef.current?.workElapsedAt(event.receivedMonotonicTimeMs) ??
+        workElapsedMsRef.current
+      matcherRef.current?.onPunchEvent(event, landedAtWorkMs)
 
       syncFromEngine()
       // Bypasses the throttle: a punch landing has to feel instant.
@@ -1302,8 +1291,15 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
           }
           // Tiered per-hit haptic: a solid buzz for a right-hand hit on the
           // beat, a stronger one when the strike type also agrees (rare on v1).
+          //
+          // "On the beat" is the matcher's own offset against the same tight
+          // window the score uses (`TIMING_TIGHT_MS`, much tighter than the
+          // acceptance window), so a punch thrown late still counts for the
+          // combo but does not earn the reward buzz. The runner used to redo
+          // that subtraction itself, against a monotonic stamp, and the buzz
+          // never fired.
           if (matched && expected) {
-            const onBeat = onTimeForMatch(currentRef.current?.cue, expected, event.match.eventTimeMs)
+            const onBeat = Math.abs(event.match.offsetMs) <= TIMING_TIGHT_MS
             if (onBeat) hapticsRef.current?.strike(event.match.affirmed ? 'perfect' : 'good')
           }
           break

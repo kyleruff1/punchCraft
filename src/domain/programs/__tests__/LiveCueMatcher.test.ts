@@ -24,35 +24,63 @@ const STEADY_BPM = CADENCE_PROFILES.steady.nominalBpm
 const CUE: CueInstance = expandTimeline(threeRoundFundamentals, 'orthodox', STEADY_BPM)[0]!
   .cues[1]!
 
+/**
+ * How long the app had been running when the bell rang — the gap between the
+ * monotonic clock a punch is stamped on and the work clock a cue is written
+ * on. These fixtures used to stamp punches with `CUE.scheduledStartMs`, which
+ * made the two clocks one number line and hid every place they were confused.
+ */
+const UPTIME_AT_BELL_MS = 3_600_000
+
+/** A punch and where it landed on the round's work clock. */
+interface Landed {
+  event: TrackerPunchEvent
+  atMs: number
+}
+
+type LandedOverrides = Partial<TrackerPunchEvent> & { atMs?: number }
+
 let nextId = 0
 
-function event(over: Partial<TrackerPunchEvent> = {}): TrackerPunchEvent {
+function event(over: LandedOverrides = {}): Landed {
   nextId += 1
+  const { atMs = CUE.scheduledStartMs, ...eventOver } = over
   return {
-    id: `e${nextId}`,
-    sourceFrameId: `f${nextId}`,
-    deviceId: 'D7:34',
-    hand: 'left',
-    receivedMonotonicTimeMs: CUE.scheduledStartMs,
-    receivedWallTimeIso: '2026-08-23T00:00:00.000Z',
-    recovered: false,
-    decoderId: 'fightcamp-v1',
-    decoderVersion: '1',
-    velocityUnit: 'tracker-unit',
-    velocityRaw: 10,
-    qualityFlags: [],
-    ...over,
+    atMs,
+    event: {
+      id: `e${nextId}`,
+      sourceFrameId: `f${nextId}`,
+      deviceId: 'D7:34',
+      hand: 'left',
+      receivedMonotonicTimeMs: UPTIME_AT_BELL_MS + atMs,
+      receivedWallTimeIso: '2026-08-23T00:00:00.000Z',
+      recovered: false,
+      decoderId: 'fightcamp-v1',
+      decoderVersion: '1',
+      velocityUnit: 'tracker-unit',
+      velocityRaw: 10,
+      qualityFlags: [],
+      ...eventOver,
+    },
   }
 }
 
-function onToken(n: number, over: Partial<TrackerPunchEvent> = {}): TrackerPunchEvent {
+/** When the nth expected token is scheduled, on the work clock. */
+const tokenMs = (n: number, cue: CueInstance = CUE): number =>
+  cue.scheduledStartMs + (cue.tokenOffsetsMs[cue.expectedPunches[n]!.tokenIndex] ?? 0)
+
+function onToken(n: number, over: LandedOverrides = {}): Landed {
   const expected = CUE.expectedPunches[n]!
-  return event({
-    hand: expected.hand,
-    receivedMonotonicTimeMs: CUE.scheduledStartMs + (CUE.tokenOffsetsMs[expected.tokenIndex] ?? 0),
-    ...over,
-  })
+  return event({ hand: expected.hand, atMs: tokenMs(n), ...over })
 }
+
+/** Deliver a punch the way the runner does: the event plus its work-clock time. */
+const land = (matcher: LiveCueMatcher, punch: Landed): void => {
+  matcher.onPunchEvent(punch.event, punch.atMs)
+}
+
+/** A real tracker timestamp: device epoch ms, nowhere near either other clock. */
+const DEVICE_EPOCH_MS = 1_790_000_000_000
 
 /** Minimal CueEngine events — only the two the matcher listens for. */
 const windowOpened = (): CueEvent =>
@@ -85,7 +113,7 @@ describe('provisional feedback (doc §21)', () => {
   it('credits a punch the moment it lands, before the window closes', () => {
     const h = harness()
     h.matcher.onCueEvent(windowOpened())
-    h.matcher.onPunchEvent(onToken(0))
+    land(h.matcher, onToken(0))
 
     // No window-closed yet: the token must already have brightened.
     expect(h.matches()).toHaveLength(1)
@@ -96,8 +124,8 @@ describe('provisional feedback (doc §21)', () => {
   it('fills expectations in order', () => {
     const h = harness()
     h.matcher.onCueEvent(windowOpened())
-    h.matcher.onPunchEvent(onToken(0))
-    h.matcher.onPunchEvent(onToken(1))
+    land(h.matcher, onToken(0))
+    land(h.matcher, onToken(1))
     expect(h.matches().map((m) => m.expectedIndex)).toEqual([0, 1])
   })
 
@@ -106,12 +134,12 @@ describe('provisional feedback (doc §21)', () => {
     // an extra carrying its reason, and the correct hand can still answer.
     const h = harness()
     h.matcher.onCueEvent(windowOpened())
-    h.matcher.onPunchEvent(event({ hand: 'right' }))
+    land(h.matcher, event({ hand: 'right' }))
     expect(h.matches()).toHaveLength(0)
     expect(h.extras()).toHaveLength(1)
     expect(h.extras()[0]?.reason).toBe('hand-mismatch')
 
-    h.matcher.onPunchEvent(onToken(0))
+    land(h.matcher, onToken(0))
     expect(h.matches()[0]?.expectedIndex).toBe(0)
     expect(h.matches()[0]?.outcome).toBe('matched')
   })
@@ -119,37 +147,85 @@ describe('provisional feedback (doc §21)', () => {
   it('carries tracker-reported velocity through when the source has it', () => {
     const h = harness()
     h.matcher.onCueEvent(windowOpened())
-    h.matcher.onPunchEvent(onToken(0, { velocityRaw: 13 }))
+    land(h.matcher, onToken(0, { velocityRaw: 13 }))
     expect(h.matches()[0]?.velocityRaw).toBe(13)
   })
 
   it('omits velocity when the unit is unknown rather than reporting a bare number', () => {
     const h = harness()
     h.matcher.onCueEvent(windowOpened())
-    h.matcher.onPunchEvent(onToken(0, { velocityUnit: 'unknown', velocityRaw: 13 }))
+    land(h.matcher, onToken(0, { velocityUnit: 'unknown', velocityRaw: 13 }))
     expect(h.matches()[0]?.velocityRaw).toBeUndefined()
   })
 
-  it('holds a recovered event back rather than crediting the wrong slot', () => {
-    // Its position depends on a tracker timestamp the settled pass orders
-    // properly; guessing now could brighten a token the punch did not fill.
+  it('never credits a recovered event, live or settled', () => {
+    // Drained after a reconnect: thrown 22-66 s ago, and nothing says when in
+    // the round. It may not brighten a token now, and it may not take a slot
+    // when the window closes either.
     const h = harness()
     h.matcher.onCueEvent(windowOpened())
-    h.matcher.onPunchEvent(
-      onToken(0, { recovered: true, trackerTimestampMs: CUE.scheduledStartMs }),
-    )
+    const drained = onToken(0, { recovered: true, trackerTimestampMs: DEVICE_EPOCH_MS })
+    land(h.matcher, drained)
     expect(h.matches()).toHaveLength(0)
 
     h.matcher.onCueEvent(windowClosed())
-    // It still counts — it was just settled rather than guessed.
-    expect(h.settled()[0]?.result.assignments).toHaveLength(1)
+    const settled = h.settled()[0]!
+    expect(settled.result.assignments).toEqual([])
+    expect(settled.result.missedExpectedIndexes).toEqual([0, 1])
+    // Still accounted for — an extra, never dropped.
+    expect(settled.result.extras.map((e) => e.eventId)).toEqual([drained.event.id])
+  })
+})
+
+describe('time bases', () => {
+  it('reports the signed offset from the token, measured on the work clock', () => {
+    const h = harness()
+    h.matcher.onCueEvent(windowOpened())
+    land(h.matcher, onToken(0, { atMs: tokenMs(0) - 60 }))
+    land(h.matcher, onToken(1, { atMs: tokenMs(1) + 90 }))
+    expect(h.matches().map((m) => m.offsetMs)).toEqual([-60, 90])
+  })
+
+  it('reports the same offset at any app uptime', () => {
+    for (const uptimeMs of [0, 3_600_000, 86_400_000]) {
+      const h = harness()
+      h.matcher.onCueEvent(windowOpened())
+      land(h.matcher, onToken(0, { atMs: tokenMs(0) + 25, receivedMonotonicTimeMs: uptimeMs }))
+      expect(h.matches()[0]?.offsetMs).toBe(25)
+    }
+  })
+
+  it('publishes the monotonic receive stamp as eventTimeMs, never round time', () => {
+    const h = harness()
+    h.matcher.onCueEvent(windowOpened())
+    const punch = onToken(0)
+    land(h.matcher, punch)
+    expect(h.matches()[0]?.eventTimeMs).toBe(punch.event.receivedMonotonicTimeMs)
+    expect(h.matches()[0]?.eventTimeMs).toBe(UPTIME_AT_BELL_MS + tokenMs(0))
+  })
+
+  it('gives the live match the offset the settled result will carry', () => {
+    // The on-beat reward is gated on the live offset and the score on the
+    // settled one. Two numbers for one punch is how they came to disagree.
+    const h = harness()
+    h.matcher.onCueEvent(windowOpened())
+    land(h.matcher, onToken(0, { atMs: tokenMs(0) + 110 }))
+    land(h.matcher, onToken(1, { atMs: tokenMs(1) - 35 }))
+    h.matcher.onCueEvent(windowClosed())
+
+    const settled = h.settled()[0]!
+    for (const match of h.matches()) {
+      const assignment = settled.result.assignments.find((a) => a.eventId === match.eventId)
+      expect(assignment?.offsetMs).toBe(match.offsetMs)
+    }
+    expect(settled.score.timingWindowPct).toBe(100)
   })
 })
 
 describe('extras are always emitted (spec §13.6)', () => {
   it('emits a punch thrown between combinations', () => {
     const h = harness()
-    h.matcher.onPunchEvent(event())
+    land(h.matcher, event())
     expect(h.extras()).toHaveLength(1)
     expect(h.extras()[0]?.cueId).toBeUndefined()
   })
@@ -157,13 +233,13 @@ describe('extras are always emitted (spec §13.6)', () => {
   it('emits a punch beyond the last expectation, attributed to the open cue', () => {
     const h = harness()
     h.matcher.onCueEvent(windowOpened())
-    h.matcher.onPunchEvent(onToken(0))
-    h.matcher.onPunchEvent(onToken(1))
-    const surplus = onToken(1, { receivedMonotonicTimeMs: CUE.scheduledStartMs + 120 })
-    h.matcher.onPunchEvent(surplus)
+    land(h.matcher, onToken(0))
+    land(h.matcher, onToken(1))
+    const surplus = onToken(1, { atMs: CUE.scheduledStartMs + 120 })
+    land(h.matcher, surplus)
 
     expect(h.extras()).toHaveLength(1)
-    expect(h.extras()[0]).toMatchObject({ cueId: CUE.id, eventId: surplus.id })
+    expect(h.extras()[0]).toMatchObject({ cueId: CUE.id, eventId: surplus.event.id })
   })
 
   it('credits a punch thrown late in the set, since timing no longer gates (D18)', () => {
@@ -173,7 +249,7 @@ describe('extras are always emitted (spec §13.6)', () => {
     // now presence — the set is on screen, so the punch counts.
     const h = harness()
     h.matcher.onCueEvent(windowOpened())
-    h.matcher.onPunchEvent(onToken(0, { receivedMonotonicTimeMs: CUE.windowEndMs + 200 }))
+    land(h.matcher, onToken(0, { atMs: CUE.windowEndMs + 200 }))
     expect(h.matches()).toHaveLength(1)
     expect(h.extras()).toHaveLength(0)
   })
@@ -181,9 +257,9 @@ describe('extras are always emitted (spec §13.6)', () => {
   it('still emits an extra once every expectation is answered', () => {
     const h = harness()
     h.matcher.onCueEvent(windowOpened())
-    h.matcher.onPunchEvent(onToken(0))
-    h.matcher.onPunchEvent(onToken(1))
-    h.matcher.onPunchEvent(onToken(0))
+    land(h.matcher, onToken(0))
+    land(h.matcher, onToken(1))
+    land(h.matcher, onToken(0))
     expect(h.matches()).toHaveLength(2)
     expect(h.extras()).toHaveLength(1)
   })
@@ -192,7 +268,7 @@ describe('extras are always emitted (spec §13.6)', () => {
     'carries the %s policy so the surface can present it',
     (policy) => {
       const h = harness(policy)
-      h.matcher.onPunchEvent(event())
+      land(h.matcher, event())
       expect(h.extras()[0]?.policy).toBe(policy)
     },
   )
@@ -201,7 +277,7 @@ describe('extras are always emitted (spec §13.6)', () => {
     // The policy changes presentation, never whether the punch is reported.
     for (const policy of ['encouraged', 'neutral', 'discouraged'] as const) {
       const h = harness(policy)
-      h.matcher.onPunchEvent(event())
+      land(h.matcher, event())
       expect(h.extras()).toHaveLength(1)
     }
   })
@@ -211,8 +287,8 @@ describe('settling on window close', () => {
   it('emits the authoritative result and its score', () => {
     const h = harness()
     h.matcher.onCueEvent(windowOpened())
-    h.matcher.onPunchEvent(onToken(0))
-    h.matcher.onPunchEvent(onToken(1))
+    land(h.matcher, onToken(0))
+    land(h.matcher, onToken(1))
     h.matcher.onCueEvent(windowClosed())
 
     const settled = h.settled()[0]!
@@ -225,42 +301,40 @@ describe('settling on window close', () => {
   it('reports no corrections when provisional and settled agree', () => {
     const h = harness()
     h.matcher.onCueEvent(windowOpened())
-    h.matcher.onPunchEvent(onToken(0))
-    h.matcher.onPunchEvent(onToken(1))
+    land(h.matcher, onToken(0))
+    land(h.matcher, onToken(1))
     h.matcher.onCueEvent(windowClosed())
     expect(h.settled()[0]?.corrections).toEqual([])
   })
 
-  it('reports a correction when a recovered event reorders the cue', () => {
-    // The live punch is credited to slot 0 immediately. A recovered event then
-    // turns up with an earlier tracker timestamp, so the settled pass puts that
-    // one first and the live punch no longer owns slot 0 — it either moves to a
-    // later slot or, if that slot wants the other glove, becomes an extra.
-    // Which of the two does not matter here; that the disagreement is reported
-    // rather than silently smoothed over does.
+  it('does not let a drained punch take the slot a live one left open', () => {
+    // The mid-round buffer drain. One live punch answers slot 0; then a punch
+    // thrown a minute earlier with the other glove is delivered into the open
+    // window. It used to reach the settled pass as though it had just landed —
+    // its device-epoch timestamp read as round time, the window test skipped
+    // under `gate: 'open'` — and fill slot 1.
     const h = harness()
     h.matcher.onCueEvent(windowOpened())
 
-    const live = onToken(0, { receivedMonotonicTimeMs: CUE.scheduledStartMs + 300 })
-    h.matcher.onPunchEvent(live)
-    expect(h.matches()[0]?.expectedIndex).toBe(0)
-
-    h.matcher.onPunchEvent(
-      onToken(0, { recovered: true, trackerTimestampMs: CUE.scheduledStartMs }),
-    )
+    const live = onToken(0)
+    land(h.matcher, live)
+    const drained = onToken(1, { recovered: true, trackerTimestampMs: DEVICE_EPOCH_MS })
+    land(h.matcher, drained)
     h.matcher.onCueEvent(windowClosed())
 
     const settled = h.settled()[0]!
-    const liveAssignment = settled.result.assignments.find((a) => a.eventId === live.id)
-    expect(liveAssignment?.expectedIndex).not.toBe(0)
-    expect(settled.corrections.map((c) => c.eventId)).toEqual([live.id])
+    expect(settled.result.assignments.map((a) => a.eventId)).toEqual([live.event.id])
+    expect(settled.result.missedExpectedIndexes).toEqual([1])
+    expect(settled.result.extras.map((e) => e.eventId)).toEqual([drained.event.id])
+    // Provisional and settled agree, so nothing is reported as corrected.
+    expect(settled.corrections).toEqual([])
   })
 
   it('accumulates settled results for persistence', () => {
     const h = harness()
     for (let i = 0; i < 3; i++) {
       h.matcher.onCueEvent(windowOpened())
-      h.matcher.onPunchEvent(onToken(0))
+      land(h.matcher, onToken(0))
       h.matcher.onCueEvent(windowClosed())
     }
     expect(h.matcher.results()).toHaveLength(3)
@@ -281,7 +355,7 @@ describe('a cancelled cue is not graded (doc §25)', () => {
     // The athlete was told to stop, so there is nothing to grade.
     const h = harness()
     h.matcher.onCueEvent(windowOpened())
-    h.matcher.onPunchEvent(onToken(0))
+    land(h.matcher, onToken(0))
     h.matcher.onCueEvent(cueCancelled())
 
     expect(h.settled()).toHaveLength(0)
@@ -292,7 +366,7 @@ describe('a cancelled cue is not graded (doc §25)', () => {
     const h = harness()
     h.matcher.onCueEvent(windowOpened())
     h.matcher.onCueEvent(cueCancelled())
-    h.matcher.onPunchEvent(event())
+    land(h.matcher, event())
     expect(h.extras()[0]?.cueId).toBeUndefined()
   })
 })
@@ -320,11 +394,11 @@ describe('unsubscribe', () => {
     const matcher = new LiveCueMatcher({ tier: 'hand-timestamp', extraPunchPolicy: 'neutral' })
     const seen: LiveMatcherEvent[] = []
     const off = matcher.subscribe((e) => seen.push(e))
-    matcher.onPunchEvent(event())
+    land(matcher, event())
     expect(seen).toHaveLength(1)
 
     off()
-    matcher.onPunchEvent(event())
+    land(matcher, event())
     expect(seen).toHaveLength(1)
   })
 })
@@ -389,13 +463,7 @@ describe('overlapping windows keep cue identity (forensics 2026-08-31)', () => {
     // N is still the open cue: a punch belongs to it, not to the extras bin.
     const expected = CUE_N.expectedPunches[0]
     if (!expected) return // defensive: a cue with no punches proves nothing here
-    h.matcher.onPunchEvent(
-      event({
-        hand: expected.hand,
-        receivedMonotonicTimeMs:
-          CUE_N.scheduledStartMs + (CUE_N.tokenOffsetsMs[expected.tokenIndex] ?? 0),
-      }),
-    )
+    land(h.matcher, event({ hand: expected.hand, atMs: tokenMs(0, CUE_N) }))
 
     expect(h.matches().map((m) => m.cueId)).toContain(CUE_N.id)
     // Pre-fix this punch was published as an `extra` because `open` was null.

@@ -106,6 +106,15 @@ export interface CueResultRow {
   observedEventId: string | null
   /** `'type-mismatch'` is unreachable on this hardware for the same reason. */
   outcome: CueOutcome
+  /**
+   * Signed ms from the token's scheduled moment to the punch, both on the
+   * round's work clock; negative is early. `null` when nothing answered.
+   *
+   * Only meaningful from `calculationVersion` 1.1.0 — see
+   * `CALCULATION_VERSION`. The SQL comment on this column in migrations
+   * 004/005 ("event time minus window open, on the monotonic clock")
+   * describes the 1.0.0 mistake, not the column.
+   */
   offsetMs: number | null
   /** Tracker-reported values, stored as received with their own unit (§4.3). */
   velocityRaw: number | null

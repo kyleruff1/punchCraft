@@ -35,5 +35,13 @@ export const CONFIDENCE_VERSION = '1.0.0'
 
 /**
  * Derived session metrics (spec §8.6). Bump when a metric's formula changes.
+ *
+ * - `1.1.0` — `cue_results.offset_ms` and `timingWindowPct` are computed on
+ *   the round's work clock. Under `1.0.0` the offset was a monotonic receive
+ *   stamp minus a work-elapsed moment, which is the app's uptime at round
+ *   start rather than a timing error: every `1.0.0` offset is meaningless and
+ *   `timingWindowPct` was always 0. Those rows cannot be recalculated — the
+ *   work clock's anchor was never stored — so a reader must treat `offset_ms`
+ *   as absent wherever `calculation_version` is `1.0.0`.
  */
-export const CALCULATION_VERSION = '1.0.0'
+export const CALCULATION_VERSION = '1.1.0'

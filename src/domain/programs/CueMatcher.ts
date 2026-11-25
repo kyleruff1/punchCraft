@@ -19,9 +19,26 @@
  *   `type-mismatch` is only possible when the decoder actually reported a
  *   type, which on FightCamp v1 it never does (D12).
  *
+ * ## One clock
+ *
+ * A cue is written on the round's **work clock** — `scheduledStartMs`,
+ * `tokenOffsetsMs` and both window bounds are work-elapsed milliseconds,
+ * origin at the bell. A punch arrives stamped with the monotonic clock,
+ * whose origin is arbitrary (app uptime, on the device), and a recovered
+ * one also carries the tracker's own epoch time. Those are three different
+ * number lines.
+ *
+ * So this module takes punches that have already been **placed** on the work
+ * clock (`PlacedPunch`) and reads no time off the event itself. The
+ * conversion happens once, where both clocks are known
+ * (`WorkoutSessionClock.workElapsedAt`). It used to happen here by simply
+ * subtracting a work-elapsed moment from a monotonic stamp — which made
+ * `offsetMs` equal to the app's uptime at round start on every punch, and
+ * went unnoticed because the fixtures derived the stamp *from* the cue.
+ *
  * ## Order and greed
  *
- * Events are matched in event-time order, each to the earliest unfilled
+ * Punches are matched in work-clock order, each to the earliest unfilled
  * expectation whose window contains it. One event fills at most one slot.
  * That is deliberately simple: a smarter assignment could pair punches to
  * slots more flatteringly, but the athlete's experience is sequential — the
@@ -47,8 +64,33 @@ export interface CueAssignment {
   offsetMs: number
 }
 
+/**
+ * A punch placed on the round's work clock — the only clock a cue is
+ * written in.
+ */
+export interface PlacedPunch {
+  event: TrackerPunchEvent
+  /**
+   * Work-elapsed ms within the round at which the punch landed, from
+   * `WorkoutSessionClock.workElapsedAt(event.receivedMonotonicTimeMs)`.
+   *
+   * `null` when the punch cannot be placed. That is every **recovered**
+   * event: it was delivered after a reconnection, so its receive time says
+   * nothing about when it was thrown, and its `trackerTimestampMs` is device
+   * epoch time that nothing maps onto the work clock. An unplaceable punch
+   * is set aside as an extra rather than guessed into a slot (H12, doc §6).
+   */
+  workElapsedMs: number | null
+}
+
 export interface CueExtra {
   eventId: string
+  /**
+   * When the event was **received**, on the monotonic clock — the same
+   * meaning as `LiveExtra.eventTimeMs`. Not a work-clock time: it is carried
+   * for ordering and display against other monotonic stamps, never for
+   * arithmetic against the cue.
+   */
   eventTimeMs: number
   /**
    * Why this punch earned no slot, when the reason is known.
@@ -75,19 +117,22 @@ export interface CueMatchResult {
 }
 
 /**
- * When a tracker timestamp can be trusted for ordering.
+ * When an expectation's token was scheduled to land, in work-elapsed ms.
  *
- * A recovered event (delivered after a reconnection) may arrive long after
- * it happened, so receive time says nothing useful about when the punch
- * landed. Its tracker timestamp does — but only if the tracker reported
- * one. Without that, the event cannot be placed in the sequence and is
- * treated as an extra rather than guessed into a slot (H12, doc §6).
+ * The reference for the signed match offset. Exported so the live pass can
+ * report the same offset the settled pass will, from this one definition —
+ * a second copy of the arithmetic is how the on-beat haptic came to disagree
+ * with the score.
+ *
+ * M39-V1c plumbing (2026-08-30): engine mode returns the authored
+ * expected-strike time. The V1c `expectedStrikeOffsetsMs` override retired in
+ * Phase 5-ii — engine authoring now lives on
+ * `SpineSchedule.compiled[cueId].strikes[i].targetStrikeTick`, and consumers
+ * that want the engine grid read that field directly. Legacy cues use the
+ * beat-grid offset.
  */
-function eventTimeMs(event: TrackerPunchEvent): number | null {
-  if (event.recovered) {
-    return typeof event.trackerTimestampMs === 'number' ? event.trackerTimestampMs : null
-  }
-  return event.receivedMonotonicTimeMs
+export function tokenScheduledMs(cue: CueInstance, expected: ExpectedPunch): number {
+  return cue.scheduledStartMs + (cue.tokenOffsetsMs[expected.tokenIndex] ?? 0)
 }
 
 export class CueMatcher {
@@ -98,6 +143,7 @@ export class CueMatcher {
   }
 
   /**
+   * @param punches the cue's punches, each already placed on the work clock.
    * @param opts.gate how a punch qualifies for the cue.
    *
    * `'window'` (the default) keeps the original rule: the punch must land
@@ -113,7 +159,7 @@ export class CueMatcher {
    */
   match(
     cue: CueInstance,
-    events: readonly TrackerPunchEvent[],
+    punches: readonly PlacedPunch[],
     opts: { gate?: 'window' | 'open' } = {},
   ): CueMatchResult {
     const gate = opts.gate ?? 'window'
@@ -122,28 +168,31 @@ export class CueMatcher {
     const filled = new Set<number>()
     const decoderVersions = new Set<string>()
 
-    // Order by the time each event actually happened. A recovered event
-    // without a usable timestamp is unorderable, so it is set aside as an
-    // extra rather than being slotted by its arrival time.
+    // Order by when each punch landed in the round. One that could not be
+    // placed on the work clock is unorderable, so it is set aside as an
+    // extra rather than being slotted by its arrival.
     const timed: Array<{ event: TrackerPunchEvent; atMs: number }> = []
-    for (const event of events) {
+    for (const { event, workElapsedMs } of punches) {
       decoderVersions.add(event.decoderVersion)
-      const atMs = eventTimeMs(event)
-      if (atMs === null) {
+      if (workElapsedMs === null) {
         extras.push({ eventId: event.id, eventTimeMs: event.receivedMonotonicTimeMs })
         continue
       }
-      timed.push({ event, atMs })
+      timed.push({ event, atMs: workElapsedMs })
     }
     timed.sort((a, b) => a.atMs - b.atMs || a.event.id.localeCompare(b.event.id))
 
+    // `atMs` is work-elapsed from here down — the cue's own clock, so it may
+    // be compared with the window and subtracted from a scheduled moment.
+    // An extra's `eventTimeMs` is the monotonic receive stamp instead: it
+    // leaves this module, and nothing outside may mistake it for round time.
     for (const { event, atMs } of timed) {
       // Windows arrive already clamped from expandTimeline — no grace math
       // here, deliberately. Under `gate: 'open'` the caller has already scoped
       // the events to the cue's open window, so the test is skipped rather
       // than applied twice.
       if (gate === 'window' && (atMs < cue.windowStartMs || atMs > cue.windowEndMs)) {
-        extras.push({ eventId: event.id, eventTimeMs: atMs })
+        extras.push({ eventId: event.id, eventTimeMs: event.receivedMonotonicTimeMs })
         continue
       }
 
@@ -151,7 +200,7 @@ export class CueMatcher {
       if (expectedIndex === null) {
         // Every slot is taken: the athlete threw more than was called. That
         // is information, not an error (doc §21).
-        extras.push({ eventId: event.id, eventTimeMs: atMs })
+        extras.push({ eventId: event.id, eventTimeMs: event.receivedMonotonicTimeMs })
         continue
       }
 
@@ -161,7 +210,11 @@ export class CueMatcher {
       // A wrong hand leaves the ordinal open for a retry (D18), matching the
       // live pass. Without this the two disagree on every hand error.
       if (outcome === 'hand-mismatch') {
-        extras.push({ eventId: event.id, eventTimeMs: atMs, reason: 'hand-mismatch' })
+        extras.push({
+          eventId: event.id,
+          eventTimeMs: event.receivedMonotonicTimeMs,
+          reason: 'hand-mismatch',
+        })
         continue
       }
 
@@ -170,7 +223,7 @@ export class CueMatcher {
         expectedIndex,
         eventId: event.id,
         outcome,
-        offsetMs: atMs - this.scheduledMomentMs(cue, expected),
+        offsetMs: atMs - tokenScheduledMs(cue, expected),
       })
     }
 
@@ -195,23 +248,6 @@ export class CueMatcher {
       if (!filled.has(i)) return i
     }
     return null
-  }
-
-  /**
-   * When this expectation's token was expected to LAND (the reference
-   * used for the signed match offset).
-   *
-   * M39-V1c plumbing (2026-08-30): engine mode returns the authored
-   * expected-strike time. The V1c `expectedStrikeOffsetsMs` override
-   * retired in Phase 5-ii — engine authoring now lives on
-   * `SpineSchedule.compiled[cueId].strikes[i].targetStrikeTick`, and
-   * consumers that want the engine grid read that field directly.
-   * Legacy cues use the beat-grid offset (identical to the pre-M39
-   * scheduledMomentMs).
-   */
-  private scheduledMomentMs(cue: CueInstance, expected: ExpectedPunch): number {
-    const offset = cue.tokenOffsetsMs[expected.tokenIndex] ?? 0
-    return cue.scheduledStartMs + offset
   }
 
   /**

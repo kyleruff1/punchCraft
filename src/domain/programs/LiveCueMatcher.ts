@@ -9,9 +9,8 @@
  * Two requirements pull in opposite directions. Doc §21 wants per-punch
  * feedback *now* — the token brightens as the punch lands. But the
  * authoritative match cannot be decided until the window closes, because
- * ordering depends on events that have not arrived yet: a recovered event
- * may turn up seconds later carrying a tracker timestamp that places it
- * earlier in the sequence.
+ * it is the whole set of punches, in the order they landed, that says which
+ * one answered which call.
  *
  * So this does both, and keeps them honest about which is which:
  *
@@ -22,9 +21,28 @@
  *   everything buffered for that cue and emit the settled result. This is
  *   what gets scored and later persisted.
  *
- * When they disagree — which only a recovered or out-of-order event can
- * cause — the settled result wins and the disagreement is reported rather
- * than silently smoothed over.
+ * When they disagree — which only an out-of-order event can cause — the
+ * settled result wins and the disagreement is reported rather than silently
+ * smoothed over.
+ *
+ * ## Two clocks, converted once
+ *
+ * A punch arrives with a monotonic receive stamp; a cue is written on the
+ * round's work clock. The caller converts — `onPunchEvent` takes the punch's
+ * work-elapsed time alongside it — and from there the two are kept apart by
+ * name: every `eventTimeMs` this module publishes is the monotonic stamp,
+ * and `offsetMs` is the only quantity derived from round time.
+ *
+ * ## Recovered events are not credited
+ *
+ * A tracker buffers punches thrown while its link was down and drains them
+ * on reconnect, 22–66 s late (measured 2026-08-29). Such a punch is history,
+ * not an answer to whatever is on screen. Its receive time is meaningless
+ * and its tracker timestamp is device epoch time that nothing maps onto the
+ * work clock, so it is buffered as **unplaceable** and the settled pass
+ * files it as an extra. It used to reach the settled pass carrying that
+ * epoch value as if it were round time, and — with the window test skipped
+ * under `gate: 'open'` — took the next unfilled slot.
  *
  * ## Extras
  *
@@ -35,7 +53,13 @@
  * Pure TypeScript — no React, Expo, SQLite or BLE imports (spec §15.1).
  */
 
-import { CueMatcher, type CueMatchResult, type MatchOutcome } from './CueMatcher'
+import {
+  CueMatcher,
+  tokenScheduledMs,
+  type CueMatchResult,
+  type MatchOutcome,
+  type PlacedPunch,
+} from './CueMatcher'
 import { scoreCue, type CueScore, type ScoreCueOptions } from './cueScoring'
 import type { CueEvent } from './CueState'
 import type { CueInstance } from './CueTimeline'
@@ -48,7 +72,15 @@ export interface LiveMatch {
   cueId: string
   expectedIndex: number
   eventId: string
+  /** When the punch was received, on the monotonic clock. */
   eventTimeMs: number
+  /**
+   * Signed distance from the token's scheduled moment, in ms; negative is
+   * early. The same number the settled `CueAssignment.offsetMs` will carry,
+   * from the same definition (`tokenScheduledMs`) — so the surface gates its
+   * on-beat reward on what the score will say, not on arithmetic of its own.
+   */
+  offsetMs: number
   outcome: MatchOutcome
   /** Tracker-reported velocity in tracker units, when the source has it. */
   velocityRaw?: number
@@ -98,7 +130,7 @@ export type LiveMatcherEvent =
       score: CueScore
       /**
        * Provisional assignments the settled pass disagreed with. Normally
-       * empty; non-empty means a late or recovered event reordered the cue.
+       * empty; non-empty means an out-of-order event reordered the cue.
        */
       corrections: LiveMatch[]
     }
@@ -114,7 +146,8 @@ export interface LiveCueMatcherOptions {
 
 interface OpenCue {
   cue: CueInstance
-  events: TrackerPunchEvent[]
+  /** Every punch that arrived while the window was open, placed on the work clock. */
+  events: PlacedPunch[]
   provisional: LiveMatch[]
   filled: Set<number>
 }
@@ -190,7 +223,13 @@ export class LiveCueMatcher {
     }
   }
 
-  onPunchEvent(event: TrackerPunchEvent): void {
+  /**
+   * @param workElapsedMs where the punch landed on the round's work clock —
+   *   `WorkoutSessionClock.workElapsedAt(event.receivedMonotonicTimeMs)`.
+   *   Required rather than derived here: this module has no session clock,
+   *   and a default would quietly reinstate the mixed-clock subtraction.
+   */
+  onPunchEvent(event: TrackerPunchEvent, workElapsedMs: number): void {
     const open = this.open
     if (!open) {
       // Nothing is being called: a punch between combinations. Still real,
@@ -206,7 +245,9 @@ export class LiveCueMatcher {
       return
     }
 
-    open.events.push(event)
+    // A recovered event is buffered as unplaceable — see the header. The
+    // `workElapsedMs` it arrived with describes when it was *delivered*.
+    open.events.push({ event, workElapsedMs: event.recovered ? null : workElapsedMs })
 
     // A count-scored cue has no expectations to fill: every punch during a
     // burst is output, and output is what it is judged on (doc §14). It is
@@ -227,16 +268,15 @@ export class LiveCueMatcher {
       return
     }
 
-    // A recovered event cannot be placed provisionally — its position
-    // depends on a tracker timestamp the settled pass will order properly.
-    // Buffer it and say nothing yet rather than crediting the wrong slot.
+    // A recovered event answers nothing that is on screen now. It stays in
+    // the buffer so the settled result still accounts for it, as an extra.
     if (event.recovered) return
 
     // Credit is presence, not arithmetic (D18). The cue's window brackets this
     // method — nothing is open before `cue-window-opened` or after
     // `cue-window-closed` — so a punch thrown while the set is on screen is
     // creditable however late in the window it lands. Timing gates nothing.
-    const atMs = event.receivedMonotonicTimeMs
+    const receivedMs = event.receivedMonotonicTimeMs
     const expectedIndex = this.nextUnfilled(open)
 
     // Every expectation already answered: the athlete threw more than the set
@@ -247,7 +287,7 @@ export class LiveCueMatcher {
         extra: {
           cueId: open.cue.id,
           eventId: event.id,
-          eventTimeMs: atMs,
+          eventTimeMs: receivedMs,
           policy: this.options.extraPunchPolicy,
         },
       })
@@ -271,7 +311,7 @@ export class LiveCueMatcher {
         extra: {
           cueId: open.cue.id,
           eventId: event.id,
-          eventTimeMs: atMs,
+          eventTimeMs: receivedMs,
           policy: this.options.extraPunchPolicy,
           reason: 'hand-mismatch',
         },
@@ -298,7 +338,8 @@ export class LiveCueMatcher {
       cueId: open.cue.id,
       expectedIndex,
       eventId: event.id,
-      eventTimeMs: atMs,
+      eventTimeMs: receivedMs,
+      offsetMs: workElapsedMs - tokenScheduledMs(open.cue, expected),
       // Hand is the only thing verifiable at this hardware's tier (D12);
       // the settled pass applies the full rule including technique.
       outcome,
@@ -345,7 +386,7 @@ export class LiveCueMatcher {
     this.settled.push(result)
 
     const score = scoreCue(result, this.options.tier, {
-      events: open.events,
+      events: open.events.map((p) => p.event),
       expectedPunches: open.cue.expectedPunches,
       ...(this.options.typeProfiles ? { typeProfiles: this.options.typeProfiles } : {}),
       ...(this.options.targetVelocityRange
@@ -364,7 +405,7 @@ export class LiveCueMatcher {
   /**
    * Provisional assignments the settled pass contradicted.
    *
-   * Reported rather than hidden: a non-empty list means a late or recovered
+   * Reported rather than hidden: a non-empty list means an out-of-order
    * event reordered the cue after the athlete already saw feedback, and a
    * surface that silently rewrote the tokens would be lying about what it
    * had shown.
@@ -394,12 +435,12 @@ export class LiveCueMatcher {
       cueId: open.cue.id,
       assignments: [],
       missedExpectedIndexes: [],
-      extras: open.events.map((e) => ({
-        eventId: e.id,
-        eventTimeMs: e.receivedMonotonicTimeMs,
+      extras: open.events.map(({ event }) => ({
+        eventId: event.id,
+        eventTimeMs: event.receivedMonotonicTimeMs,
       })),
       capabilityTier: this.options.tier,
-      decoderVersions: [...new Set(open.events.map((e) => e.decoderVersion))].sort(),
+      decoderVersions: [...new Set(open.events.map(({ event }) => event.decoderVersion))].sort(),
     }
   }
 

@@ -68,6 +68,13 @@ function timelineFor(blocks: WorkoutBlock[], workDurationMs = 180_000): RoundTim
   return expandTimeline(workout, 'orthodox', STEADY_BPM)
 }
 
+/**
+ * Where on the round's work clock the burst punches land. A count-scored cue
+ * measures output, not timing, so one moment serves every punch — but the
+ * matcher still requires it, separately from the event's monotonic stamp.
+ */
+const BURST_AT_WORK_MS = 12_000
+
 let nextId = 0
 function punch(over: Partial<TrackerPunchEvent> = {}): TrackerPunchEvent {
   nextId += 1
@@ -76,7 +83,8 @@ function punch(over: Partial<TrackerPunchEvent> = {}): TrackerPunchEvent {
     sourceFrameId: `f${nextId}`,
     deviceId: 'D7:34',
     hand: 'left',
-    receivedMonotonicTimeMs: 12_000,
+    // An hour of app uptime away from the work clock: the two share no origin.
+    receivedMonotonicTimeMs: 3_600_000 + BURST_AT_WORK_MS,
     receivedWallTimeIso: '2026-08-23T00:00:00.000Z',
     recovered: false,
     decoderId: 'fightcamp-v1',
@@ -293,7 +301,7 @@ describe('the matcher counts rather than reporting extras', () => {
     // is the whole point of the block.
     const h = harness()
     h.open()
-    h.matcher.onPunchEvent(punch())
+    h.matcher.onPunchEvent(punch(), BURST_AT_WORK_MS)
     expect(h.events.filter((e) => e.type === 'count')).toHaveLength(1)
     expect(h.events.filter((e) => e.type === 'extra')).toHaveLength(0)
   })
@@ -301,15 +309,15 @@ describe('the matcher counts rather than reporting extras', () => {
   it('counts either hand', () => {
     const h = harness()
     h.open()
-    h.matcher.onPunchEvent(punch({ hand: 'left' }))
-    h.matcher.onPunchEvent(punch({ hand: 'right' }))
+    h.matcher.onPunchEvent(punch({ hand: 'left' }), BURST_AT_WORK_MS)
+    h.matcher.onPunchEvent(punch({ hand: 'right' }), BURST_AT_WORK_MS)
     expect(h.events.filter((e) => e.type === 'count')).toHaveLength(2)
   })
 
   it('carries tracker-reported velocity on the count', () => {
     const h = harness()
     h.open()
-    h.matcher.onPunchEvent(punch({ velocityRaw: 14 }))
+    h.matcher.onPunchEvent(punch({ velocityRaw: 14 }), BURST_AT_WORK_MS)
     const counted = h.events.find((e) => e.type === 'count')
     expect(counted?.type === 'count' ? counted.count.velocityRaw : undefined).toBe(14)
   })
@@ -317,8 +325,8 @@ describe('the matcher counts rather than reporting extras', () => {
   it('settles with no assignments and no misses', () => {
     const h = harness()
     h.open()
-    h.matcher.onPunchEvent(punch())
-    h.matcher.onPunchEvent(punch())
+    h.matcher.onPunchEvent(punch(), BURST_AT_WORK_MS)
+    h.matcher.onPunchEvent(punch(), BURST_AT_WORK_MS)
     h.close()
 
     const settled = h.events.find((e) => e.type === 'cue-settled')
