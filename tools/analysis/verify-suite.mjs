@@ -138,7 +138,14 @@ export function parseArgs(argv) {
   return args
 }
 
-/** The `punchcraft://qa/run` URL for one drive. Always carries qa=1 so the flag persists. */
+/**
+ * The `punchcraft://qa/run` URL for one drive.
+ *
+ * Carries no `qa=1`: a link cannot switch QA mode on (it used to, which let
+ * any URL grant itself autostart). QA mode is turned on once per install in
+ * the app — Settings, QA mode — and persists; a drive against a device where
+ * it is off fails with `qa-flag-off`.
+ */
 export function buildRunUrl({ workout, vocab, sim, simForce, simBpm, nonce }) {
   const params = [
     ['workout', workout],
@@ -147,7 +154,6 @@ export function buildRunUrl({ workout, vocab, sim, simForce, simBpm, nonce }) {
     ...(simForce ? [['simForce', '1']] : []),
     ...(simBpm !== undefined ? [['simBpm', String(simBpm)]] : []),
     ['autostart', '1'],
-    ['qa', '1'],
     ['nonce', nonce],
   ]
   const query = params.map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join('&')
@@ -666,7 +672,10 @@ async function driveOne(ctx, job, attempt = 1) {
         row.build.shaMismatch = true
       }
       if (row.build.autostart === false) {
-        fail('qa-flag-off: autostart was downgraded (persisted QA flag off on the device)')
+        fail(
+          'qa-flag-off: autostart was downgraded — QA mode is off on the device. ' +
+            'Turn it on once in the app (Settings, QA mode); a link can no longer do it.',
+        )
         return finish()
       }
     }

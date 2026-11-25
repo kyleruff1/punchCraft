@@ -1,10 +1,18 @@
 import { Link } from 'expo-router'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
 import { getBuildInfo } from '@diagnostics/buildInfo'
+import { useQaStore } from '@state/useQaStore'
 import { colors } from '@/theme/colors'
+
+/** Said in full, because this row is where the permission is actually given. */
+export const QA_MODE_HINT =
+  'Lets a punchcraft://qa/run link start a workout and throw simulated punches on its own. ' +
+  'For the unattended timing suite. Leave it off otherwise.'
 
 export default function SettingsLanding() {
   const info = getBuildInfo()
+  const qaEnabled = useQaStore((s) => s.enabled)
+  const setQaEnabled = useQaStore((s) => s.setEnabled)
   const rows: Array<[string, string]> = [
     ['App name', info.appName],
     ['App version', info.appVersion],
@@ -43,6 +51,22 @@ export default function SettingsLanding() {
           <Text style={styles.linkButtonText}>Workout backdrop</Text>
         </Pressable>
       </Link>
+      {/* QA mode is switched on HERE and nowhere else. A `qa/run` link can
+          use it and can switch it off, but cannot switch it on: a URL anyone
+          can open must not be able to grant itself the right to start a
+          workout full of simulated punches (see `qa/run.tsx`). */}
+      <View style={styles.switchRow}>
+        <View style={styles.switchText}>
+          <Text style={styles.rowLabel}>QA mode</Text>
+          <Text style={styles.switchHint}>{QA_MODE_HINT}</Text>
+        </View>
+        <Switch
+          accessibilityLabel="QA mode"
+          onValueChange={setQaEnabled}
+          testID="qa-mode-switch"
+          value={qaEnabled}
+        />
+      </View>
       <Link href="/(tabs)/velocity-lab" asChild>
         <Pressable style={styles.linkButton}>
           <Text style={styles.linkButtonText}>Back to Velocity Lab</Text>
@@ -83,4 +107,17 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   linkButtonText: { fontSize: 16, fontWeight: '600', color: colors.textPrimary },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    backgroundColor: colors.surface,
+  },
+  switchText: { flex: 1, gap: 4 },
+  switchHint: { fontSize: 13, lineHeight: 18, color: colors.textSecondary },
 })

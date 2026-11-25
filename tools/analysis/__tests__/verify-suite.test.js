@@ -31,10 +31,10 @@ import {
 import { latencyStats, summarizeObserved } from '../observed-summary.mjs'
 
 describe('run URL', () => {
-  it('carries every QA param, autostart and qa=1, URL-encoded', () => {
+  it('carries every QA param and autostart, URL-encoded — and never asks to enable QA mode', () => {
     const url = buildRunUrl({ workout: 'quick-one-two', vocab: 'techniques', sim: 'captured-jam', simForce: true, simBpm: 120, nonce: 'suite 1' })
     expect(url).toBe(
-      'punchcraft://qa/run?workout=quick-one-two&vocab=techniques&sim=captured-jam&simForce=1&simBpm=120&autostart=1&qa=1&nonce=suite%201',
+      'punchcraft://qa/run?workout=quick-one-two&vocab=techniques&sim=captured-jam&simForce=1&simBpm=120&autostart=1&nonce=suite%201',
     )
   })
 

@@ -6,13 +6,16 @@
  * testable without a router.
  *
  *   punchcraft://qa/run?workout=body-work&vocab=techniques&sim=captured-jam
- *                       &autostart=1&qa=1&nonce=suite-1788-body-work-0
+ *                       &autostart=1&nonce=suite-1788-body-work-0
  *
  * Every parameter is optional except `workout`. `sim` defaults to `none`
  * rather than to a script — the suite always names its script explicitly,
  * and a bare link that starts throwing simulated punches would be a
  * surprise. `autostart` and `sim` are the privileged actions; the ROUTE
  * (not this parser) downgrades them when the persisted QA flag is off.
+ *
+ * `qa` is still parsed, but the route honours only `qa=0`. A link can switch
+ * QA mode off; it can never switch it on — that is the Settings switch's job.
  */
 import { isSampleWorkoutKey, type SampleWorkoutKey } from '@domain/workout/samples'
 import { SIM_SCRIPTS, type SimScriptId } from '@simulation/scripts'
@@ -30,7 +33,10 @@ export interface QaRunRequest {
   simBpm?: number
   autostart: boolean
   seed?: string
-  /** Present only when the link asked to flip the persisted flag. */
+  /**
+   * Present only when the link named the persisted flag. The route acts on
+   * `false` alone; `true` is logged and ignored.
+   */
   qa?: boolean
   nonce?: string
 }

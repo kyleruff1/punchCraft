@@ -15,10 +15,18 @@
  * the tap the old driver performed.
  *
  * Privilege: `autostart` and `sim` only take effect when the persisted QA
- * flag is on (or this very link flips it on with `qa=1`). Without it the
- * link merely selects a workout — a public URL scheme must not be able to
- * start a workout throwing phantom punches on its own. Nothing here is
- * gated on `__DEV__`: the suite runs against a release build.
+ * flag is ALREADY on. Without it the link merely selects a workout — a
+ * public URL scheme must not be able to start a workout throwing phantom
+ * punches on its own. Nothing here is gated on `__DEV__`: the suite runs
+ * against a release build.
+ *
+ * A link may USE QA mode and may turn it OFF (`qa=0`). It may never turn it
+ * ON. It used to: `qa=1` set the flag and the very next line read it back as
+ * the authorization, so the link granted its own permission — and the flag
+ * is persisted, so one link left QA mode on for good. Anything able to open
+ * a URL could then autostart a simulated workout that was saved as a real
+ * session. The only way to turn QA mode on is the switch in Settings, which
+ * takes a person holding the tablet.
  */
 import React, { useEffect, useRef, useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
@@ -50,7 +58,9 @@ export default function QaRunLauncher(): React.JSX.Element {
   const firedRef = useRef(false)
   const navigateTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [outcome, setOutcome] = useState<
-    { kind: 'staged'; request: QaRunRequest } | { kind: 'invalid'; errors: string[] } | null
+    | { kind: 'staged'; request: QaRunRequest; blocked: boolean }
+    | { kind: 'invalid'; errors: string[] }
+    | null
   >(null)
 
   // Unmount-only cleanup for the navigation timer. Kept apart from the
@@ -90,7 +100,16 @@ export default function QaRunLauncher(): React.JSX.Element {
     lastNonce = request.nonce
 
     const qa = useQaStore.getState()
-    if (request.qa !== undefined) qa.setEnabled(request.qa)
+    if (request.qa === false) {
+      qa.setEnabled(false)
+    } else if (request.qa === true && !qa.enabled) {
+      // Not an error — the rest of the link still does what an unprivileged
+      // link may do. Said out loud so a suite run that expected QA mode can
+      // see why its autostart was downgraded.
+      logger.warn('workout.qa.run.cannotEnable', 'a link cannot switch QA mode on', {
+        hint: safe('turn it on in the app: Settings, QA mode'),
+      })
+    }
     const qaEnabled = useQaStore.getState().enabled
 
     // Select the workout. A sample pins the catalogue entry; 'generated'
@@ -153,7 +172,11 @@ export default function QaRunLauncher(): React.JSX.Element {
       platformVersion: safe(String(build.platformVersion)),
       installationId: safe(build.installationId ?? null),
     })
-    setOutcome({ kind: 'staged', request: { ...request, autostart, sim } })
+    setOutcome({
+      kind: 'staged',
+      request: { ...request, autostart, sim },
+      blocked: autostart !== request.autostart || sim !== request.sim,
+    })
 
     navigateTimer.current = setTimeout(() => {
       navigateTimer.current = null
@@ -183,6 +206,12 @@ export default function QaRunLauncher(): React.JSX.Element {
             <Text style={styles.detail}>
               {`${outcome.request.workout} · ${outcome.request.vocab}\n` +
                 `sim ${outcome.request.sim} · autostart ${outcome.request.autostart ? 'on' : 'off'}`}
+            </Text>
+          ) : null}
+          {outcome?.kind === 'staged' && outcome.blocked ? (
+            <Text style={styles.detail} testID="qa-run-blocked">
+              QA mode is off, so this link only selected the workout. Turn it on in Settings → QA
+              mode to let a link start one.
             </Text>
           ) : null}
         </>

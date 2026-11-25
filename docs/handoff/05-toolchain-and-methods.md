@@ -81,8 +81,11 @@ wirelessly-ADB'd tablet.
    - `verify-suite.mjs` (1000 lines) — unattended multi-workout driver.
 
 **QA privilege model:** `autostart` and `sim` only take effect when the
-*persisted* QA flag is on; `qa=1` on the link flips it. Without the flag the
-public scheme merely opens the screen.
+*persisted* QA flag is on. The flag is switched on in the app — Settings →
+QA mode — once per install; a link can switch it off (`qa=0`) but never on
+(it could until `review/handoff-cycle-2`, which made the flag
+self-granting). Without the flag the public scheme merely opens the screen
+and selects the workout.
 
 **Corpus under test:** 22 sample workouts (10 designed + 12 `quick-*`), each
 with a numbers and a techniques manifest → 44 files in `tools/analysis/manifests/`.

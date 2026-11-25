@@ -67,12 +67,13 @@ afterEach(() => {
 
 describe('qa/run', () => {
   it('stages the run, patches the recipe, and navigates to live — even as params identity churns', () => {
+    // QA mode was switched on in Settings beforehand; the link only uses it.
+    useQaStore.getState().setEnabled(true)
     mockParams = {
       workout: 'body-work',
       vocab: 'techniques',
       sim: 'captured-jam',
       autostart: '1',
-      qa: '1',
       nonce: 'n-1',
     }
     render()
@@ -139,7 +140,8 @@ describe('qa/run', () => {
   })
 
   it('a re-sent intent with the same nonce re-navigates but does not re-stage', () => {
-    mockParams = { workout: 'body-work', autostart: '1', qa: '1', nonce: 'dup-1' }
+    useQaStore.getState().setEnabled(true)
+    mockParams = { workout: 'body-work', autostart: '1', nonce: 'dup-1' }
     render()
     advance(250)
     expect(mockReplace).toHaveBeenCalledTimes(1)
@@ -151,5 +153,78 @@ describe('qa/run', () => {
     // Not re-staged: the consumed latch survives, so the live screen cannot start twice.
     expect(useQaStore.getState().run?.autostartConsumed).toBe(true)
     expect(mockReplace).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('a link cannot grant itself QA mode', () => {
+  // `qa=1` used to set the flag, and the very next line read it back as the
+  // authorization — so the link approved its own autostart. The flag is
+  // persisted, so one link also left QA mode on for good. The scheme is
+  // reachable from outside the app: anything that could open a URL could
+  // start a simulated workout that was then saved as a real session.
+
+  /** A settings repository that records what was written to it. */
+  function recordingRepo() {
+    const writes: Array<{ key: string; value: unknown }> = []
+    const repo = {
+      read: <T,>(_key: string, fallback: T): T => fallback,
+      write: (key: string, value: unknown) => {
+        writes.push({ key, value })
+      },
+      clear: () => {},
+    }
+    useQaStore.getState().load(repo as never)
+    return writes
+  }
+
+  it('leaves QA mode off when the link asks to turn it on', () => {
+    mockParams = { workout: 'heavy-hands', sim: 'captured-jam', autostart: '1', qa: '1' }
+    render()
+    expect(useQaStore.getState().enabled).toBe(false)
+  })
+
+  it('therefore neither autostarts nor throws simulated punches', () => {
+    mockParams = { workout: 'heavy-hands', sim: 'captured-jam', autostart: '1', qa: '1' }
+    render()
+    expect(useQaStore.getState().run).toMatchObject({ autostart: false, sim: 'none' })
+    expect(logged('workout.qa.run.cannotEnable')).toHaveLength(1)
+    expect(logged('workout.qa.run.blocked')).toHaveLength(1)
+  })
+
+  it('writes nothing to storage, so the next cold start is not privileged either', () => {
+    const writes = recordingRepo()
+    mockParams = { workout: 'heavy-hands', autostart: '1', qa: '1' }
+    render()
+    expect(writes).toEqual([])
+  })
+
+  it('still does what an unprivileged link may do, and says why it did no more', () => {
+    mockParams = { workout: 'heavy-hands', autostart: '1', qa: '1' }
+    const tree = render()
+    advance(250)
+    expect(useWorkoutStore.getState().selectedSampleKey).toBe('heavy-hands')
+    expect(mockReplace).toHaveBeenCalledWith('/(tabs)/punchcraft/live')
+    expect(tree.root.findAllByProps({ testID: 'qa-run-blocked' }, { deep: false })).toHaveLength(1)
+  })
+
+  it('can switch QA mode OFF — a link may always make itself less privileged', () => {
+    const writes = recordingRepo()
+    useQaStore.getState().setEnabled(true)
+    writes.length = 0
+
+    mockParams = { workout: 'heavy-hands', autostart: '1', qa: '0' }
+    render()
+    expect(useQaStore.getState().enabled).toBe(false)
+    expect(useQaStore.getState().run?.autostart).toBe(false)
+    expect(writes).toEqual([{ key: 'qa.mode', value: { enabled: false } }])
+  })
+
+  it('needs no qa parameter once QA mode is on, and does not complain about one', () => {
+    useQaStore.getState().setEnabled(true)
+    mockParams = { workout: 'heavy-hands', sim: 'captured-jam', autostart: '1', qa: '1' }
+    const tree = render()
+    expect(useQaStore.getState().run).toMatchObject({ autostart: true, sim: 'captured-jam' })
+    expect(logged('workout.qa.run.cannotEnable')).toHaveLength(0)
+    expect(tree.root.findAllByProps({ testID: 'qa-run-blocked' }, { deep: false })).toHaveLength(0)
   })
 })
