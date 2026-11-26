@@ -447,7 +447,7 @@ describe('athlete controls', () => {
     const h = harness()
     h.runTo(10_100)
     const original = h.engine.snapshot().current!
-    h.engine.repeatCue()
+    expect(h.engine.repeatCue()).toBe('placed')
 
     const next = h.engine.snapshot().next!
     expect(next.repeatIndex).toBe(original.repeatIndex + 1)
@@ -457,16 +457,17 @@ describe('athlete controls', () => {
   })
 
   it('gives the copy a repeat index no other rep of the block holds', () => {
-    // A block thrown three times: reps 0, 1 and 2. Repeating rep 0 used to
-    // mint a second rep 1 — the natural next rep's own index — and
-    // `(blockId, repeatIndex)` is what a stored result is keyed on.
-    const timeline = timelineFor([block({ kind: 'repeated-combo', repeat: 3 })])
+    // A block thrown three times: reps 0, 1 and 2, with a gap between them
+    // wide enough to hold a copy. Repeating rep 0 used to mint a second rep
+    // 1 — the natural next rep's own index — and `(blockId, repeatIndex)` is
+    // what a stored result is keyed on.
+    const timeline = timelineFor([block({ kind: 'repeated-combo', repeat: 3, gapBeats: 12 })])
     const h = harness(timeline)
     h.runTo(10_100)
     const original = h.engine.snapshot().current!
     expect(original.repeatIndex).toBe(0)
 
-    h.engine.repeatCue()
+    expect(h.engine.repeatCue()).toBe('placed')
     h.runTo(60_000)
 
     const reps = h.engine
@@ -478,15 +479,67 @@ describe('athlete controls', () => {
     expect(Math.max(...reps)).toBe(3)
   })
 
+  it('does not place a copy on top of the next rep', () => {
+    // The same block at its usual one-beat gap: rep 0's window ends where
+    // rep 1 begins, so a copy has nowhere to run. It used to be injected
+    // anyway, both came due on one tick, and the natural rep was closed the
+    // instant it opened — a combination the athlete was never shown, on
+    // their record as missed. Now nothing is injected, and the round plays
+    // exactly as if Repeat had not been pressed.
+    const tight = (): RoundTimeline[] => timelineFor([block({ kind: 'repeated-combo', repeat: 3 })])
+    const trace = (h: Harness): string[] => h.events.map((e) => `${e.type}:${e.cue.id}`)
+
+    const control = harness(tight())
+    control.runTo(60_000)
+
+    const h = harness(tight())
+    h.runTo(10_100)
+    expect(h.engine.repeatCue()).toBe('no-room')
+    h.runTo(60_000)
+
+    expect(h.engine.results()).toHaveLength(3)
+    expect(trace(h)).toEqual(trace(control))
+  })
+
+  it('does not place a copy whose punches would be called past the bell', () => {
+    // The fixture's cue starts at 10 s. A round that ends just after it has
+    // no room for it twice: the copy would begin at the first one's window
+    // end and still be calling punches when the bell goes.
+    const BELL_MS = 11_300
+    const h = harness(timelineFor([block()], BELL_MS))
+    h.runTo(10_100)
+    const original = h.engine.snapshot().current!
+    const copyStartMs = Math.max(original.windowEndMs, 10_100)
+    const copyLastPunchMs = copyStartMs + (original.scheduledEndMs - original.scheduledStartMs)
+    expect(copyLastPunchMs).toBeGreaterThan(BELL_MS)
+
+    expect(h.engine.repeatCue()).toBe('past-the-bell')
+    h.runTo(BELL_MS)
+    expect(h.engine.results()).toHaveLength(1)
+  })
+
+  it('refuses a second copy on top of the first', () => {
+    const h = harness()
+    h.runTo(10_100)
+    expect(h.engine.repeatCue()).toBe('placed')
+    expect(h.engine.repeatCue()).toBe('no-room')
+    h.runTo(60_000)
+    expect(h.engine.results()).toHaveLength(2)
+  })
+
   it('keeps handing out fresh indexes when a cue is repeated more than once', () => {
     const h = harness()
     h.runTo(10_100)
-    h.engine.repeatCue()
-    h.engine.repeatCue()
+    expect(h.engine.repeatCue()).toBe('placed')
+    // On to the copy, then ask for that one again.
+    const copy = h.engine.snapshot().next!
+    h.runTo(copy.scheduledStartMs + 100)
+    expect(h.engine.snapshot().current?.id).toBe(copy.id)
+    expect(h.engine.repeatCue()).toBe('placed')
     h.runTo(60_000)
 
     const reps = h.engine.results().map((r) => r.cue.repeatIndex)
-    expect(new Set(reps).size).toBe(reps.length)
+    expect(reps).toEqual([0, 1, 2])
   })
 
   it('runs the repeated copy through its own lifecycle', () => {
@@ -500,7 +553,7 @@ describe('athlete controls', () => {
   it('does nothing when there is no cue in flight', () => {
     const h = harness()
     expect(() => h.engine.skipCue()).not.toThrow()
-    expect(() => h.engine.repeatCue()).not.toThrow()
+    expect(h.engine.repeatCue()).toBe('nothing-to-repeat')
   })
 })
 

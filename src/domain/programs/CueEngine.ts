@@ -70,6 +70,12 @@ export interface CueSnapshot {
   freeWork?: boolean
 }
 
+/**
+ * What a Repeat did. Only `placed` injected a cue; the others changed
+ * nothing, and say why so the caller can tell the athlete or the log.
+ */
+export type RepeatCueOutcome = 'placed' | 'nothing-to-repeat' | 'no-room' | 'past-the-bell'
+
 /** How a cue finished, kept separately because the status becomes `gap`. */
 export type CueOutcome = 'completed' | 'expired' | 'cancelled'
 
@@ -201,11 +207,26 @@ export class CueEngine {
   }
 
   /**
-   * Re-run the current cue at the next gap.
+   * Re-run the current cue in the gap right after it — if there is one.
    *
    * The copy carries every timing field shifted by the same delta, so the
    * acceptance window keeps its shape rather than being recomputed from
    * graces the engine does not own.
+   *
+   * It is placed only where it can run undisturbed: no other cue still to
+   * come may be in flight during it, and its last punch must be called
+   * before the bell. Otherwise nothing is injected and the caller is told
+   * why. It used to be placed regardless, at the source's window end —
+   * which for any rep but a block's last IS the next rep's start. Two cues
+   * then came due on one tick and `closeOverlapping` settled it: the
+   * natural rep was closed the instant it opened, with nothing matched,
+   * and the athlete's record gained a missed combination they were never
+   * shown.
+   *
+   * The engine does not go looking for a later gap. Inside a block the next
+   * rep is the same combination anyway; and the next real gap is usually a
+   * section's setup pause, where a copy arriving half a minute after it
+   * was asked for would talk over the coach.
    *
    * Its `repeatIndex` is the next one NO rep of the block holds — natural or
    * already injected. It used to be `source.repeatIndex + 1`, which for any
@@ -213,17 +234,35 @@ export class CueEngine {
    * with one `(blockId, repeatIndex)`, which is the identity `cue_results`
    * keys its rows on.
    */
-  repeatCue(): void {
+  repeatCue(): RepeatCueOutcome {
     const runtime = this.currentRuntime() ?? this.lastFinishedRuntime()
-    if (!runtime) return
+    if (!runtime) return 'nothing-to-repeat'
 
     const round = this.timeline[this.roundIndex]
-    if (!round) return
+    if (!round) return 'nothing-to-repeat'
 
     const source = runtime.cue
     const startAt = Math.max(source.windowEndMs, this.lastTickMs)
     const delta = startAt - source.scheduledStartMs
-    if (delta <= 0) return
+    if (delta <= 0) return 'nothing-to-repeat'
+
+    // Every punch called before the bell. The window may still be clamped
+    // at it, as a natural cue's is (D5).
+    if (source.scheduledEndMs + delta > round.workDurationMs) return 'past-the-bell'
+
+    // In flight = from the first punch to the window's end, which is the
+    // span `closeOverlapping` polices. The copy's own source cannot
+    // collide: the copy starts at or after the source's window end.
+    const copyStartMs = source.scheduledStartMs + delta
+    const copyEndMs = source.windowEndMs + delta
+    const collides = this.runtimes.some(
+      (other) =>
+        other !== runtime &&
+        !TERMINAL_STATUSES.has(other.status) &&
+        other.cue.scheduledStartMs < copyEndMs &&
+        other.cue.windowEndMs > copyStartMs,
+    )
+    if (collides) return 'no-room'
 
     const repeatIndex =
       1 +
@@ -246,6 +285,7 @@ export class CueEngine {
 
     this.runtimes.push(newRuntime(copy))
     this.runtimes.sort((a, b) => a.cue.scheduledStartMs - b.cue.scheduledStartMs)
+    return 'placed'
   }
 
   // -- read model -----------------------------------------------------------

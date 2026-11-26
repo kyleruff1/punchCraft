@@ -2326,7 +2326,16 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
         pushStore(true)
       },
       repeatCue: () => {
-        engineRef.current?.repeatCue()
+        const outcome = engineRef.current?.repeatCue()
+        // A Repeat with nowhere to go changes nothing on screen, so it has
+        // to say so somewhere — otherwise "I held it and nothing happened"
+        // cannot be told apart from a dead button.
+        if (outcome !== undefined && outcome !== 'placed') {
+          logger.info('workout.cue.repeatNotPlaced', 'repeat had nowhere to go', {
+            reason: safe(outcome),
+            workElapsedMs: safe(Math.round(workElapsedMsRef.current)),
+          })
+        }
         syncFromEngine()
         pushStore(true)
       },

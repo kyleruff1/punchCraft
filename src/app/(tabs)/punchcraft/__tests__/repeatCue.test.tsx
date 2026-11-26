@@ -34,10 +34,16 @@ import { resetLive, useLiveStore } from '@state/useWorkoutStore'
 import type { GeneratedWorkout } from '@domain/workout/GeneratedWorkout'
 import type { PunchEventSource } from '@domain/punch/PunchEventSource'
 
-const WORK_MS = 12_000
+const WORK_MS = 20_000
 
-/** One round, one 1-2 thrown twice: reps 0 and 1 of block `r1-b1`. */
-const WORKOUT: GeneratedWorkout = {
+/**
+ * One round, one 1-2 thrown twice: reps 0 and 1 of block `r1-b1`.
+ *
+ * `gapBeats` is the beats of rest between the reps. Repeat only places a
+ * copy where it can run undisturbed, so the two fixtures differ in exactly
+ * that: a gap wide enough to hold another 1-2, and one that is not.
+ */
+const workoutWithGap = (gapBeats: number): GeneratedWorkout => ({
   id: 'repeat-cue-fixture',
   recipe: defaultRecipe(),
   schedule: [
@@ -57,7 +63,7 @@ const WORKOUT: GeneratedWorkout = {
           stance: 'inherit',
           startOffsetMs: 0,
           durationMs: 1_000,
-          gapBeats: 2,
+          gapBeats,
           repeat: 2,
           tokens: [
             { kind: 'punch', number: 1, body: false, beatOffset: 0 },
@@ -71,7 +77,9 @@ const WORKOUT: GeneratedWorkout = {
   expectedTechniqueDistribution: {},
   estimatedActivePunchesPerMinute: 60,
   warnings: [],
-}
+})
+const ROOMY = workoutWithGap(10)
+const TIGHT = workoutWithGap(1)
 
 const silentSource: PunchEventSource = {
   id: 'fake',
@@ -81,8 +89,8 @@ const silentSource: PunchEventSource = {
   stop: () => {},
 }
 
-/** Run the fixture, holding Repeat while the first combination is on stage. */
-function runWithRepeat() {
+/** Run a fixture, holding Repeat while the first combination is on stage. */
+function runWithRepeat(workout: GeneratedWorkout = ROOMY) {
   const clock = createFakeClock()
   const db = createMigratedDb()
   const persistence = {
@@ -95,7 +103,7 @@ function runWithRepeat() {
 
   function Probe(): React.JSX.Element {
     const runner = useWorkoutRunner({
-      workout: WORKOUT,
+      workout,
       source: silentSource,
       stance: 'orthodox',
       clock,
@@ -171,5 +179,18 @@ describe('a repeated combination', () => {
     const { rows } = runWithRepeat()
     expect(rows.filter((row) => row.rep === 2).map((row) => row.token)).toEqual([0, 1])
     expect(rows).toHaveLength(6)
+  })
+})
+
+describe('a Repeat with nowhere to go', () => {
+  // The next rep starts where this one's window ends. A copy used to be
+  // injected anyway and the engine settled the collision by closing the
+  // natural rep as it opened — so the session gained a rep that was never
+  // on screen, with every punch in it recorded as missed.
+  it('adds nothing to the record', () => {
+    const { outcomes, rows } = runWithRepeat(TIGHT)
+    expect(outcomes[0]?.status).toBe('persisted')
+    expect([...new Set(rows.map((row) => row.rep))]).toEqual([0, 1])
+    expect(rows).toHaveLength(4)
   })
 })
