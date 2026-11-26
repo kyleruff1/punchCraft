@@ -107,6 +107,9 @@ export default [
         fetch: 'readonly',
         AbortController: 'readonly',
         structuredClone: 'readonly',
+        // Built into node 22 and later; the PC smoke test drives a browser
+        // through it (`tools/pc/app/cdp.mjs`).
+        WebSocket: 'readonly',
       },
     },
     rules: {

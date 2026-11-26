@@ -59,6 +59,12 @@ const config: ExpoConfig = {
       'android.permission.BLUETOOTH_ADMIN',
     ],
   },
+  // The PC version (`npm run pc:app`). Only the tab's icon: without one the
+  // build has no `favicon.ico`, every page load asks for it, and the 404 is
+  // the one error left on an otherwise clean page.
+  web: {
+    favicon: './assets/branding/icon.png',
+  },
   ios: {
     // Not shipping to iOS in the MVP; keep a minimal declaration so `expo prebuild`
     // does not fail when someone accidentally runs it for iOS.

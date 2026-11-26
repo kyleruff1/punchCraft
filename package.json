@@ -22,6 +22,8 @@
     "hooks:install": "git config core.hooksPath .githooks",
     "tablet:reload": "node tools/dev/reload-tablet.mjs",
     "pc:glove-check": "node tools/pc/glove-check/serve.mjs",
+    "pc:app": "node tools/pc/app/serve.mjs",
+    "pc:smoke": "node tools/pc/app/smoke.mjs",
     "test": "jest",
     "test:watch": "jest --watch",
     "guard:velocity-terminology": "node tools/guards/velocity-terminology.mjs",

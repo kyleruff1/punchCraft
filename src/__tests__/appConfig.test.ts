@@ -31,6 +31,13 @@ describe('app.config', () => {
     expect(existsSync(join(ROOT, String(splash?.['image'])))).toBe(true)
   })
 
+  it('gives the PC version a tab icon that is in the repo', () => {
+    // Without one the web build has no `favicon.ico`, and the 404 for it is
+    // an error on every page load — the one `npm run pc:smoke` failed on.
+    expect(typeof config.web?.favicon).toBe('string')
+    expect(existsSync(join(ROOT, String(config.web?.favicon)))).toBe(true)
+  })
+
   it('points the icons at files that are in the repo', () => {
     expect(existsSync(join(ROOT, String(config.icon)))).toBe(true)
     expect(existsSync(join(ROOT, String(config.android?.adaptiveIcon?.foregroundImage)))).toBe(true)
