@@ -25,9 +25,11 @@
  *   told so (`StorageNotice`) and does not start.
  * - **A saved file that has gone missing is said out loud.** The last save
  *   leaves a note in `localStorage`. A load that finds the note and no file
- *   logs an error rather than passing for a first run — which is how the one
- *   unexplained loss so far (the desktop app's browser pane, 2026-11-26)
- *   went unnoticed until the sessions were looked for.
+ *   logs an error rather than passing for a first run. It happens: the
+ *   Claude desktop app's built-in browser pane empties the private file
+ *   system of a page left idle for about ten minutes, while leaving
+ *   `localStorage` and IndexedDB alone (measured with an unrelated canary
+ *   file beside the database, 2026-11-26; findings doc N-10).
  * - **If the saved file will not open, the app still runs** — on an empty
  *   database, with an error in the log. The file that would not open is
  *   copied aside first (`UNREADABLE_FILE`); if even that fails, nothing is

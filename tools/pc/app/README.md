@@ -49,11 +49,13 @@ a second after each write, and at once when the tab is hidden:
   first's, so it does not start; it says the app is already open.
 - **If the browser drops the file, the app says so.** A load that finds no
   database where one was saved logs `storage.web.savedFileMissing` as an
-  error and starts empty. This happened once, in the desktop app's built-in
-  browser pane on 2026-11-26, between two page loads fifteen minutes apart;
-  it could not be reproduced in Chrome (36 forced reloads) and its cause is
-  not known. Until it is, do not keep anything here you cannot afford to
-  lose — the tablet is where sessions live.
+  error and starts empty.
+- **Do not use the Claude desktop app's built-in browser pane for anything
+  you want kept.** It empties this kind of storage for a page left idle
+  about ten minutes — measured 2026-11-26 with an unrelated file beside the
+  database: both gone, while `localStorage` and IndexedDB survived. Sessions
+  saved there are lost. Chrome itself kept both files through the same
+  twelve-minute test — this is the pane, not the app.
 
 ## The smoke test
 

@@ -91,6 +91,8 @@ Added 2026-11-25. Everything here runs on the workstation with no tablet.
 | `npm test` | The whole suite, about two minutes. App logging is silenced; `JEST_LOGS=1 npx jest path/to/test` brings it back. |
 | `npm run typecheck:tools` | Type-checks the verifier and guard scripts (`tools/analysis`, `tools/guards`, `tools/dev`, and the `.mjs` under `tools/pc`), which the root `tsconfig.json` does not include. |
 | `npm run pc:glove-check` | Serves the PC glove check on `http://127.0.0.1:8787/` (loopback only; `PORT=` moves it). Open it in Chrome or Edge. See below. |
+| `npm run pc:app` | Builds the app for a browser and serves it on `http://127.0.0.1:8788/` (loopback only; `PORT=` moves it; `-- --no-build` serves the last build). See below. |
+| `npm run pc:smoke` | Builds, then drives the PC app in a headless Chrome or Edge: boot, a workout on simulated punches, stop, save, reload, and the saved database read back out of the browser. Fails on any error on the page. About a minute after the build. Local only — not in CI. |
 | `npm run tablet:reload` | Restarts Metro, cold-restarts the app on the tablet, waits for it to come up. `--no-metro` restarts only the app; `--dry-run` says what it would do. **Not yet proven on the device** — see the script's header. |
 
 **The PC glove check** (added 2026-11-25) is the first piece of the PC
@@ -102,8 +104,57 @@ open the browser's device chooser from a click. What to do at the PC, how to
 read the result, and exactly what it writes to a glove are in
 [`tools/pc/glove-check/README.md`](../tools/pc/glove-check/README.md).
 Bundled in memory by `esbuild` (a direct dev dependency since this was
-added); nothing is written to disk. It is not the app in a browser — the web
-build does not boot yet.
+added); nothing is written to disk. It is not the app in a browser — that is
+`pc:app`, next.
+
+**The PC app** (added 2026-11-26) is the app itself, built for a browser. It
+boots, lists the workouts, runs one on **simulated punches** and saves the
+session. What it does not do yet — the gloves, the moving backdrop — and
+where its data lives are in
+[`tools/pc/app/README.md`](../tools/pc/app/README.md). Three things about it
+are worth knowing before changing anything near them:
+
+- **A `*.web.ts` file replaces its sibling in the web build**, and only
+  there: `src/storage/database.web.ts`, `src/ble/index.web.ts`,
+  `src/audio/browserPlayback.web.ts`. Jest and the tablet never load them.
+  They are the only files in `src` allowed the page's globals (`window`,
+  `navigator`, `document`); eslint enforces that.
+- **Its database is sql.js, not expo-sqlite.** The pinned expo-sqlite
+  truncates any synchronous result of 256 bytes or more in a browser
+  (`src/storage/sqlJsPort.ts` has the line). Same schema, same migrations,
+  same repositories; the storage suites run against both engines. After
+  pulling this in, run `npm install` once — `sql.js` is a new dependency.
+- **`src/ble/gloveSupport.ts` is the one switch** for "this build cannot
+  search for gloves". Do not sprinkle `Platform.OS === 'web'` around the
+  Bluetooth code; ask `canFindGloves()`.
+
+`pc:smoke` is the regression test for all of it, and the only thing that
+exercises the real WebAssembly engine and the browser's own storage. It
+drives the browser through its debugging port with node's built-in
+WebSocket, so there is nothing to install — but it needs Chrome or Edge on
+the machine, which is why it is not in CI. Run it after touching storage,
+the root layout, anything `*.web.ts`, or the live screen's start-up.
+
+One trap when checking the PC app by hand: **the Claude desktop app's
+built-in browser pane empties the private file system of a page left idle
+about ten minutes**, so a saved database vanishes there (findings doc, N-10;
+Chrome itself keeps it). The app logs `storage.web.savedFileMissing` on the
+next load. Use the pane to look, and `pc:smoke` or your own browser to judge
+what is kept.
+
+**Mining the captures on disk** (added 2026-11-26). Two read-only scripts
+ask today's questions of logs that were captured for something else:
+
+- `node tools/analysis/mine-ble-logs.mjs [dir] [--links|--json]` — every
+  glove link in the captured app logs: when it came up, how long it was seen
+  alive, how it ended, and the init and heartbeat write timings.
+- `node tools/analysis/rejudge-captures.mjs [dir] [--changed|--all]` —
+  re-runs today's first-round verifier over stored captures and says where
+  a verdict moved. It is how to find out what the next suite drive will
+  report without spending a tablet session on it.
+
+Both default to `tools/analysis`, and both read the two log layouts on disk
+(`-v time`, and the epoch-stamped one).
 
 **Line endings and formatting are enforced.** Text is LF everywhere
 (`.gitattributes`), and `src/**/*.{ts,tsx}` and `tools/pc/**` must match
@@ -124,8 +175,12 @@ on every push to `main` and on manual dispatch, and kept for seven days as
 the artifact `punchcraft-release-<sha>`. It is signed with the same debug
 keystore every `expo prebuild` generates, so it installs over a locally
 built one with `adb install -r` and the tablet keeps its data. Building
-locally still works exactly as described above. *As of 2026-11-25 this
-workflow had not yet been seen to pass.*
+locally still works exactly as described above. *Its first run on `main`
+failed (2026-11-26): the splash screen was configured with a colour and no
+image, so a clean checkout had no `splashscreen_logo` drawable. That is
+fixed in `app.config.ts` and proven as far as a clean `expo prebuild`
+generating the drawable; the workflow itself has still not been seen to
+pass.*
 
 ## Bluetooth HCI snoop (M01, only while the official app still connects)
 
