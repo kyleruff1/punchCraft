@@ -49,8 +49,17 @@ const MIGRATIONS: readonly Migration[] = [
  */
 export const MIGRATIONS_FOR_TESTS: readonly Migration[] = MIGRATIONS
 
-/** Apply any migrations whose id is not yet recorded in schema_migrations. */
-export function runMigrations(db: SQLiteDatabase): void {
+/**
+ * Apply any migrations whose id is not yet recorded in schema_migrations.
+ *
+ * `through` stops after that migration id. The app never passes it; it is
+ * the seam that lets a test build a database exactly as an OLDER build left
+ * it — same runner, same transactions, same bookkeeping — then put rows in
+ * it and run the rest, which is the only way to exercise what an upgrade
+ * does to data that already exists.
+ */
+export function runMigrations(db: SQLiteDatabase, opts: { through?: number } = {}): void {
+  const through = opts.through ?? Number.POSITIVE_INFINITY
   db.execSync(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
       id INTEGER PRIMARY KEY,
@@ -67,7 +76,9 @@ export function runMigrations(db: SQLiteDatabase): void {
     appliedStmt.finalizeSync()
   }
 
-  const pending = [...MIGRATIONS].sort((a, b) => a.id - b.id).filter((m) => !applied.has(m.id))
+  const pending = [...MIGRATIONS]
+    .sort((a, b) => a.id - b.id)
+    .filter((m) => !applied.has(m.id) && m.id <= through)
   if (pending.length === 0) return
 
   for (const m of pending) {
