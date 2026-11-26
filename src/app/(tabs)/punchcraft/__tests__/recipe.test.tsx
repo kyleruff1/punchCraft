@@ -441,9 +441,13 @@ describe('scoring language (D4)', () => {
   it('offers Start now that the live screen exists (M32-08)', () => {
     const tree = render(<RecipeScreen />)
     expect(tree.root.findByProps({ testID: 'start-button' }).props.disabled).toBeUndefined()
-    // Honest about what it runs on: simulated punches until M33-01 wires
-    // the trackers in.
-    expect(allText(tree)).toContain('simulated punches')
+    // Honest about what it runs on: the gloves when both are connected, and
+    // otherwise a workout with nothing to count. Until 2026-11-26 this said
+    // the trackers were "not wired in yet", months after M33-01 wired them.
+    const caption = textOf(tree.root.findByProps({ testID: 'start-caption' }))
+    expect(caption).toContain('when both gloves are connected')
+    expect(caption).toContain('nothing to count')
+    expect(allText(tree)).not.toMatch(/until the trackers are wired in/)
   })
 })
 

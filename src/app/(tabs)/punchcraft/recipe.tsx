@@ -414,8 +414,14 @@ export default function RecipeScreen(): React.JSX.Element {
               {`Start is off until this is fixed: ${blockers.map((c) => c.message).join(' ')}`}
             </Text>
           ) : null}
-          <Text style={styles.startCaption}>
-            Runs on simulated punches until the trackers are wired in (M33-01).
+          {/* What the live screen really does (`_useLivePunchSource`): the
+              gloves when both are connected, the simulator otherwise — and
+              outside a development or QA run nothing drives the simulator,
+              so the workout runs with nothing to count. This used to say the
+              trackers were not wired in yet; they have been since M33-01. */}
+          <Text style={styles.startCaption} testID="start-caption">
+            Counts your punches when both gloves are connected. Without them the workout still runs
+            — it just has nothing to count.
           </Text>
 
           <ForgedButton variant="subtle" onPress={resetRecipe} testID="reset-button">
