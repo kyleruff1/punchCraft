@@ -197,3 +197,104 @@ describe('BleCaptureService lifecycle', () => {
     expect(() => service.capture(broken as RawBleFrame)).not.toThrow()
   })
 })
+
+describe('the ambient capture (N-7)', () => {
+  // The capture that is open whenever no other is — so a workout, and the
+  // keepalive, keep their raw frames too. Before it, only a Velocity Lab
+  // route ever opened a capture.
+  afterEach(async () => {
+    while (built.length) {
+      const service = built.pop()!
+      await service.stop()
+      await service.stopAmbient()
+    }
+  })
+
+  it('keeps a frame that arrives with no labelled capture open', async () => {
+    const { service, captures } = build()
+    const ambient = service.startAmbient()
+    service.capture(frame('f1'))
+    await service.stopAmbient()
+    expect(captures.frames.map((f) => [f.id, f.captureId])).toEqual([['f1', ambient]])
+    expect(captures.closed).toEqual([ambient])
+  })
+
+  it('is one capture however often it is started', () => {
+    const { service, captures } = build()
+    expect(service.startAmbient()).toBe(service.startAmbient())
+    expect(captures.opened).toHaveLength(1)
+  })
+
+  it('is labelled, so it can be told from a capture someone opened', () => {
+    const labels: Array<string | null | undefined> = []
+    const { service, captures } = build()
+    const open = captures.open.bind(captures)
+    captures.open = ((input?: { label?: string | null }) => {
+      labels.push(input?.label)
+      return open()
+    }) as never
+    service.startAmbient()
+    service.start({ label: 'live-decode' })
+    expect(labels).toEqual(['connection', 'live-decode'])
+  })
+
+  it('steps aside for a labelled capture, and takes frames back when it closes', async () => {
+    const { service, captures } = build()
+    const ambient = service.startAmbient()
+    service.capture(frame('before'))
+
+    // `start()` used to return whatever capture was already open — which,
+    // with an ambient capture always open, would have swallowed this one.
+    const labelled = service.start({ label: 'live-decode' })
+    expect(labelled).not.toBe(ambient)
+    expect(service.currentCaptureId()).toBe(labelled)
+    service.capture(frame('during'))
+
+    await service.stop()
+    expect(service.currentCaptureId()).toBe(ambient)
+    service.capture(frame('after'))
+    await service.stopAmbient()
+
+    expect(captures.frames.map((f) => [f.id, f.captureId])).toEqual([
+      ['before', ambient],
+      ['during', labelled],
+      ['after', ambient],
+    ])
+    expect(captures.closed).toEqual([labelled, ambient])
+  })
+
+  it('keeps flushing after a labelled capture stops', async () => {
+    jest.useFakeTimers()
+    try {
+      const { service, captures } = build()
+      service.startAmbient()
+      service.start()
+      await service.stop()
+      service.capture(frame('late'))
+      // No explicit drain: the flush timer has to still be running.
+      await jest.advanceTimersByTimeAsync(2_000)
+      expect(captures.frames.map((f) => f.id)).toEqual(['late'])
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
+  it('never records a decoded event under it — a pruned capture would take the event with it', async () => {
+    const { service, punchEvents } = build()
+    service.startAmbient()
+    service.recordEvent(event('p1'))
+    await service.stopAmbient()
+    expect(punchEvents.rows).toEqual([])
+  })
+
+  it('stopping it leaves a labelled capture recording', async () => {
+    const { service, captures } = build()
+    service.startAmbient()
+    const labelled = service.start()
+    await service.stopAmbient()
+    expect(service.hasAmbient()).toBe(false)
+    service.capture(frame('f1'))
+    await service.stop()
+    expect(captures.frames.map((f) => f.captureId)).toEqual([labelled])
+  })
+})

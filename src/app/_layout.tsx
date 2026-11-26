@@ -21,6 +21,7 @@ import { useAutoConnectOnLaunch } from '@ble/useAutoConnectOnLaunch'
 import { logger, safe } from '@diagnostics/logger'
 import { onKeepaliveBattery, startTrackerKeepalive } from '@protocol/trackerKeepalive'
 import { noteSlotBattery } from '@state/useTrackerStore'
+import { startKeepingRawFramesOnce } from '@state/loadCaptureSettings'
 import { useVoiceSettingsOnLaunch } from '@state/loadVoiceSettings'
 import { useBackdropSettingsOnLaunch } from '@state/loadBackdropSettings'
 import { useInstrumentSettingsOnLaunch } from '@state/loadInstrumentSettings'
@@ -51,6 +52,9 @@ export default function RootLayout() {
   // so a freshly-bound glove immediately hears the init plan — a
   // FightCamp tracker hangs up on a silent central (2026-08-29).
   useEffect(() => {
+    // Frames first (N-7): the sink must be on the transport before the
+    // keepalive brings a glove up and it starts to speak.
+    startKeepingRawFramesOnce()
     startTrackerKeepalive()
     // Battery levels flow from the keepalive's heartbeat into the slot
     // store, where the header lamps read them.

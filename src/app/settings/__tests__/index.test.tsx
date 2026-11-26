@@ -14,7 +14,16 @@ jest.mock('expo-router', () => ({
   Link: ({ children }: { children: React.ReactNode }) => children,
 }))
 
-import SettingsLanding, { QA_MODE_HINT } from '../index'
+const mockStartAmbient = jest.fn(() => true)
+const mockStopAmbient = jest.fn(async () => undefined)
+jest.mock('@capture/getCaptureService', () => ({
+  startAmbientCapture: () => mockStartAmbient(),
+  stopAmbientCapture: () => mockStopAmbient(),
+}))
+
+import SettingsLanding, { KEEP_RAW_FRAMES_HINT, QA_MODE_HINT } from '../index'
+import { AMBIENT_LIMITS } from '@capture/ambientCapture'
+import { __resetCaptureSettingsForTests } from '@state/useCaptureSettingsStore'
 import { __resetQaStoreForTests, useQaStore } from '@state/useQaStore'
 
 const mounted: ReactTestRenderer[] = []
@@ -29,6 +38,8 @@ function render(): ReactTestRenderer {
 }
 
 const qaSwitch = (tree: ReactTestRenderer) => tree.root.findByProps({ testID: 'qa-mode-switch' })
+const rawFramesSwitch = (tree: ReactTestRenderer) =>
+  tree.root.findByProps({ testID: 'keep-raw-frames-switch' })
 
 beforeEach(() => {
   __resetQaStoreForTests()
@@ -37,6 +48,36 @@ beforeEach(() => {
 afterEach(() => {
   act(() => {
     for (const tree of mounted.splice(0)) tree.unmount()
+  })
+})
+
+describe('keep raw glove data switch (N-7)', () => {
+  beforeEach(() => {
+    mockStartAmbient.mockClear()
+    mockStopAmbient.mockClear()
+    __resetCaptureSettingsForTests()
+  })
+
+  it('is on until someone turns it off', () => {
+    expect(rawFramesSwitch(render()).props.value).toBe(true)
+  })
+
+  it('turns frame keeping off, and on again', () => {
+    const tree = render()
+    act(() => {
+      rawFramesSwitch(tree).props.onValueChange(false)
+    })
+    expect(rawFramesSwitch(tree).props.value).toBe(false)
+    expect(mockStopAmbient).toHaveBeenCalledTimes(1)
+    act(() => {
+      rawFramesSwitch(tree).props.onValueChange(true)
+    })
+    expect(rawFramesSwitch(tree).props.value).toBe(true)
+    expect(mockStartAmbient).toHaveBeenCalledTimes(1)
+  })
+
+  it('says how long the data is kept, from the limit itself', () => {
+    expect(KEEP_RAW_FRAMES_HINT).toContain(`${AMBIENT_LIMITS.retentionDays} days`)
   })
 })
 

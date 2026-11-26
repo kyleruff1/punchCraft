@@ -84,6 +84,11 @@ export const SETTINGS_KEYS = {
    * release build.
    */
   qa: 'qa.mode',
+  /**
+   * `{ keepRawFrames }` — whether every glove frame is persisted for the
+   * whole connection (N-7). On unless someone has switched it off.
+   */
+  capture: 'capture.rawFrames',
 } as const
 
 export type SettingsKey = (typeof SETTINGS_KEYS)[keyof typeof SETTINGS_KEYS]
