@@ -19,6 +19,7 @@ Read [docs/design-spec.md](docs/design-spec.md) — and, for anything punchCraft
 - `docs/` — spec, roadmap, sprint plans, dev setup, protocol notes. `docs/protocol/hypotheses.md` is the protocol hypothesis log (confidence + evidence per entry).
 - `tools/backlog/` — backlog-as-code (`backlog-static.json`: labels, milestones, project; `backlog-issues.json`: epics + issues in 8 phase fragments) and the idempotent GitHub seeding scripts.
 - `src/` — created in Sprint 1 Story 1 following §16 (`app/`, `ble/`, `protocol/`, `capture/`, `domain/`, `spotify/`, `storage/`, `state/`, `components/`, `diagnostics/`).
+- `tools/pc/` — the PC version, so far one piece: `npm run pc:glove-check`, a browser page that runs the real start-up on a glove over Web Bluetooth (`tools/pc/glove-check/README.md`). The app itself does not boot in a browser yet. Not yet run against a glove as of 2026-11-25.
 - `captures/` and `artifacts/` are git-ignored local folders for raw captures and APKs. Curated replay fixtures live in `src/protocol/<adapter>/fixtures/`.
 
 ## GitHub conventions
@@ -47,7 +48,7 @@ Three environment facts that cost real time if unknown:
 2. **`adb shell wm size` lies** — it reports portrait while the app runs landscape. Taps use the current frame with no rotation math; `uiautomator dump` bounds are authoritative. Prefix adb with `MSYS_NO_PATHCONV=1` in Git Bash.
 3. **`.claude/` is gitignored except `.claude/skills/`**, which holds the `cadence-lab` and `qa-audio-verify` runbooks — the only written record of the verification loop. They are tracked as of 2026-11-25; before that a fresh clone had neither. Everything else under `.claude/` (worktrees, local settings) stays out.
 
-**Before you commit.** `npm run check` is the fast half of CI (typecheck, lint, format, guards; about 20 s) and runs on every push once `npm run hooks:install` has been run in the clone. Text is LF and `src/**/*.{ts,tsx}` must be Prettier-clean — run `npx prettier --write` on what you touched. Two groups are exempt and must be left exactly as committed: the generated manifests and the Puncheoke paths (`.prettierignore`, `.gitattributes`). `npm test` is quiet by default; `JEST_LOGS=1` brings the app's logging back. A stored setting is read with `SettingsRepository.readChecked`, never `read`. More in [docs/dev-setup.md](docs/dev-setup.md).
+**Before you commit.** `npm run check` is the fast half of CI (typecheck, lint, format, guards; about 20 s) and runs on every push once `npm run hooks:install` has been run in the clone. Text is LF and `src/**/*.{ts,tsx}` and `tools/pc/**` must be Prettier-clean — run `npx prettier --write` on what you touched. Two groups are exempt and must be left exactly as committed: the generated manifests and the Puncheoke paths (`.prettierignore`, `.gitattributes`). `npm test` is quiet by default; `JEST_LOGS=1` brings the app's logging back. A stored setting is read with `SettingsRepository.readChecked`, never `read`. More in [docs/dev-setup.md](docs/dev-setup.md).
 
 ## Start here for a new session
 
@@ -57,4 +58,4 @@ Three environment facts that cost real time if unknown:
 
 - The **PR-per-change workflow below was abandoned mid-September**: the last 15 commits on `main` went in directly, with no PR. An open issue is therefore *not* evidence of unbuilt work — verify against the code.
 - `tools/voice/README.md`, `docs/audio-corpus.md` and `docs/audio-validation-rulebook.md` all describe the per-punch phrase-clip pipeline as the live path. (`README.md` does not mention it; what is stale there is the status line — "planning complete", 30 milestones.) It was **retired** in V2 Phase 5-iv (`369a2c6`). `src/domain/coach/callPlacement.ts`'s doc comments are the current, mic-measured record.
-- The **bonding requirement** — trackers must be paired as "FightCam" or every link dies at ~37 s — is the most important operational fact about the hardware. It is **H13** in `docs/protocol/hypotheses.md`; the tablet timing there is reported, not re-measured.
+- The **bonding requirement** — trackers must be paired as "FightCam" or every link dies at ~37 s — is the most important operational fact about the hardware. It is **H13** in `docs/protocol/hypotheses.md`; the tablet timing there is reported, not re-measured. The app now recognises the signature (`src/ble/bondDiagnosis.ts`) and says "Not paired?" after two such drops — tested against the timing rule, never yet against a glove.

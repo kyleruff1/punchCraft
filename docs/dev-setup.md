@@ -87,13 +87,27 @@ Added 2026-11-25. Everything here runs on the workstation with no tablet.
 |---|---|
 | `npm run check` | The fast half of CI, about 20 s: `typecheck`, `typecheck:tools`, `lint`, `format:check`, both guards. |
 | `npm run hooks:install` | Once per clone: points `core.hooksPath` at `.githooks`, so `npm run check` runs before every push. Applies to every worktree of the clone. `git push --no-verify` skips it. |
-| `npm run format` | Rewrites `src/**/*.{ts,tsx}` to the Prettier config. `format:check` only reports. |
+| `npm run format` | Rewrites `src/**/*.{ts,tsx}` and `tools/pc/**` to the Prettier config. `format:check` only reports. |
 | `npm test` | The whole suite, about two minutes. App logging is silenced; `JEST_LOGS=1 npx jest path/to/test` brings it back. |
-| `npm run typecheck:tools` | Type-checks the verifier and guard scripts (`tools/analysis`, `tools/guards`, `tools/dev`), which the root `tsconfig.json` does not include. |
+| `npm run typecheck:tools` | Type-checks the verifier and guard scripts (`tools/analysis`, `tools/guards`, `tools/dev`, and the `.mjs` under `tools/pc`), which the root `tsconfig.json` does not include. |
+| `npm run pc:glove-check` | Serves the PC glove check on `http://127.0.0.1:8787/` (loopback only; `PORT=` moves it). Open it in Chrome or Edge. See below. |
 | `npm run tablet:reload` | Restarts Metro, cold-restarts the app on the tablet, waits for it to come up. `--no-metro` restarts only the app; `--dry-run` says what it would do. **Not yet proven on the device** — see the script's header. |
 
+**The PC glove check** (added 2026-11-25) is the first piece of the PC
+version: one browser page that connects a glove over **Web Bluetooth** and
+runs the tablet's real start-up on it — `startPunchStream`, the FightCamp
+adapter and decoder, the keepalive's beat — to find out whether this PC can
+hold a glove and read its punches at all. It needs a person: a page may only
+open the browser's device chooser from a click. What to do at the PC, how to
+read the result, and exactly what it writes to a glove are in
+[`tools/pc/glove-check/README.md`](../tools/pc/glove-check/README.md).
+Bundled in memory by `esbuild` (a direct dev dependency since this was
+added); nothing is written to disk. It is not the app in a browser — the web
+build does not boot yet.
+
 **Line endings and formatting are enforced.** Text is LF everywhere
-(`.gitattributes`), and `src/**/*.{ts,tsx}` must match `.prettierrc`. Two
+(`.gitattributes`), and `src/**/*.{ts,tsx}` and `tools/pc/**` must match
+`.prettierrc`. Two
 groups are exempt from both and left exactly as committed: the generated
 manifests, and the Puncheoke paths (`.prettierignore` lists them). The two
 commits that did the one-time conversion are in `.git-blame-ignore-revs`;
