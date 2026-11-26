@@ -19,24 +19,14 @@
 import { hexToBytes } from '@ble/bleBytes'
 import type { KnownTracker } from '@ble/knownTrackers'
 
-const sig = (short: string): string => `0000${short}-0000-1000-8000-00805f9b34fb`
-
-/** Standard Device Information service (H05 lists it on these trackers). */
-export const DEVICE_INFORMATION_SERVICE_UUID = sig('180a')
-export const SYSTEM_ID_UUID = sig('2a23')
-
-/**
- * The service's text characteristics. Serial Number String (0x2A25) is left
- * out on purpose: browsers refuse to read it (it is on the Web Bluetooth
- * blocklist as a tracking identifier).
- */
-export const DEVICE_INFORMATION_STRINGS: ReadonlyArray<{ label: string; uuid: string }> = [
-  { label: 'manufacturer', uuid: sig('2a29') },
-  { label: 'model', uuid: sig('2a24') },
-  { label: 'hardware revision', uuid: sig('2a27') },
-  { label: 'firmware revision', uuid: sig('2a26') },
-  { label: 'software revision', uuid: sig('2a28') },
-]
+// The Device Information definitions are the protocol layer's; the tablet
+// keepalive reads the same characteristics from the same constants.
+export {
+  DEVICE_INFORMATION_SERVICE_UUID,
+  DEVICE_INFORMATION_STRINGS,
+  SYSTEM_ID_UUID,
+  textFromHex,
+} from '@protocol/deviceInformation'
 
 const formatAddress = (bytes: readonly number[]): string =>
   bytes.map((b) => b.toString(16).padStart(2, '0').toUpperCase()).join(':')
@@ -81,19 +71,4 @@ export function identifyGlove(
 ): KnownTracker | null {
   const found = new Set(addressesInSystemId(systemIdHex))
   return known.find((t) => found.has(t.address.trim().toUpperCase())) ?? null
-}
-
-/** A text characteristic's bytes as text, or as hex when they are not text. */
-export function textFromHex(valueHex: string): string {
-  let bytes: Uint8Array
-  try {
-    bytes = hexToBytes(valueHex)
-  } catch {
-    return valueHex
-  }
-  const trimmed = [...bytes]
-  while (trimmed.length > 0 && trimmed[trimmed.length - 1] === 0) trimmed.pop()
-  if (trimmed.length === 0) return ''
-  const printable = trimmed.every((b) => b >= 0x20 && b <= 0x7e)
-  return printable ? String.fromCharCode(...trimmed) : `0x${valueHex}`
 }
