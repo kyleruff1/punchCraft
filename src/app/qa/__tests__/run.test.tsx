@@ -167,7 +167,10 @@ describe('a link cannot grant itself QA mode', () => {
   function recordingRepo() {
     const writes: Array<{ key: string; value: unknown }> = []
     const repo = {
-      read: <T,>(_key: string, fallback: T): T => fallback,
+      readChecked: <T,>(_key: string, normalize: (row: Record<string, unknown>) => T) => ({
+        value: normalize({}),
+        corrected: false,
+      }),
       write: (key: string, value: unknown) => {
         writes.push({ key, value })
       },

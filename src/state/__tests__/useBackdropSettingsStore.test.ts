@@ -8,8 +8,10 @@ import type { SettingsRepository } from '@storage/repositories/SettingsRepositor
 function fakeRepo(stored?: unknown) {
   const writes: Array<{ key: string; value: unknown }> = []
   const repo = {
-    read: <T>(_key: string, fallback: T): T =>
-      stored === undefined ? fallback : ({ ...fallback, ...(stored as object) } as T),
+    readChecked: <T>(_key: string, normalize: (row: Record<string, unknown>) => T) => ({
+      value: normalize((stored ?? {}) as Record<string, unknown>),
+      corrected: false,
+    }),
     write: (key: string, value: unknown) => {
       writes.push({ key, value })
     },
