@@ -16,13 +16,17 @@ already cost someone a wrong turn.
 (avatar opacity/height, fused-bee spelling, persona timbre, startPadMs). The
 linked files are fine. Open the file; never act on the hook.
 
-**2. `README.md`, `tools/voice/README.md`, `docs/audio-validation-rulebook.md`.**
-All three describe the per-punch phrase-clip pipeline as the primary runtime
-path. It was **retired** in V2 Phase 5-iv (`369a2c6`). `playCombination()` is a
-hardwired `return false`, the 776 wavs moved to `assets/voice/phrases-legacy/`,
-and `phraseManifest.ts` was deleted. Rulebook steps 3 and 4 cannot run — the
-tools they call now refuse with a message. `callPlacement.ts`'s own doc comments
-are the real, mic-measured record.
+**2. `tools/voice/README.md`, `docs/audio-validation-rulebook.md`,
+`docs/audio-corpus.md`.** All three describe the per-punch phrase-clip pipeline
+as the primary runtime path. It was **retired** in V2 Phase 5-iv (`369a2c6`).
+`playCombination()` is a hardwired `return false`, the 776 wavs moved to
+`assets/voice/phrases-legacy/`, and `phraseManifest.ts` was deleted. Rulebook
+steps 3 and 4 cannot run — the tools they call now refuse with a message.
+`callPlacement.ts`'s own doc comments are the real, mic-measured record.
+
+`README.md` was on this list in error: it never mentions the pipeline. It is
+stale on *status* instead — "planning complete", 30 milestones, dated
+2026-08-22.
 
 **3. The GitHub tracker lags the code.** 107 issues open across 18 milestones,
 but the PR-per-change workflow was abandoned mid-September: the last 15 commits
@@ -33,8 +37,10 @@ description cites a `tools/analysis/ledgers` directory that does not exist.
 **4. Any constant you were told from memory.** Worked example: the brief that
 produced this package asserted `LEAD_IN_PAD_MS = 282` in
 `src/domain/coach/VoicePolicy.ts:41`. Every part was wrong — the value is
-**250**, the file is **`src/domain/coach/callPlacement.ts:38`**, and there is no
-`VoicePolicy.ts`. 282 landed in `ea5df336` and was reverted in `1af8a232`
+**250**, the file is **`src/domain/coach/callPlacement.ts:38`**, and
+`src/domain/coach/VoicePolicy.ts` — which does exist — holds no such constant
+(an earlier draft of this page said the file itself did not exist, which is the
+mistake this paragraph warns about). 282 landed in `ea5df336` and was reverted in `1af8a232`
 because the paired change caused cross-workout regressions. Grep before you
 quote.
 

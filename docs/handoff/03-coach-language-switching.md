@@ -523,8 +523,8 @@ Comfortable, but `body-work r3` has only 443 ms of room — and that pad is auth
 Four places assert it:
 - `src/domain/coach/VoiceCoachPolicy.ts:64-68` — *"`names` … costs roughly four times the phrase duration, which is why the announcer may downgrade to `numbers` at a cadence that cannot fit names."*
 - `src/domain/workout/WorkoutRecipe.ts:42-46` — *"at high cadence `numbers` is the only vocabulary that fits, and the announcer downgrades to it."*
-- `docs/puncheokie-ux-workout-engine.md:1098-1099` — *"`CueAnnouncer` knows each phrase's duration and skips or downgrades rather than overlapping. `numbers` is the automatic fallback when the cadence cannot fit `names`, and the downgrade is surfaced rather than silent."*
-- `docs/puncheokie-ux-workout-engine.md:1108` — D15 rationale.
+- `docs/workouts-ux-engine.md:1098-1099` — *"`CueAnnouncer` knows each phrase's duration and skips or downgrades rather than overlapping. `numbers` is the automatic fallback when the cadence cannot fit `names`, and the downgrade is surfaced rather than silent."*
+- `docs/workouts-ux-engine.md:1108` — D15 rationale.
 
 **Grepped the entire repo for `downgrade` (case-insensitive) across `src`, `docs`, `tools`, `.claude`: every hit in `src/` is about the QA-flag autostart downgrade or settings copy. There is no vocabulary downgrade code.** The only type-level trace is `CompiledCoachVariant.transformReason?: … | 'converted-to-numeric'` (`workoutScore.ts:240`), which is **never assigned**.
 

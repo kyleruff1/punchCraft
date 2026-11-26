@@ -54,5 +54,5 @@ Three environment facts that cost real time if unknown:
 ## Known drift (2026-11-25)
 
 - The **PR-per-change workflow below was abandoned mid-September**: the last 15 commits on `main` went in directly, with no PR. An open issue is therefore *not* evidence of unbuilt work — verify against the code.
-- `README.md`, `tools/voice/README.md`, `docs/audio-corpus.md` and `docs/audio-validation-rulebook.md` all describe the per-punch phrase-clip pipeline as the live path. It was **retired** in V2 Phase 5-iv (`369a2c6`). `src/domain/coach/callPlacement.ts`'s doc comments are the current, mic-measured record.
-- The **bonding requirement** — trackers must be paired as "FightCam" or every link dies at ~37 s — is the most important operational fact about the hardware and is still missing from `docs/protocol/hypotheses.md`.
+- `tools/voice/README.md`, `docs/audio-corpus.md` and `docs/audio-validation-rulebook.md` all describe the per-punch phrase-clip pipeline as the live path. (`README.md` does not mention it; what is stale there is the status line — "planning complete", 30 milestones.) It was **retired** in V2 Phase 5-iv (`369a2c6`). `src/domain/coach/callPlacement.ts`'s doc comments are the current, mic-measured record.
+- The **bonding requirement** — trackers must be paired as "FightCam" or every link dies at ~37 s — is the most important operational fact about the hardware. It is **H13** in `docs/protocol/hypotheses.md`; the tablet timing there is reported, not re-measured.

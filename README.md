@@ -24,7 +24,7 @@ Android-first mobile app that restores useful life to a pair of unsupported **Fi
 ## Roadmap and tracking
 
 - **Project board:** https://github.com/users/kyleruff1/projects/5
-- **Milestones (the 30-step roadmap):** https://github.com/kyleruff1/punchCraft-punchCraft workouts/milestones
+- **Milestones (the 30-step roadmap):** https://github.com/kyleruff1/punchCraft/milestones
 - **Epics (one per phase, 8):** issues labeled `epic`; every task is a sub-issue of its phase epic.
 - Definitions of done for every milestone: [docs/roadmap.md](docs/roadmap.md).
 

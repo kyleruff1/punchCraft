@@ -76,21 +76,36 @@ hand-authored **click map** (`samples/clickMaps.ts`, 10 designed + 12 `quick-*`
 
 ## Path 3 — the coach speaks
 
-**There are two generations side by side**, and which one speaks is decided
-entirely by `WorkoutRecipe.voiceMode`:
+**There are two generations side by side**, and which one calls the punches is
+decided by the workout's authored coach path (until 2026-11-25, by
+`WorkoutRecipe.voiceMode` — see below):
 
 | | **(A) V2 "score" path** | **(B) Script-Bible-v2 "click-script" path** |
 |---|---|---|
-| Fires when | `voiceMode !== 'minimal'` | always, on click maps |
+| Fires when | the workout is not a click-script workout (`coachPathOf(workout) === 'score'`) | on any bar the click-script bank has a clip for — in practice the library's motifs |
 | Chain | `CueAnnouncer` → `RhythmMap` → `compileWorkoutScore` → `SlotDispatcher` | `_useWorkoutRunner.buildLeadInSchedule` → `callPlacement.ts` |
 | Bank | 218-clip `comboAnnounceManifest` | 736-clip `clickScriptManifest` |
-| **In practice** | **never runs on shipped content** | **this is what you hear** |
+| **In practice** | **not on the 22 library workouts; live on generated ones** | **this is what you hear on the library** |
 
-**Every one of the 22 shipped click workouts sets `voiceMode: 'minimal'`**, and
-`scoreDispatchEnabled = recipe.voiceMode !== 'minimal'`
-(`_useWorkoutRunner.ts:1759`). So the SlotDispatcher is dormant on everything
-that ships. Internalize this before debugging audio — you will otherwise
-instrument a path that never fires.
+**Every one of the 22 library workouts is a click-script workout**, and the
+runner arms the SlotDispatcher only when a workout is not one
+(`scoreDispatchEnabled` in `_useWorkoutRunner.ts`). So on the library the
+SlotDispatcher is unarmed — internalize that before debugging audio there, or
+you will instrument a path that never fires.
+
+**It is not dormant everywhere.** An earlier draft of this page said the score
+path "never runs on shipped content". It runs on `diagnostic-token-sequence`
+(a registered, runnable sample) and on every **generated** workout, which is
+what the recipe screen builds. A bug in the score path is a bug an athlete
+can reach.
+
+**How a workout says which path it is on** (changed 2026-11-25): an authored
+`coachPath: 'click-script'` on the workout, read through `coachPathOf`
+(`src/domain/workout/GeneratedWorkout.ts`). Until then the marker was
+`recipe.voiceMode === 'minimal'`, which made the athlete's "how chatty is the
+coach" setting double as "this is a click-track workout". Pages 03, 04 and 06
+still quote the old `voiceMode !== 'minimal'` test; read those as
+`coachPathOf(workout) !== 'click-script'`.
 
 A third generation, the 776-clip **per-punch phrase corpus**, was retired in V2
 Phase 5-iv (`369a2c6`): `playCombination()` is a hardwired `return false` and

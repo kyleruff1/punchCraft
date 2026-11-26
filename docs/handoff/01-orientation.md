@@ -29,9 +29,9 @@ and is out of scope here (see `02-architecture.md` for what remains in-tree).
 | Repo | `F:\punchCraft` · remote `github.com/kyleruff1/punchCraft` |
 | `main` | `8b7e79a2`, **2026-09-26** |
 | Working tree | Clean (one untracked `assets/branding/Kyle Ruff.lnk`) |
-| CI | Green. 180 suites / **4141 tests** / 22 snapshots; typecheck, lint and both guards clean |
+| CI | `main` green: 180 suites / **4141 tests** / 22 snapshots; typecheck, lint and both guards clean. The PR that carried this package (390) was **red** when this was written — it failed `guard:velocity-terminology` on `05-toolchain-and-methods.md`, the page that quotes the guard's own banned list |
 | Issues | 107 open across 18 milestones; 241 closed |
-| Open PRs | **Zero** |
+| Open PRs | One when written — 390, this package. (This row said "Zero".) |
 
 **The repo is dormant, not mid-flight.** Nothing is half-finished. You are
 starting a cycle.
@@ -88,8 +88,8 @@ binds both on launch.
 **The trackers must be BONDED.** Unpaired, the glove's Security Request plus a
 30 s SMP timeout kills every link at ~37 s — which is why the official Hykso
 app appears to round-robin between gloves. Pair once as "FightCam" and both
-hold. **This fact exists only in a memory file; it is not in
-`docs/protocol/hypotheses.md`.** It is the single most important operational
+hold. **When this was written the fact existed only in a memory file; it is
+now H13 in `docs/protocol/hypotheses.md`.** It is the single most important operational
 fact about the hardware and it belongs in the repo.
 
 Tablet: Lenovo TB125FU over wireless ADB. It blocks HCI snoop logging (H08),
@@ -107,10 +107,12 @@ later worked around via `adb bugreport`.
 | Working rules | `CLAUDE.md` — 9 non-negotiables |
 | Timing truth | `src/domain/coach/callPlacement.ts` doc comments — mic-measured, more current than the audio docs |
 
-**Known-stale:** `README.md`, `tools/voice/README.md`,
-`docs/audio-validation-rulebook.md`, and `docs/audio-corpus.md` all describe the
-retired phrase pipeline. `CLAUDE.md`'s toolchain section is dated 2026-08-22 and
-still points at the old `C:` path.
+**Known-stale:** `tools/voice/README.md`, `docs/audio-validation-rulebook.md`,
+and `docs/audio-corpus.md` all describe the retired phrase pipeline.
+`README.md` does not mention it (it was listed here in error); its status line
+is what is stale. `CLAUDE.md`'s toolchain section was dated 2026-08-22 and
+pointed at the old `C:` path when this was written; it has since been
+re-verified (2026-11-25).
 
 ---
 
