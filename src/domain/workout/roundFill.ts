@@ -81,8 +81,19 @@ const PHASE_SHARE = {
   pressure: 0.14,
 } as const
 
-/** Repair-pass bound: extending pressure reps must terminate loudly. */
-const MAX_REPAIR_PASSES = 24
+/**
+ * Backstop for the repair loops, far past anything a round can hold. They
+ * are bounded by PROGRESS — every pass must move the span toward the bell,
+ * and the loop ends at the bell margin or when the next block will not fit
+ * — so this is never the reason one stops.
+ *
+ * It used to be: 24 two-rep passes, then 6 single reps, counted. At sprint
+ * tempo a pass adds well under a second, so around 250 punches a round the
+ * count ran out 5-7 s before the bell (generator 1.3.0 pinned 6 of 144
+ * sampled sprint cells short). A bound that is a number of passes is only a
+ * bound on time at one tempo.
+ */
+const REPAIR_HARD_CAP = 2_000
 
 /**
  * The widest gap a repeat phase may leave between reps, in beats. Past this
@@ -642,20 +653,29 @@ export function fillScoredRound(
       [...specs].reverse().find((s) => s.kind === 'repeated-combo') ??
       specs[specs.length - 1]
     if (repairPick) blockCount += 0 // probe spec above never enters the list
-    let guard = 0
-    while (closing && workMs - span() > REPAIR_BELL_MARGIN_MS && guard++ < MAX_REPAIR_PASSES) {
+    // One repair block, or the reason to stop: it would overrun the bell, or
+    // it would not move the span at all (which would otherwise spin to the
+    // backstop). Either way the id it took is handed back.
+    const extend = (reps: number): boolean => {
+      if (!closing) return false
       const spec = comboSpecFor(
         nextId(),
         closing.notation,
-        2,
+        reps,
         Math.max(MIN_GAP_BEATS, gap * 0.8),
         closing.offsets,
       )
-      if (spanWith(specs, spec, bpm) > workMs) {
+      const next = spanWith(specs, spec, bpm)
+      if (next > workMs || next <= span()) {
         blockCount -= 1
-        break
+        return false
       }
       specs.push(spec)
+      return true
+    }
+    let guard = 0
+    while (workMs - span() > REPAIR_BELL_MARGIN_MS && guard++ < REPAIR_HARD_CAP) {
+      if (!extend(2)) break
     }
 
     // Single-rep top-off: the 2-rep repair blocks are ~3.5-5s each, so
@@ -663,19 +683,8 @@ export function fillScoredRound(
     // before the ding (switch-test lab). One-rep closers fill the last
     // gap almost to the margin, one breath at a time.
     let topOff = 0
-    while (closing && workMs - span() > REPAIR_BELL_MARGIN_MS && topOff++ < 6) {
-      const spec = comboSpecFor(
-        nextId(),
-        closing.notation,
-        1,
-        Math.max(MIN_GAP_BEATS, gap * 0.8),
-        closing.offsets,
-      )
-      if (spanWith(specs, spec, bpm) > workMs) {
-        blockCount -= 1
-        break
-      }
-      specs.push(spec)
+    while (workMs - span() > REPAIR_BELL_MARGIN_MS && topOff++ < REPAIR_HARD_CAP) {
+      if (!extend(1)) break
     }
   }
 
@@ -719,12 +728,11 @@ export function fillScoredRound(
         if (callout !== undefined) {
           first.leadInBeats = (first.leadInBeats ?? 0) + msToBeats(callout.reserveMs, bpm)
           first.setupCallout = callout
-          let guard = 0
-          while (
-            blocksSpanMs(layBlocks(specs, bpm)) > workMs &&
-            specs.length - 1 > runStart &&
-            guard++ < MAX_REPAIR_PASSES
-          ) {
+          // Bounded by the list itself — it only ever shrinks. A count here
+          // would be the same mistake as the repair loops': at sprint tempo
+          // the reps to drop are short, and stopping early leaves the round
+          // running past its bell.
+          while (blocksSpanMs(layBlocks(specs, bpm)) > workMs && specs.length - 1 > runStart) {
             specs.pop()
           }
         }

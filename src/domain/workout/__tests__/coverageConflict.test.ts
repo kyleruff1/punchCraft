@@ -9,7 +9,7 @@
 import { MATERIAL_TAIL_MS, ROUNDS_RUN_DRY, coverageConflict } from '../coverageConflict'
 import { generateWorkout } from '../generateWorkout'
 import { defaultRecipe, type WorkoutRecipe } from '../WorkoutRecipe'
-import type { GeneratedWorkout } from '../GeneratedWorkout'
+import { scoredRounds, type GeneratedWorkout } from '../GeneratedWorkout'
 import type { ProgramRound } from '../WorkoutTokens'
 
 const generated = (over: Partial<WorkoutRecipe> = {}): GeneratedWorkout =>
@@ -66,12 +66,24 @@ describe('against the real generator', () => {
     expect(coverageConflict(generated({ durationMinutes: 20, totalPunchGoal: 50 }))).toBeNull()
   })
 
-  it('flags a workout built from a single punch at a fast cadence', () => {
-    // One enabled punch leaves no build-up ladder to teach and nothing but
-    // one motif to repeat; at sprint tempo that runs out well before the bell.
-    const conflict = coverageConflict(generated({ enabledPunches: [1], cadenceProfile: 'sprint' }))
+  it('says nothing about a single punch at a fast cadence', () => {
+    // Was the flagged case through generator 1.3.0: jab-only at sprint tempo
+    // ran the count-bounded repair pass out before the bell. Bounded by
+    // progress (1.3.1), it fills.
+    expect(coverageConflict(generated({ enabledPunches: [1], cadenceProfile: 'sprint' }))).toBeNull()
+  })
+
+  it('flags a workout whose punches form no combination at all', () => {
+    // A cross on its own is in no motif the library has, so there is no
+    // ladder to teach and no fallback to repeat: every round is laid empty.
+    // The recipe screen calls the missing jab a warning ("variety will be
+    // reduced"); this is the notice that says what that actually costs.
+    const workout = generated({ enabledPunches: [2] })
+    expect(scoredRounds(workout.schedule).every((r) => r.blocks.length === 0)).toBe(true)
+
+    const conflict = coverageConflict(workout)
     expect(conflict?.code).toBe(ROUNDS_RUN_DRY)
-    expect(conflict?.message).toMatch(/out of combinations before the bell/)
+    expect(conflict?.message).toMatch(/^Every round runs out of combinations before the bell/)
   })
 })
 

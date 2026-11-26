@@ -7,10 +7,9 @@
  */
 import { compileRoundRhythmMap } from '../../programs/RhythmMap'
 import { coverageAudit, silenceAudit } from '../../programs/mapValidation'
-import { MATERIAL_TAIL_MS } from '../coverageConflict'
 import { generateWorkout } from '../generateWorkout'
 import { defaultRecipe, type WorkoutRecipe } from '../WorkoutRecipe'
-import { scoredRounds } from '../GeneratedWorkout'
+import { scoredRounds, validateGeneratedWorkout } from '../GeneratedWorkout'
 import { expandTimeline } from '../../programs/CueTimeline'
 import { punchTokens } from '../WorkoutTokens'
 import { CADENCE_PROFILES } from '../cadence'
@@ -77,10 +76,18 @@ describe.each(SEEDS)('D26 fill properties (seed %s)', (seed) => {
 const DURATIONS = [20, 30, 40, 60] as const
 const GOALS = [50, 100, 150, 200, 300, 450, 600, 900, 1_200, 2_000, 3_000, 6_000]
 const GOAL_SEEDS = ['a', 'b', 'c']
+const ALL_CADENCES = Object.keys(CADENCE_PROFILES) as Array<WorkoutRecipe['cadenceProfile']>
 
 describe.each(DURATIONS)('D26 at any goal — %i minutes', (durationMinutes) => {
   it.each(GOALS)('covers every scored round to the bell at a goal of %i', (totalPunchGoal) => {
-    for (const cadenceProfile of ['technical', 'steady', 'pressure'] as const) {
+    // Every cadence, sprint included. Sprint was left out of this sweep
+    // through generator 1.3.0 and pinned separately as a known residual: the
+    // repair pass was bounded by a COUNT of passes (24 two-rep, then 6
+    // single), and at sprint tempo a pass adds well under a second, so around
+    // 250 punches a round the count ran out 5-7 s before the bell on 6 of the
+    // 144 sprint cells. Lifting either count closed all six; the pass is
+    // bounded by progress toward the bell now (1.3.1).
+    for (const cadenceProfile of ALL_CADENCES) {
       for (const seed of GOAL_SEEDS) {
         const workout = make({ seed, durationMinutes, totalPunchGoal, cadenceProfile })
         for (const round of scoredRounds(workout.schedule)) {
@@ -98,28 +105,23 @@ describe.each(DURATIONS)('D26 at any goal — %i minutes', (durationMinutes) => 
   })
 })
 
-describe('D26 at sprint cadence — the known residual', () => {
-  it('never leaves a round short enough to be worth a warning', () => {
-    // Not fully covered, and pinned here rather than hidden. At sprint tempo
-    // one pass of the repair loop adds well under a second, and that loop is
-    // bounded by COUNT (24 two-rep passes, then 6 single reps), not by time —
-    // so around 250 punches a round it runs out 5-7 s before the bell on a
-    // few rounds. That is past the 5 s the audit allows and well inside the
-    // 10 s at which the recipe screen says anything. Closing it means
-    // re-bounding the repair pass, which changes how a round ends and is a
-    // listening decision, not a desk one.
-    let worstMs = 0
+describe('the repair pass never runs a round past its bell', () => {
+  // The other half of re-bounding it: a pass that no longer stops at a count
+  // must still stop at the bell. `validateGeneratedWorkout` rejects a block
+  // that overruns its round, so a sweep with no errors is the proof.
+  it.each(ALL_CADENCES)('%s: every generated workout still validates', (cadenceProfile) => {
     for (const durationMinutes of DURATIONS) {
       for (const totalPunchGoal of GOALS) {
         for (const seed of GOAL_SEEDS) {
-          const workout = make({ seed, durationMinutes, totalPunchGoal, cadenceProfile: 'sprint' })
-          for (const round of scoredRounds(workout.schedule)) {
-            const coverage = coverageAudit(round.blocks, round.workDurationMs)
-            worstMs = Math.max(worstMs, round.workDurationMs - coverage.spanMs)
-          }
+          const workout = make({ seed, durationMinutes, totalPunchGoal, cadenceProfile })
+          expect({
+            durationMinutes,
+            totalPunchGoal,
+            seed,
+            errors: validateGeneratedWorkout(workout).map((e) => e.code),
+          }).toEqual({ durationMinutes, totalPunchGoal, seed, errors: [] })
         }
       }
     }
-    expect(worstMs).toBeLessThan(MATERIAL_TAIL_MS)
   })
 })

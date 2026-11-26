@@ -23,8 +23,11 @@
  *   round's last 40-60 s without content (D26). The version also seeds
  *   selection, so every generated workout differs from its `1.2.0` plan
  *   for the same recipe and seed — not only the low-goal ones.
+ * - `1.3.1` — the coverage repair pass is bounded by progress toward the
+ *   bell instead of by a count of passes, so a sprint-tempo round no longer
+ *   stops 5-7 s short. Same reseeding caveat as above.
  */
-export const GENERATOR_VERSION = '1.3.0'
+export const GENERATOR_VERSION = '1.3.1'
 
 /**
  * Schema of the persisted `WorkoutRecipe` object in `workout_recipes.params_json`.
