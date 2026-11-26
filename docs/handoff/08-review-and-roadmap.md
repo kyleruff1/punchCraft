@@ -51,6 +51,28 @@ Where this document says a line number, it was read at `6129f24b`.
 > **Not verified:** anything on the tablet, and the QA suite has not been
 > re-driven since its verdicts were tightened. The checklist is §7.
 
+> **Second batch, later on 2026-11-25** — branch `review/handoff-cycle-2`, cut
+> from the head of PR 391, one commit per fix, nothing pushed. What each item
+> became, and what the batch turned up on its own, is in **§3b**.
+>
+> | | Commit |
+> |---|---|
+> | QA link can no longer grant itself QA mode | `f9f758ee` |
+> | `voiceMode` split: authored `coachPath` | `308540cf` |
+> | Sprint rounds fill to the bell (generator 1.3.1) | `8538aa40` |
+> | Repeat placed only where it can run | `1d0e33af` |
+> | Velocity Lab Live no longer re-initialises a glove | `8730db02` |
+> | Handoff package errata + H13 (bonding) | `bbfd5c4c` |
+> | Runbooks tracked | `e886924b` |
+> | **Found here:** migration 003 restored to its shipped SQL | `e9615f77` |
+> | Upgrade-path tests + append-only guard | `fa4f3291` |
+> | Saved voice settings validated | `1d7ecdee` |
+>
+> **Verified at this state:** 190 suites / 4,527 tests / 22 snapshots green;
+> `tsc` and `eslint` clean; both guards pass. All 22 compiled timeline hashes
+> and token-stream snapshots are unchanged. **Still not verified:** anything
+> on the tablet. §7 has the additions.
+
 
 ---
 
@@ -99,6 +121,8 @@ headline paragraph overreached from "no such constant" to "no such file."
 
 The value of the lesson survives; the example needs the one-word fix.
 
+**Status: done** (`bbfd5c4c`).
+
 ### P-2 · PR #390 is red, on the guard the package documents
 
 `guard:velocity-terminology` exits 1 with 4 violations. All four are in
@@ -145,6 +169,11 @@ but a session told to distrust the wrong part will trust the wrong part. The
 other three are correctly flagged: `tools/voice/README.md` (12 "phrase" hits),
 `docs/audio-validation-rulebook.md` (26), `docs/audio-corpus.md` (19).
 
+**Status: done** (`bbfd5c4c`) in `00`, `01` and `CLAUDE.md`, which repeated it.
+The README's milestones link, which the rename had turned into a URL with a
+space in it, is repaired in the same commit. Its status line ("planning
+complete", 30 milestones) is still stale and still says so.
+
 ### P-4 · "The score path never runs on shipped content" is false
 
 `02-architecture.md` states the SlotDispatcher V2 coach path "never runs on
@@ -165,6 +194,11 @@ path (notably package target 3, the unguarded 50 ms tick), and it is why the
 provenance handshake in T-2 below is dead on exactly the 22 workouts that *are*
 driven.
 
+**Status: done** (`bbfd5c4c`), and the ground under it moved (`308540cf`): the
+marker is no longer `recipe.voiceMode`. A workout says which path it is on with
+an authored `coachPath`, read through `coachPathOf`. `02-architecture.md` now
+says both things.
+
 ### P-5 · Six citations point at a file this same PR deleted
 
 `07-new-workout-types.md` cites `docs/puncheokie-ux-workout-engine.md` (:23,
@@ -172,6 +206,8 @@ driven.
 the single hardest hardware constraint in the project. Commit `bd2ca682` renamed
 it to `docs/workouts-ux-engine.md` and correctly updated `CLAUDE.md:3`. The line
 numbers all still land; only the path is dead.
+
+**Status: done** (`bbfd5c4c`) — five occurrences, in `03` and `07`.
 
 ### P-6 · The only runbooks are ungitted *and* stale
 
@@ -182,6 +218,17 @@ They are also stale in the same way the package warns about:
 cadence rail; the real lines are **:477-478** and **:1719** (the package has
 this right). It also references `tools/analysis/reports/cadence-audit.json`,
 which does not exist.
+
+**Status: done** (`e886924b`). `.gitignore` ignores everything under `.claude/`
+except `skills/`. Corrected on the way in: every log code in both runbooks
+still carried the pre-rename `puncheokie.` prefix (the app logs `workout.*` —
+being untracked is how they missed the rename); `file:line` references became
+symbol references; the QA runbook's `qa=1` step became the Settings switch.
+Left as it was and marked stale in the file: cadence-lab's clip-fixing
+section, which describes the retired phrase pipeline, and the report
+template's `cadence-audit.json` path. Nothing in either runbook is new to the
+repo, which is public: no credentials, and the local tool paths and tablet
+notes already appear in tracked files.
 
 ### Verified correct, no correction needed
 
@@ -587,13 +634,17 @@ the recipe screen; (3) revisit the repair cap, which is a tuning question.
     250 punches a round, 5–7 s short. At that tempo one repair pass adds under
     a second and the loop is bounded by count (24 two-rep passes, then 6
     single reps), not by time. Pinned in a test, not changed — re-bounding it
-    changes how a round ends.
+    changes how a round ends. **Since fixed** (`8538aa40`, generator 1.3.1):
+    both loops are bounded by progress, and sprint is in the any-goal sweep.
   - **The warning from (2) is re-aimed.** A low goal no longer runs a round
     dry, so "raise the goal" would be advice that changes nothing. What still
     does is too narrow a content pool — one enabled punch, or combinations
     capped at one or two, leaves 12–29 s tails. `coverageConflict` now fires at
     10 s rather than the audit's 5 s, points at those two controls, and says
-    to enable more punches.
+    to enable more punches. **The cause was misattributed here.** It is not
+    the narrow pool as such: the same-move announcement pass drops a whole
+    trailing block to pay for a 6-7 s call and nothing refills the round. See
+    N-3 in §3b — it also hits a cap of 2 with every punch enabled.
   - Still wants your ear: how a low-goal round sounds now that it is full.
 
 ### M-group · Six confirmed MEDIUMs
@@ -697,6 +748,13 @@ likely:
    URL"* (`useQaStore.ts:90-93`). The threat was understood; the request path
    just wasn't covered. Worth a look even on a personal device, because it also
    explains any mystery sessions in the DB.
+
+   **Status: fixed** (`f9f758ee`). A link may switch QA mode *off* and may use
+   it when it is already on; it can no longer switch it on. That is a switch
+   in Settings and nowhere else. `qa=1` is logged as
+   `workout.qa.run.cannotEnable` and ignored, and the screen says why the link
+   only selected the workout. Cost: the unattended suite needs the switch
+   flipped once per install.
 3. **`src/storage` migrations.** `createMigratedDb()`
    (`__tests__/helpers/memoryDb.ts:83-92`) applies all eight migrations to an
    **empty** database. No test anywhere applies 001–004, inserts rows, then
@@ -708,6 +766,13 @@ likely:
    `VoiceCoachPolicy.ts:143` — the gate enforcing CLAUDE.md non-negotiable #9
    (never speak over third-party playback without opt-in).
 
+   **Status: both done.** The upgrade path is tested on a database that holds
+   data (`fa4f3291`) and it is sound — every assertion passed first time. What
+   the work found instead is N-2 in §3b. Saved voice settings are checked
+   field by field (`1d7ecdee`): the claim was real — a stored string `"false"`,
+   a `1`, or an empty object in `overlayOptIn` each opened the D1 gate — and
+   only literal `true` opts in now.
+
 **Defect classes worth a dedicated sweep**, since this review was organised by
 subsystem and cross-cutting classes were the blind spot: clock-domain collapse
 (brand the three ms domains as nominal types); process-local values in durable
@@ -715,6 +780,139 @@ columns; unvalidated persisted reads; self-authorizing guards; and
 absence-suppresses-failure in the analysis tools (T-2 is one instance — grep
 every `?? `, `|| 0`, `=== 'unavailable'` feeding a pass/fail expression and check
 its sign).
+
+---
+
+## 3b. The second batch — what each item became
+
+Same day, branch `review/handoff-cycle-2`. The rule from the first batch held
+again: re-derive the mechanism before fixing. It changed the work four times
+here, and once it stopped me reporting something as far worse than it is.
+
+### What was asked for
+
+**QA link** (`f9f758ee`) — as planned. A link can use QA mode and can turn it
+off; only the Settings switch turns it on.
+
+**`voiceMode` split** (`308540cf`) — as planned, plus two things the plan did
+not know:
+
+- *The marker has to be saved.* A stored workout is rebuilt from its saved
+  plan, and the old marker rode along inside the recipe. As its own field it
+  was silently dropped on the way back; the full suite caught it. It is now
+  in `blocks_json`.
+- *The click-script loop is not specific to library workouts.* It runs on any
+  bar the clip bank has a call for. In practice that is the library's
+  motifs — `call/1-1-1-1` exists, `call/1-2` and `call/1-2-3` do not — so on
+  a generated workout it rarely fires. (I said mid-batch that Minimal "still
+  speaks per-bar calls on generated workouts today". That overstated it: only
+  where a generated bar happens to match a library motif.)
+
+What changes for an athlete: **Minimal now silences punch calls on library
+workouts**, where before it changed nothing; and choosing Minimal on a
+generated workout no longer switches off the reactive backdrop, which it did
+by accident. Standard and Full are unchanged — and are, today, the same as
+each other: nothing emits a `coaching-reminder`, the one category Full adds.
+The picker says so.
+
+**Sprint rounds** (`8538aa40`) — the mechanism was right this time: lifting
+either count cap took sprint from 6 short cells in 144 (worst 6.9 s) to 0.
+Both repair loops are bounded by progress now. Generator **1.3.1**.
+
+**Repeat** (`1d0e33af`) — narrower than the plan. The plan said "the first
+slot that overlaps no pending cue". What was built is "the slot right after
+the current rep, or nothing". Reason: inside a block the next free slot is
+the *next section's setup pause*, so a copy would arrive half a minute after
+it was asked for and talk over the lead-in. What the old code actually did,
+which the first write-up had only as "lands on the next rep": both cues came
+due on one tick and the engine closed the **natural** rep as it opened — a
+combination never shown, recorded as fully missed.
+
+**Velocity Lab Live** (`8730db02`) — as planned, made conservative. It skips
+the init writes only when the keepalive reports the glove fully up (armed,
+plan finished, no errors). Anything less and it runs the full plan as before.
+The screen itself has no test harness; the two pieces it calls are tested and
+the wiring is typechecked only.
+
+**Housekeeping** — errata and H13 (`bbfd5c4c`), runbooks (`e886924b`),
+upgrade tests (`fa4f3291`), saved settings (`1d7ecdee`). Statuses are on the
+items above (§1, and "Not reviewed" items 2 and 3).
+
+### What it found on its own
+
+#### N-2 · The rename edited a migration that has already run · **fixed**
+
+`bd2ca682` changed migration 003's `sessions.mode` CHECK from `'puncheokie'`
+to `'workouts'`, and `SESSION_MODES` with it. `schema_migrations` records
+that a migration ran, not what it ran, so the edit would have left two
+schemas under one id: a fresh install accepting `'workouts'`; the tablet,
+whose table is never re-created, rejecting it — while typecheck and every
+test, which build their database from the edited file, agreed with the edit.
+
+**It was latent, not live.** I first read it as "every workout session will
+fail to save", then traced the writer: `persistWorkoutSession` saves a
+workout as `'punchcraft'` and nothing writes the third mode at all. So no
+session was at risk; it was a trap for whoever next wrote that mode. It had
+not reached `main`.
+
+Fixed in `e9615f77` by restoring the shipped text — all eight migrations now
+execute byte-for-byte the SQL on `main`, checked by fingerprinting `main`'s
+own files — and guarded in `fa4f3291`, where each migration's executed SQL is
+pinned. Re-applying the rename's edit fails two tests. `'puncheokie'` stays
+as a stored identifier, like the tab directory. Renaming the stored value
+properly is a new migration that rebuilds `sessions`; say if you want it.
+
+#### N-3 · One announcement can cost a round its last 15-25 seconds · **open**
+
+This is the real cause of the residual the first batch filed under "narrow
+recipes run 12-29 s dry". It is not about narrow recipes.
+
+`roundFill` fills a round to within 2 s of the bell, *then* runs the
+"mandatory same-move announcement" pass: a run of one combination longer than
+a minute gets a "settle in" call, whose time is paid for by popping trailing
+blocks until the round fits again. It pops **whole blocks**, and nothing
+tops the round back up. Measured on `{ seed: 'x', cap 2, steady, 20 min }`,
+round 3: span 239.1 s → a 6.6 s reservation → pop a 2.1 s block (still over)
+→ pop the next, a 12-rep pressure block worth 25.7 s → 218 s. A second
+announcement then adds 7 s. The round ends at 225 of 240.
+
+It needs a long single-combination run, so it shows up where variety is low:
+a combination cap of 2 does it **with all six punches enabled** (15-25 s on
+several seeds), as does jab-only. The recipe screen's warning does fire.
+Fix, when wanted: trim reps off the last block instead of dropping it, or
+re-run the top-up afterwards (checking it does not create a new unannounced
+run). Either changes generated output, so it belongs with a version bump —
+1.3.1 is still unpushed and could carry it.
+
+#### N-4 · Some recipes generate a workout with nothing in it · **open**
+
+A single enabled punch other than the jab (`[2]`, `[3]`, `[4]`, `[5]`,
+`[6]`), and pairs like `[3,4]` or `[5,6]`, match no motif in the library:
+**every round is laid empty**, 36 of 36 in the sweep. `[2,3]` and wider are
+fine. The recipe screen says so accurately ("Every round runs out… up to
+about 240 seconds") but as a warning beside a `jab-disabled` warning that
+says only "variety will be reduced", and the workout can be started. Whether
+an empty workout should be startable is a product call.
+
+#### N-5 · A library workout's stored plan is frozen at its first save · **open, low**
+
+`saveGeneratedWorkout` is `INSERT OR IGNORE` on the workout id, and a library
+workout's id is fixed (`body-work`). So the plan row is whatever the first
+build to run it wrote; a later build that re-authors the workout keeps
+linking new sessions to the old plan. Nothing in the app reads plans back
+today, and recalculation replays the per-session realized stream, not the
+plan — so no visible effect yet. It will matter the day history shows a plan.
+
+### Corrections to my own work in this batch
+
+- A "passing" run that never ran: one jest invocation did not match the file
+  I meant (unquoted parentheses in the path), and I read 315 green tests and
+  two mutation results as evidence for tests that had not executed. The
+  baseline was in fact red — the fixture's `1-2` bar has no call clip. Caught
+  on the next run; fixture changed to a bar the bank can call; mutations
+  re-run against a green baseline.
+- The Repeat design was narrowed from what the approved plan said (above).
+- N-2's severity, as described there.
 
 ---
 
@@ -915,6 +1113,14 @@ and is fixed; the repair cap proper turned out to be a much smaller, separate
 residual at sprint cadence (see H-4) and is still a listening question.
 (3), (4) and (5) are open.
 
+**After the second batch.** The sprint residual is fixed (`8538aa40`); what
+is left to listen to is how those rounds now end. Open and yours to decide:
+whether to fix **N-3** (a round losing its last 15-25 s to an announcement —
+1.3.1 is unpushed and could carry it), whether an empty workout should be
+startable (**N-4**), whether to rename the stored session mode with a real
+migration (**N-2**), and still which discipline the first non-boxing workout
+targets.
+
 ---
 
 ## 7. What only the tablet, or a suite drive, can verify
@@ -940,7 +1146,11 @@ cold app restart first — `F:` has no fast refresh.
 - M-3: Stop → Discard removes the session; Stop → Save keeps it.
 - M-6: flip numbers ⇄ techniques while the rest walkthrough is speaking — it
   finishes in the vocabulary it started in.
-- M-5: hold Repeat mid-combination, finish the round — the session saves.
+- M-5: hold Repeat on the **last** rep of a block, finish the round — an
+  extra rep is thrown and the session saves. Held on any earlier rep of a
+  tight block, Repeat now does nothing (the next rep is the same
+  combination); that is the change in `1d0e33af`, and the thing to judge is
+  whether "nothing" needs to say so on screen.
 
 **Recipe screen.**
 - Duration 20 → 60 shows a goal of 2,700 and the same intensity label.
@@ -951,10 +1161,29 @@ cold app restart first — `F:` has no fast refresh.
 **By ear.**
 - A generated workout at a low goal (try 60 minutes at 900): every round is
   now full to the bell. Is that the round you want, or too dense?
-- Any generated workout: generator 1.3.0 reseeds selection, so a saved seed
-  no longer gives the workout it used to.
+- Any generated workout: the generator is at **1.3.1**, and each bump reseeds
+  selection, so a saved seed no longer gives the workout it used to.
+- A sprint-cadence workout: rounds now run to the bell. The last few seconds
+  are more of the closing combination — is that the ending you want?
+- Voice coach **Minimal** on a library workout: bells, stance changes and the
+  countdown, and no spoken punch calls or section lead-ins. Nothing on screen
+  should sit dimmed waiting for a call. Standard should sound exactly as it
+  did.
 
-**The QA suite (T-2).** One full drive to re-baseline the ledger. Expect:
+**Velocity Lab Live, with the gloves already connected.** The log should show
+`punchstream.init.skipped` and the screen "glove already initialised by the
+app; listening only". Punches still appear. Then start a workout: its
+timestamps should not have jumped.
+
+**The upgrade itself.** Installing this build over the one on the tablet is
+the real migration test. Nothing here changes the schema, so it should be a
+no-op; worth one look at `SELECT mode, COUNT(*) FROM sessions GROUP BY mode`
+to learn whether any stored session carries `'puncheokie'` (N-2).
+
+**The QA suite (T-2).** First switch QA mode on in the app — Settings → QA
+mode — once per install; the link no longer does it, and a drive without it
+reports `qa-flag-off` and says where the switch is. Then one full drive to
+re-baseline the ledger. Expect:
 every capture to carry a `workout.timeline.provenance` record and read
 "verified"; no workout to read STALE; verdicts that were PASS to become WARN
 where loop-call coverage is under 90%, and FAIL where a clip failed to load
