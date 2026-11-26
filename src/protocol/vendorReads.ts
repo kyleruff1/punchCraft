@@ -80,13 +80,17 @@ export class VendorReads {
     }
   }
 
-  private async read(deviceId: string, serviceUuid: string, uuid: string): Promise<string | null> {
+  private async readHex(
+    deviceId: string,
+    serviceUuid: string,
+    uuid: string,
+  ): Promise<string | null> {
     const result = await this.facade.readCharacteristic(deviceId, serviceUuid, uuid)
     return result.success && result.valueHex !== undefined ? result.valueHex : null
   }
 
   private async readStatus(deviceId: string, hand: string, link: LinkState): Promise<void> {
-    const valueHex = await this.read(deviceId, FIGHTCAMP_SERVICE_UUID, CHAR.NOTIFY_STATUS)
+    const valueHex = await this.readHex(deviceId, FIGHTCAMP_SERVICE_UUID, CHAR.NOTIFY_STATUS)
     if (valueHex === null) {
       // Say so once per link, not on every beat.
       if (link.lastStatusHex !== '') {
@@ -111,13 +115,17 @@ export class VendorReads {
 
   private async readDeviceInformation(deviceId: string, hand: string): Promise<void> {
     const text = async (uuid: string): Promise<string | null> => {
-      const hex = await this.read(deviceId, DEVICE_INFORMATION_SERVICE_UUID, uuid)
+      const hex = await this.readHex(deviceId, DEVICE_INFORMATION_SERVICE_UUID, uuid)
       return hex === null ? null : textFromHex(hex)
     }
     const strings: Record<string, string | null> = {}
     for (const { label, uuid } of DEVICE_INFORMATION_STRINGS) strings[label] = await text(uuid)
     const serial = await text(SERIAL_NUMBER_UUID)
-    const systemIdHex = await this.read(deviceId, DEVICE_INFORMATION_SERVICE_UUID, SYSTEM_ID_UUID)
+    const systemIdHex = await this.readHex(
+      deviceId,
+      DEVICE_INFORMATION_SERVICE_UUID,
+      SYSTEM_ID_UUID,
+    )
     logger.info('keepalive.deviceInformation', 'glove device information', {
       hand: safe(hand),
       manufacturer: safe(strings['manufacturer']),
