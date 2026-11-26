@@ -1086,6 +1086,80 @@ native library.
 
 ---
 
+## 3e. Farming the on-disk evidence
+
+2026-11-25, same branch, after the desk tests with the gloves were put off.
+The question was what the disk already holds that could stand in for them.
+
+**What is there.** 21 GB of monitor captures, 115 session captures and five
+full 22-workout suite runs (the newest from 2026-09-11) under
+`tools/analysis/` — all git-ignored; the decompiled official app under
+`artifacts/reversing/`; one 21-record punch fixture. **What is not:** any raw
+glove payload, a pulled tablet database, a Bluetooth snoop. The app logs no
+per-punch line, and only 9 of 1,239 logged workout runs took their punches
+from the gloves.
+
+**What it settled.**
+
+- *Bonding is in the vendor's own code.* The official app reads the status
+  byte and will not call a tracker ready until Android reports it bonded.
+  Recorded as **H14**; H13 no longer rests on session notes.
+- *Bonded gloves hold.* The app logs contain 76 distinct glove links. 72 were
+  seen alive past 45 s, the longest for 410 s; the other four are short only
+  because the app restarted or the capture ended. None dropped while the app
+  ran.
+- *The upgrade-path test catches a real failure.* The tablet logged migration
+  007 failing with `FOREIGN KEY constraint failed` on 2026-08-29, minutes
+  before `91d77458` fixed it. With the pre-fix migration put back, today's
+  upgrade-path test fails with that same error (8 tests, plus the
+  append-only guard).
+- *Today's manifests still describe what the September build said.* Re-judged
+  with today's verifier, the last full suite's per-bar call counts are within
+  one of the manifest on all 22 workouts.
+- *Real timings, for comparing a PC against.* On the tablet, over ~75 real
+  connects: each init write takes 80-130 ms at the median and up to 2.4 s;
+  the 20 s heartbeat write 105 ms at the median, 400 ms at p90, and once
+  11.6 s.
+
+**What it found, and what became of it.**
+
+| | Commit |
+|---|---|
+| The fullest tracker reference was outside the repo; now `docs/protocol/tracker-schematics.md`, with H14 | `18250d29` |
+| The glove check reads the status byte, before and after start-up | `1d331791` |
+| The first-round verifier could not read any stored capture | `8f9b055e` |
+| The announcer warmed clips that cannot exist; the next suite drive would have failed 8 of 22 workouts on it | `b12763ab` |
+
+**Verified at this state:** 206 suites / 4,746 tests / 22 snapshots green;
+`npm run check` passes.
+
+#### N-7 · A workout persists no raw frames · **open — a decision**
+
+CLAUDE.md rule 1 says every incoming frame is persisted before any decoder
+runs. That holds for the transport's *ordering*, and for the three Velocity
+Lab routes, which are the only callers of `startCapture()`. It does not hold
+for a workout: no frame sink is installed, so the frames the keepalive and
+the live screen decode are never stored, and `persistWorkoutSession` keeps
+only the punches a cue result names. The tracker schematics recorded this on
+2026-09-05; it is still so. It is why the disk holds so little glove data —
+and why a decoder change cannot be replayed over a workout. Fixing it is a
+storage decision: a raw frame is about 400 bytes, and a long session with
+both gloves is a few thousand of them.
+
+#### N-8 · `autoconnect.connected` logs no device · **open, trivial**
+
+It logs `deviceId: deviceSensitive(deviceId)` where `deviceId` is the scan's
+result, undefined whenever the connect fell back to the known address — which
+was every one of the 83 successes logged in the captures.
+
+**Still open after the farming.** How the tablet's BLE library reports an
+unbonded drop (no link dropped in any capture, so there is nothing to read);
+whether a browser can answer the glove's security request; whether System ID
+carries the address (the vendor never reads it — it identifies a tracker by
+Serial Number, which a browser refuses to read). All three need the gloves.
+
+---
+
 ## 4. The roadmap finding you asked me to verify first
 
 **Verdict: confirmed, and narrower than stated in a way that strengthens the

@@ -16,7 +16,7 @@ Read [docs/design-spec.md](docs/design-spec.md) — and, for anything punchCraft
 
 ## Repository layout
 
-- `docs/` — spec, roadmap, sprint plans, dev setup, protocol notes. `docs/protocol/hypotheses.md` is the protocol hypothesis log (confidence + evidence per entry).
+- `docs/` — spec, roadmap, sprint plans, dev setup, protocol notes. `docs/protocol/hypotheses.md` is the protocol hypothesis log (confidence + evidence per entry); `docs/protocol/tracker-schematics.md` is the fullest single reference for the trackers (GATT map, record layout, command table, the vendor's bond gate) — compiled 2026-09-05, with a dated note on what has moved since.
 - `tools/backlog/` — backlog-as-code (`backlog-static.json`: labels, milestones, project; `backlog-issues.json`: epics + issues in 8 phase fragments) and the idempotent GitHub seeding scripts.
 - `src/` — created in Sprint 1 Story 1 following §16 (`app/`, `ble/`, `protocol/`, `capture/`, `domain/`, `spotify/`, `storage/`, `state/`, `components/`, `diagnostics/`).
 - `tools/pc/` — the PC version, so far one piece: `npm run pc:glove-check`, a browser page that runs the real start-up on a glove over Web Bluetooth (`tools/pc/glove-check/README.md`). The app itself does not boot in a browser yet. Not yet run against a glove as of 2026-11-25.
@@ -38,7 +38,7 @@ Read [docs/design-spec.md](docs/design-spec.md) — and, for anything punchCraft
 
 ## Toolchain facts (verified 2026-11-25)
 
-Repo lives at **`F:\punchCraft`**. (`C:\Users\kyler\punchlab` is the retired location — it is no longer a git repo and holds only stray schematics.)
+Repo lives at **`F:\punchCraft`**. (`C:\Users\kyler\punchlab` is the retired location — it is no longer a git repo. Its tracker schematics were brought into the repo on 2026-11-25; what is left there is a Puncheoke schematic.)
 
 Windows 11, Node 24, npm 11, JDK 17, `gh` authenticated as `kyleruff1`. Stack is pinned exactly (`.npmrc` `save-exact=true`): Expo 57.0.15, React Native 0.86.2, React 19.2.3, and **`@sfourdrinier/react-native-ble-plx` 3.9.3** — a fork, chosen because upstream was unverified on the New Architecture. Details in [docs/dev-setup.md](docs/dev-setup.md).
 
