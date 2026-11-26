@@ -22,10 +22,10 @@ import { create } from 'zustand'
 
 import {
   defaultVoiceCoachPolicy,
-  normalizeVoiceStyle,
+  normalizeVoiceCoachPolicy,
   type VoiceCoachPolicy,
 } from '@domain/coach/VoiceCoachPolicy'
-import { DEFAULT_VOLUMES, type Volumes } from '@domain/coach/VoiceOutputPort'
+import { DEFAULT_VOLUMES, normalizeVolumes, type Volumes } from '@domain/coach/VoiceOutputPort'
 import { SETTINGS_KEYS } from '@storage/migrations/006_app_settings'
 import type { SettingsRepository } from '@storage/repositories/SettingsRepository'
 
@@ -91,20 +91,28 @@ export const useVoiceSettingsStore = create<VoiceSettingsState>((set, get) => ({
   load(repo) {
     repository = repo
     // `read` merges over the defaults, so a policy stored before a field
-    // existed comes back complete rather than missing it.
+    // existed comes back complete rather than missing it. What it cannot do
+    // is vouch for the VALUES: the row is JSON, and the type parameter below
+    // is a hope, not a check.
     const stored = repo.read<VoiceCoachPolicy>(
       SETTINGS_KEYS.voicePolicy,
       defaultVoiceCoachPolicy(),
     )
-    // A saved setting outlives the release that wrote it, so a retired style
-    // has to be migrated rather than merely removed — an install carrying
-    // `coach-shorthand` would otherwise keep beeping its repetitions with no
-    // control left in the UI to explain why (D22).
-    const style = normalizeVoiceStyle(stored.style)
-    const policy = style === stored.style ? stored : { ...stored, style }
-    if (policy !== stored) persistPolicy(policy)
+    // So every field is checked. This is where a retired style is migrated
+    // (an install carrying `coach-shorthand` would otherwise keep beeping its
+    // repetitions with no control left in the UI to explain why, D22) — and
+    // where a stored `overlayOptIn` that is anything but literal `true` is
+    // closed. `voiceAllowed` asks `!overlayOptIn`; the string "false" is
+    // truthy, and would have had the coach speaking over someone's music.
+    const policy = normalizeVoiceCoachPolicy(stored)
+    // Heal the row when it was corrected. This never OPENS the opt-in: the
+    // normalizer can only turn it off, so the rule at the top of this file
+    // — only the athlete's toggle sets it — still holds.
+    if (JSON.stringify(policy) !== JSON.stringify(stored)) persistPolicy(policy)
 
-    const volumes = repo.read<Volumes>(SETTINGS_KEYS.voiceVolumes, { ...DEFAULT_VOLUMES })
+    const volumes = normalizeVolumes(
+      repo.read<Volumes>(SETTINGS_KEYS.voiceVolumes, { ...DEFAULT_VOLUMES }),
+    )
     // A pre-click install has no row → defaults off, the safe direction for
     // dev instrumentation. A corrupt/non-object row also merges to the default.
     const click = repo.read<{ enabled: boolean }>(SETTINGS_KEYS.click, {

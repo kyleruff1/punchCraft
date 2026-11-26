@@ -111,6 +111,55 @@ export function defaultVoiceCoachPolicy(): VoiceCoachPolicy {
   }
 }
 
+const VOICE_MODES: readonly VoiceMode[] = ['off', 'minimal', 'standard', 'full']
+const VOICE_VOCABULARIES: readonly VoiceVocabulary[] = ['numbers', 'names']
+const METRIC_ANNOUNCEMENTS: ReadonlyArray<VoiceCoachPolicy['metricAnnouncements']> = [
+  'off',
+  'periodic',
+  'round-summary',
+]
+
+function oneOf<T extends string>(allowed: readonly T[], value: unknown, fallback: T): T {
+  return typeof value === 'string' && (allowed as readonly string[]).includes(value)
+    ? (value as T)
+    : fallback
+}
+
+/**
+ * A policy read back from storage, checked field by field.
+ *
+ * Storage hands back JSON, and JSON has no types: the object may have been
+ * written by an older build, by a build with a bug, or edited by hand. Every
+ * field is therefore accepted only if it is a value this build knows, and
+ * replaced by the default otherwise. Unknown keys are dropped.
+ *
+ * **`overlayOptIn` is the reason this exists.** `voiceAllowed` asks
+ * `!p.overlayOptIn`, so any truthy value — the string `"false"`, a `1`, an
+ * empty object — reads as "the athlete said yes, speak over my music". Only
+ * the literal `true` is an opt-in (D1, spec §13.5). This function can close
+ * that gate; it can never open it.
+ */
+export function normalizeVoiceCoachPolicy(
+  stored: Partial<Record<keyof VoiceCoachPolicy, unknown>>,
+): VoiceCoachPolicy {
+  const fallback = defaultVoiceCoachPolicy()
+  return {
+    mode: oneOf(VOICE_MODES, stored.mode, fallback.mode),
+    style: typeof stored.style === 'string' ? normalizeVoiceStyle(stored.style) : fallback.style,
+    vocabulary: oneOf(VOICE_VOCABULARIES, stored.vocabulary, fallback.vocabulary),
+    overlayOptIn: stored.overlayOptIn === true,
+    metricAnnouncements: oneOf(
+      METRIC_ANNOUNCEMENTS,
+      stored.metricAnnouncements,
+      fallback.metricAnnouncements,
+    ),
+    finalTenSecondWarning:
+      typeof stored.finalTenSecondWarning === 'boolean'
+        ? stored.finalTenSecondWarning
+        : fallback.finalTenSecondWarning,
+  }
+}
+
 export type SpokenCategory =
   | 'punch-command'
   | 'stance-change'

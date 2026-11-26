@@ -363,6 +363,22 @@ export interface Volumes {
 export const DEFAULT_VOLUMES: Volumes = { voice: 1, bells: 1, haptics: 1, metronome: 0.6 }
 
 /**
+ * Volumes read back from storage: each one a finite number clamped to 0-1,
+ * or its default. A stored `7` would otherwise reach the players as a gain
+ * of seven, and a stored string as `NaN`.
+ */
+export function normalizeVolumes(stored: Partial<Record<keyof Volumes, unknown>>): Volumes {
+  const level = (value: unknown, fallback: number): number =>
+    typeof value === 'number' && Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : fallback
+  return {
+    voice: level(stored.voice, DEFAULT_VOLUMES.voice),
+    bells: level(stored.bells, DEFAULT_VOLUMES.bells),
+    haptics: level(stored.haptics, DEFAULT_VOLUMES.haptics),
+    metronome: level(stored.metronome, DEFAULT_VOLUMES.metronome),
+  }
+}
+
+/**
  * Domain-side view of the metronome transport (M39-V2 Phase W0-a,
  * Kyle 2026-08-30). The concrete class lives at
  * `src/audio/MetronomeTransport.ts`. Domain consumers see only the
