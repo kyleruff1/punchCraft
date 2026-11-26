@@ -66,6 +66,82 @@ export default [
     },
   },
   {
-    ignores: ['node_modules/**', 'android/**', 'ios/**', 'dist/**', '.expo/**', 'coverage/**', 'tools/**', 'captures/**', 'artifacts/**'],
+    // The verifier and guard scripts. Every QA verdict and two CI gates rest
+    // on these, and until 2026-11-25 `tools/**` was ignored wholesale: plain
+    // JavaScript that neither eslint nor tsc ever read. Linted with the
+    // recommended rules above; type-checked by `npm run typecheck:tools`.
+    files: ['tools/analysis/**/*.{mjs,js}', 'tools/guards/**/*.mjs', 'tools/dev/**/*.mjs'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: {
+        process: 'readonly',
+        console: 'readonly',
+        Buffer: 'readonly',
+        URL: 'readonly',
+        URLSearchParams: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly',
+        performance: 'readonly',
+        fetch: 'readonly',
+        AbortController: 'readonly',
+        structuredClone: 'readonly',
+      },
+    },
+    rules: {
+      'no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrors: 'none' }],
+      // The drivers wrap best-effort device pokes and teardown — kill a
+      // process that may already be gone, dismiss a keyguard that may not be
+      // up — in `try {} catch {}`. All sixteen were read; none hides a result.
+      'no-empty': ['error', { allowEmptyCatch: true }],
+    },
+  },
+  {
+    // The verifiers' own tests: ES modules, transformed and run by jest.
+    files: ['tools/analysis/__tests__/**/*.js'],
+    languageOptions: {
+      globals: {
+        require: 'readonly',
+        __dirname: 'readonly',
+        describe: 'readonly',
+        it: 'readonly',
+        test: 'readonly',
+        expect: 'readonly',
+        beforeAll: 'readonly',
+        afterAll: 'readonly',
+        beforeEach: 'readonly',
+        afterEach: 'readonly',
+        jest: 'readonly',
+      },
+    },
+  },
+  {
+    // Everything else under tools/ stays out for now: the voice and avatar
+    // pipelines, the spikes, and Puncheoke's bridge and tablet-voice tools.
+    ignores: [
+      'node_modules/**',
+      'android/**',
+      'ios/**',
+      'dist/**',
+      '.expo/**',
+      'coverage/**',
+      'captures/**',
+      'artifacts/**',
+      'tools/audition/**',
+      'tools/avatar/**',
+      'tools/backlog/**',
+      'tools/effects/**',
+      'tools/punchbridge/**',
+      'tools/spike/**',
+      'tools/spikes/**',
+      'tools/tablet-voice/**',
+      'tools/voice/**',
+      'tools/analysis/manifests/**',
+      'tools/analysis/suites/**',
+      'tools/analysis/monitor/**',
+      'tools/analysis/reports/**',
+    ],
   },
 ]

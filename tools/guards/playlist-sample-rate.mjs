@@ -44,6 +44,10 @@ const REPO_ROOT = path.resolve(path.dirname(__filename), '..', '..')
 const MANIFESTS = path.join(REPO_ROOT, 'src', 'audio', 'voiceAssets')
 
 /** Every `require('../../../assets/...')` in a manifest, as repo-relative paths. */
+/**
+ * @param {string} manifestFile
+ * @param {(line: string) => boolean} [filter]
+ */
 async function requiredAssets(manifestFile, filter = () => true) {
   const text = await fs.readFile(path.join(MANIFESTS, manifestFile), 'utf8')
   const out = []

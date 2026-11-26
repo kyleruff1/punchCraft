@@ -74,6 +74,7 @@ tools/analysis/*
 # Device-measurement shell tools (adb wrappers) are source too — GH #356.
 !tools/analysis/*.sh
 !tools/analysis/README.md
+!tools/analysis/tsconfig.json
 !tools/analysis/manifests/
 tools/analysis/manifests/*
 !tools/analysis/manifests/*.json
