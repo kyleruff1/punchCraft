@@ -18,9 +18,19 @@ import {
 import { TrackerScanner, type TrackerScannerRunOptions } from './TrackerScanner'
 import type { AdvertisementSnapshot, ConnectionStatus, Hand } from './bleTypes'
 import {
+  UNBONDED_DROP_WINDOW_MS,
+  initialBondDiagnosis,
+  linkAbandoned,
+  linkDropped,
+  linkReady,
+  linkStillUp,
+  type BondDiagnosis,
+} from './bondDiagnosis'
+import {
   assignSlot,
   clearSlot,
   getTrackerSlots,
+  setSlotBondVerdict,
   setSlotConnected,
   setSlotConnecting,
 } from '@/state/useTrackerStore'
@@ -37,6 +47,16 @@ interface SlotBinding {
 export class TrackerCoordinator {
   private readonly scanner: TrackerScanner
   private readonly bindings: Record<TrackerSlotHand, SlotBinding | null> = {
+    left: null,
+    right: null,
+  }
+  /**
+   * How each glove's links have ended, by device (H13). Not by slot: a slot
+   * is torn down and rebuilt on every reconnect, and "it dropped at 37 s
+   * again" is only visible across two of them.
+   */
+  private readonly bond = new Map<string, BondDiagnosis>()
+  private readonly holdTimers: Record<TrackerSlotHand, ReturnType<typeof setTimeout> | null> = {
     left: null,
     right: null,
   }
@@ -73,6 +93,7 @@ export class TrackerCoordinator {
       if (status.state === 'error') {
         setSlotConnecting(hand, false, status.errorMessage)
       }
+      this.noteBond(hand, deviceId, status)
     })
     this.bindings[hand] = { deviceId, unsubscribe }
 
@@ -80,6 +101,9 @@ export class TrackerCoordinator {
       const status = await this.facade.connect(deviceId, options)
       const ready = status.state === 'ready' || status.state === 'streaming'
       setSlotConnected(hand, ready)
+      // The listener above normally sees this first; a transport that only
+      // resolves the promise is covered here. Idempotent either way.
+      this.noteBond(hand, deviceId, status)
       setSlotConnecting(hand, false)
       logger.info('ble.slot.connect.ok', 'Tracker slot connected', {
         hand: safe(hand),
@@ -166,6 +190,73 @@ export class TrackerCoordinator {
       // Idempotent; swallow.
     }
     this.bindings[hand] = null
+    // We are about to hang up, or have stopped watching: whatever ends this
+    // link now is our doing and proves nothing about the bond.
+    this.cancelHoldTimer(hand)
+    const diagnosis = this.bond.get(binding.deviceId)
+    if (diagnosis) this.bond.set(binding.deviceId, linkAbandoned(diagnosis))
+  }
+
+  /**
+   * Feed one connection event to the glove's bond diagnosis and publish the
+   * verdict (H13).
+   *
+   * A drop the transport reports without an error counts as clean; one with
+   * an error, and a connect that never came up, count for nothing. Events are
+   * timed by the transport's own monotonic stamp, so nothing here reads a
+   * clock.
+   */
+  private noteBond(hand: TrackerSlotHand, deviceId: string, status: ConnectionStatus): void {
+    const before = this.bond.get(deviceId) ?? initialBondDiagnosis()
+    const at = status.lastChangeMonotonicMs
+    let after = before
+    if (status.state === 'ready' || status.state === 'streaming') {
+      if (before.readyAtMs !== null) return
+      after = linkReady(before, at)
+      this.cancelHoldTimer(hand)
+      // If the link is still up when the window has passed, the security
+      // procedure succeeded: say so, and forget earlier drops.
+      this.holdTimers[hand] = setTimeout(() => {
+        this.holdTimers[hand] = null
+        const live = this.bond.get(deviceId)
+        if (!live || live.readyAtMs === null) return
+        const held = linkStillUp(live, live.readyAtMs + UNBONDED_DROP_WINDOW_MS.max + 1)
+        this.bond.set(deviceId, held)
+        this.publishBond(hand, deviceId, live, held, UNBONDED_DROP_WINDOW_MS.max + 1)
+      }, UNBONDED_DROP_WINDOW_MS.max + 1)
+    } else if (status.state === 'dormant' || status.state === 'error') {
+      if (before.readyAtMs === null) return
+      this.cancelHoldTimer(hand)
+      after = linkDropped(before, at, status.state === 'dormant')
+    } else {
+      return
+    }
+    this.bond.set(deviceId, after)
+    this.publishBond(hand, deviceId, before, after, at - (before.readyAtMs ?? at))
+  }
+
+  private publishBond(
+    hand: TrackerSlotHand,
+    deviceId: string,
+    before: BondDiagnosis,
+    after: BondDiagnosis,
+    heldMs: number,
+  ): void {
+    setSlotBondVerdict(hand, after.verdict)
+    if (after.verdict === before.verdict && after.signatureDrops === before.signatureDrops) return
+    logger.info('ble.bond.verdict', 'bond diagnosis changed', {
+      hand: safe(hand),
+      deviceId: deviceSensitive(deviceId),
+      verdict: safe(after.verdict),
+      signatureDrops: safe(after.signatureDrops),
+      heldMs: safe(Math.round(heldMs)),
+    })
+  }
+
+  private cancelHoldTimer(hand: TrackerSlotHand): void {
+    const timer = this.holdTimers[hand]
+    if (timer !== null) clearTimeout(timer)
+    this.holdTimers[hand] = null
   }
 }
 

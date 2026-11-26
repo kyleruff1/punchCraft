@@ -86,6 +86,14 @@ export function linkDropped(state: BondDiagnosis, atMs: number, clean: boolean):
 }
 
 /**
+ * The central hung up, or stopped watching the link. Says nothing about
+ * bonding either way: the count and the verdict stand, and there is no link.
+ */
+export function linkAbandoned(state: BondDiagnosis): BondDiagnosis {
+  return state.readyAtMs === null ? state : { ...state, readyAtMs: null }
+}
+
+/**
  * The verdict as of `nowMs`, for a link that may still be up: once it has
  * outlived the window it is `holding`, whatever came before.
  */

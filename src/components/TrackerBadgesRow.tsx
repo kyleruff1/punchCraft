@@ -28,11 +28,12 @@ import { colors } from '@/theme/colors'
 export function TrackerBadgesRow(): React.ReactElement {
   const left = useTrackerStore((s) => s.slots.left)
   const right = useTrackerStore((s) => s.slots.right)
+  const bond = useTrackerStore((s) => s.bond)
   return (
     <View style={styles.banner}>
       <View style={styles.badges}>
-        <ConnectionBadge hand="left" slot={left} />
-        <ConnectionBadge hand="right" slot={right} />
+        <ConnectionBadge hand="left" slot={left} bondVerdict={bond.left} />
+        <ConnectionBadge hand="right" slot={right} bondVerdict={bond.right} />
       </View>
       <View style={styles.actions}>
         <ConnectTrackersButton />

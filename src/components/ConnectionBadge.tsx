@@ -2,12 +2,20 @@ import React from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { autoConnectKnownTrackers, isAutoConnectInFlight } from '@ble/autoConnectTrackers'
+import type { BondVerdict } from '@ble/bondDiagnosis'
+import { UNBONDED_BADGE_LABEL, looksUnbonded } from '@components/bondAdvice'
 import type { SlotState } from '@/state/useTrackerStore'
 import { colors, stateColors } from '@/theme/colors'
 
 export interface ConnectionBadgeProps {
   hand: 'left' | 'right'
   slot: SlotState | null
+  /**
+   * What the glove's dropped links say about its bond (H13). A glove that is
+   * down and has twice dropped at the not-bonded moment reads "Not paired?"
+   * rather than "Disconnected", which is true and tells the athlete nothing.
+   */
+  bondVerdict?: BondVerdict
   accessibilityLabel?: string
 }
 
@@ -16,7 +24,13 @@ type Visual = {
   label: string
 }
 
-function resolveVisual(slot: SlotState | null): Visual {
+export function resolveVisual(
+  slot: SlotState | null,
+  bondVerdict: BondVerdict = 'unknown',
+): Visual {
+  if (looksUnbonded(bondVerdict, slot?.state)) {
+    return { color: stateColors.disconnected, label: UNBONDED_BADGE_LABEL }
+  }
   if (!slot) {
     return { color: stateColors.unassigned, label: '(unassigned)' }
   }
@@ -60,8 +74,8 @@ function resolveVisual(slot: SlotState | null): Visual {
  * the state alongside the colored dot.
  */
 export function ConnectionBadge(props: ConnectionBadgeProps): React.ReactElement {
-  const { hand, slot, accessibilityLabel } = props
-  const visual = resolveVisual(slot)
+  const { hand, slot, bondVerdict, accessibilityLabel } = props
+  const visual = resolveVisual(slot, bondVerdict)
   const prefix = hand === 'left' ? 'L' : 'R'
   const text = `${prefix}: ${visual.label}`
   const onPress = (): void => {

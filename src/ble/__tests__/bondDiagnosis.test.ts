@@ -3,6 +3,7 @@ import {
   UNBONDED_DROP_WINDOW_MS,
   bondVerdictAt,
   initialBondDiagnosis,
+  linkAbandoned,
   linkDropped,
   linkReady,
   linkStillUp,
@@ -80,6 +81,16 @@ describe('bondDiagnosis', () => {
     expect(s.verdict).toBe('suspect')
     s = session(s, 130_000, 37_000)
     expect(s.verdict).toBe('probably-unbonded')
+  })
+
+  it('a link the central hung up on counts for nothing and clears nothing', () => {
+    let s = session(initialBondDiagnosis(), 0, 37_000)
+    s = linkAbandoned(linkReady(s, 50_000))
+    expect(s).toEqual({ readyAtMs: null, signatureDrops: 1, verdict: 'suspect' })
+    // Nothing to abandon: the same object back.
+    expect(linkAbandoned(s)).toBe(s)
+    // A drop reported after the hang-up has no link to belong to.
+    expect(linkDropped(s, 87_000, true)).toBe(s)
   })
 
   describe('a live link', () => {
