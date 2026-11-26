@@ -9,7 +9,7 @@ Read [docs/design-spec.md](docs/design-spec.md) — and, for anything punchCraft
 3. **Terminology.** The value from the tracker is **tracker-reported velocity** (§4.3). Never label it impact speed, force, power, energy, or a physical unit unless a saved external-validation record exists (§10.1 Layer 4).
 4. **Never write to unknown GATT characteristics.** Only reproduce writes observed from the official app; guarded writes require developer mode and a known command template (§7.2C, §12.1).
 5. **Version lock** (§11.2). Expo, React Native, and the BLE library versions are locked after the Story 1 spike. Do not upgrade the Expo SDK during protocol discovery except on a separate compatibility branch; keep a known-good APK.
-6. **Monotonic time for ordering and timers; wall time only for display/export** (§3.2, §18.3).
+6. **Monotonic time for ordering and timers; wall time only for display/export** (§3.2, §18.3). The three millisecond clocks — app uptime, round work time, tracker epoch — are distinct types (`src/domain/time/clockDomains.ts`). Round time for a punch comes from `WorkoutSessionClock.workElapsedAtPunch(event)` and nowhere else; do not cast one clock into another.
 7. **Decoders and calibration profiles are versioned**; stored sessions must be recalculable after a decoder change (§3.2, §8.6).
 8. **Spotify** is optional, PKCE-only, tokens in SecureStore, minimal scopes, no client secret anywhere in the repo, no audio analysis or beat sync (§14). Cadence BPM is authored by the recipe on the monotonic clock — never derived from audio, Audio Features, or track metadata (punchCraft workouts doc D3).
 9. **Voice Coach never speaks over third-party playback unless the user explicitly opted in** — the toggle defaults to OFF whenever Spotify or another player is active, and is never auto-enabled (§13.5, §14.6, punchCraft workouts doc D1).
@@ -43,9 +43,11 @@ Windows 11, Node 24, npm 11, JDK 17, `gh` authenticated as `kyleruff1`. Stack is
 
 Three environment facts that cost real time if unknown:
 
-1. **Metro cannot watch `F:`.** Fast refresh never fires. Every edit batch needs a Metro restart *and* a cold app restart; a `(1 module)` delta in the Metro log means you are testing OLD code.
+1. **Metro cannot watch `F:`.** Fast refresh never fires. Every edit batch needs a Metro restart *and* a cold app restart; a `(1 module)` delta in the Metro log means you are testing OLD code. `npm run tablet:reload` does both and waits for the app — written without a tablet attached, so treat it as unproven until you have watched it work.
 2. **`adb shell wm size` lies** — it reports portrait while the app runs landscape. Taps use the current frame with no rotation math; `uiautomator dump` bounds are authoritative. Prefix adb with `MSYS_NO_PATHCONV=1` in Git Bash.
 3. **`.claude/` is gitignored except `.claude/skills/`**, which holds the `cadence-lab` and `qa-audio-verify` runbooks — the only written record of the verification loop. They are tracked as of 2026-11-25; before that a fresh clone had neither. Everything else under `.claude/` (worktrees, local settings) stays out.
+
+**Before you commit.** `npm run check` is the fast half of CI (typecheck, lint, format, guards; about 20 s) and runs on every push once `npm run hooks:install` has been run in the clone. Text is LF and `src/**/*.{ts,tsx}` must be Prettier-clean — run `npx prettier --write` on what you touched. Two groups are exempt and must be left exactly as committed: the generated manifests and the Puncheoke paths (`.prettierignore`, `.gitattributes`). `npm test` is quiet by default; `JEST_LOGS=1` brings the app's logging back. A stored setting is read with `SettingsRepository.readChecked`, never `read`. More in [docs/dev-setup.md](docs/dev-setup.md).
 
 ## Start here for a new session
 

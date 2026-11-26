@@ -939,6 +939,68 @@ plan — so no visible effect yet. It will matter the day history shows a plan.
 
 ---
 
+## 3c. The infrastructure batch
+
+2026-11-25, after PR 391 merged (`main` = `7e791306`). Branch
+`infra/guardrails`, one commit per item. The point of the batch is that the
+defect classes this review found should fail on their own next time.
+
+| | Commit | What it guards |
+|---|---|---|
+| Line endings | `b799b10f` | Text is LF, by `.gitattributes`. 64 files converted. |
+| Formatting | `229142e2` | Prettier, enforced. 228 files reformatted once. |
+| Quiet tests | `0278fabf` | A full run prints 1,885 lines instead of 34,471. |
+| Pre-push check | `17b87898` | `npm run check` before every push, about 20 s. |
+| Clock types | `fc8930ef` | H-1's mistake is now a compile error. |
+| Verifier checks | `9fc77ae1` | `tools/analysis` and `tools/guards` are linted and type-checked. |
+| Generator contract | `313a854e` | Every sweep generates the way the app does. |
+| Settings guard | `17fa9fb4` | A stored setting cannot be read unchecked. |
+| Tablet reload | `528122bf` | One command for Metro restart + cold app restart. |
+| CI split | `f66a2202` | Static checks run beside the tests. |
+| Release APK | `17c7e914` | CI builds the APK for every commit on `main`. |
+
+**Where it departed from its plan, and why.**
+
+- *Clock types do not reach the punch event's own fields.* The plan branded
+  `TrackerPunchEvent.receivedMonotonicTimeMs` and `trackerTimestampMs`.
+  Puncheoke's code builds those events in about twenty files, so that would
+  have meant editing it. The guard sits at the conversion instead: round time
+  for a punch comes only from `WorkoutSessionClock.workElapsedAtPunch(event)`,
+  and the matcher accepts nothing else. Re-introducing H-1's line in the
+  runner fails `npm run typecheck`.
+- *The settings item shrank.* Every non-instrument setting was already
+  validated; the work was making the unchecked read unreachable.
+- *APK signing needs no secret.* The plan said a CI-built APK would not
+  install over the tablet's build without a keystore secret. Wrong: the
+  keystore on the workstation is byte-for-byte the one `expo prebuild`
+  generates from Expo's template (same SHA-256), so CI signs with the same
+  key. The release build has always been signed with a publicly known debug
+  key — fine for a sideloaded personal app, worth knowing.
+
+**Not proven from the desk.** The tablet reload (no device was attached: the
+pure parts are tested, the device half has not been watched working), the CI
+split, and the APK workflow (neither can run until it is on GitHub; the APK
+job in particular should be expected to need a fix-up).
+
+#### N-6 · A long same-move stretch can go unannounced · **open**
+
+Found by the new real-options sweep on its first run. A run of one
+combination longer than a minute must open with a "coast" call. `pickCallout`
+draws one of the pattern's variants, prices it — sentence, recitation, tail —
+and returns nothing if the total is over `MAX_CALLOUT_RESERVE_MS` (12 s). For
+a 1-2 in technique names, the third `co-power-coast` variant comes to 12.6 s.
+So about one draw in three, the stretch is not announced at all: 60-80 s of
+jab-cross with no word that it is deliberate. It hits the default vocabulary.
+
+Not fixed in the batch because any fix changes what the generator emits and
+needs a version bump: fall back to a variant that fits; re-render the long
+sentence shorter; or raise the cap for this pattern. It is pinned at its
+cause in `src/audio/__tests__/fillOptionsForRecipe.contract.test.ts`, and the
+sweep's announcement rule is `it.failing` there, so it flips the day this is
+fixed.
+
+---
+
 ## 4. The roadmap finding you asked me to verify first
 
 **Verdict: confirmed, and narrower than stated in a way that strengthens the
@@ -1206,6 +1268,15 @@ timestamps should not have jumped.
 the real migration test. Nothing here changes the schema, so it should be a
 no-op; worth one look at `SELECT mode, COUNT(*) FROM sessions GROUP BY mode`
 to learn whether any stored session carries `'puncheokie'` (N-2).
+
+**From the infrastructure batch (§3c).**
+- `npm run tablet:reload` with the tablet attached: Metro restarts, the app
+  cold-starts, and the command ends with "the app is up on the new bundle".
+  It has never been watched doing this. `--dry-run` first if you want to see
+  what it will stop.
+- After the first push to `main` that carries it: the `release apk` workflow
+  goes green and its artifact installs over the tablet's build with
+  `adb install -r`, sessions intact. Expect the workflow to need a fix first.
 
 **The QA suite (T-2).** First switch QA mode on in the app — Settings → QA
 mode — once per install; the link no longer does it, and a drive without it
