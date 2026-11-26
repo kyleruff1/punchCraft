@@ -15,6 +15,51 @@
 export const LOG_PREFIX = /^(\d{2}-\d{2})\s+(\d{2}:\d{2}:\d{2}\.\d{3})\s+\w\/\w+\(\s*\d+\):\s*(.*)$/
 
 /**
+ * The other layout the captures use — `adb logcat -v epoch` (threadtime with
+ * epoch seconds): `1788036159.021  6644  6780 I ReactNativeJS: body`.
+ *
+ * Every `log.txt` written by a mic-monitored session is in this layout, and
+ * until 2026-11-26 nothing here could read it: `LOG_PREFIX` did not match a
+ * single line, so the correlator — which says it accepts `log.txt` — parsed
+ * those sessions to zero records.
+ */
+export const EPOCH_PREFIX = /^\s*(\d{9,11})\.(\d{3})\s+(\d+)\s+\d+\s+\w\s+[\w.-]+:\s?(.*)$/
+
+/** The pid in a `-v time` prefix, which `LOG_PREFIX` does not capture. */
+const TIME_PID = /\(\s*(\d+)\):/
+
+/**
+ * Split one line into `{ dateStr, timeStr, pid, epochMs, body }`, or null.
+ *
+ * An epoch line is given the `dateStr` / `timeStr` a `-v time` line would
+ * have carried (UTC), so every consumer written against that layout reads it
+ * unchanged. Only differences between timestamps are ever used.
+ */
+export function splitLogLine(rawLine) {
+  const m = LOG_PREFIX.exec(rawLine)
+  if (m) {
+    return {
+      dateStr: m[1],
+      timeStr: m[2],
+      pid: Number(TIME_PID.exec(rawLine)?.[1] ?? NaN),
+      epochMs: undefined,
+      body: m[3],
+    }
+  }
+  const e = EPOCH_PREFIX.exec(rawLine)
+  if (!e) return null
+  const epochMs = Number(e[1]) * 1000 + Number(e[2])
+  const iso = new Date(epochMs).toISOString() // YYYY-MM-DDTHH:MM:SS.mmmZ
+  return {
+    dateStr: iso.slice(5, 10),
+    timeStr: iso.slice(11, 23),
+    pid: Number(e[3]),
+    epochMs,
+    body: e[4],
+  }
+}
+
+/**
  * Milliseconds since midnight for a `-v time` timestamp. Only DIFFERENCES
  * are ever used, so a capture that crosses midnight is the caller's problem
  * (none of the archived ones do).
@@ -57,17 +102,17 @@ export function stitchLogRecords(logcatText) {
   const records = []
   let current = null
   for (const rawLine of lines) {
-    const m = LOG_PREFIX.exec(rawLine)
-    if (!m) {
+    const line = splitLogLine(rawLine)
+    if (!line) {
       if (current) records.push(current)
       current = null
       continue
     }
-    const [, dateStr, timeStr, body] = m
+    const { dateStr, timeStr, pid, epochMs, body } = line
     const startsWithTag = body.startsWith("'[")
     if (startsWithTag || current === null) {
       if (current) records.push(current)
-      current = { dateStr, timeStr, body }
+      current = { dateStr, timeStr, pid, epochMs, body }
     } else {
       current.body += ' ' + body.trim()
     }
