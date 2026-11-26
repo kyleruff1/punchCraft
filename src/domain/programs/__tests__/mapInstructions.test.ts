@@ -74,9 +74,7 @@ describe('block-level instructions on the rhythm map', () => {
         expect(cue?.instruction).toBeDefined()
       }
       // No cue with an instruction and repeatIndex > 0 got a re-fire.
-      const rerepeats = round.cues.filter(
-        (c) => c.repeatIndex > 0 && c.instruction !== undefined,
-      )
+      const rerepeats = round.cues.filter((c) => c.repeatIndex > 0 && c.instruction !== undefined)
       const rerepeatIds = new Set(rerepeats.map((c) => c.id))
       const rerepeatIns = insEvents.filter((e) => rerepeatIds.has(e.cueId))
       expect(rerepeatIns).toEqual([])
@@ -149,9 +147,7 @@ describe('block-level instructions on the rhythm map', () => {
       })
       const times = (m: typeof off): string[] =>
         m.events
-          .filter(
-            (e) => e.kind === 'call' || e.kind === 'refire' || e.kind === 'phase-announce',
-          )
+          .filter((e) => e.kind === 'call' || e.kind === 'refire' || e.kind === 'phase-announce')
           .map((e) => `${e.kind}:${e.id}@${e.atMs}`)
           .sort()
       expect(times(on)).toEqual(times(off))

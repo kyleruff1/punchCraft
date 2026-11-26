@@ -64,9 +64,7 @@ afterEach(() => {
 })
 
 function textOf(node: ReactTestInstance): string {
-  return node.children
-    .map((child) => (typeof child === 'string' ? child : textOf(child)))
-    .join('')
+  return node.children.map((child) => (typeof child === 'string' ? child : textOf(child))).join('')
 }
 
 const allText = (tree: ReactTestRenderer): string => textOf(tree.root)

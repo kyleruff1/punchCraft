@@ -48,7 +48,11 @@
 
 import { createAudioPlaylist, type AudioPlaylist } from 'expo-audio'
 import { releaseAudioPlaylist } from './nativeAudioTeardown'
-import { OBSERVED_PLAYLIST_UPDATE_INTERVAL_MS, type ObservedKind, type PlaybackObserver } from './PlaybackObserver'
+import {
+  OBSERVED_PLAYLIST_UPDATE_INTERVAL_MS,
+  type ObservedKind,
+  type PlaybackObserver,
+} from './PlaybackObserver'
 
 import { logger, safe } from '@/diagnostics/logger'
 
@@ -118,7 +122,12 @@ export class CeremonyPlaylist {
    * per drive. `log` is spread into it, so each ceremony names what it built
    * (segments, script, round, opener) without the handle knowing.
    */
-  build(sources: readonly number[], plannedMs: number, message: string, log: Record<string, unknown>): boolean {
+  build(
+    sources: readonly number[],
+    plannedMs: number,
+    message: string,
+    log: Record<string, unknown>,
+  ): boolean {
     this.dispose()
     if (sources.length === 0) return false
     try {

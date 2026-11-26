@@ -13,6 +13,7 @@ import {
 } from '../WorkoutSessionClock'
 import { createFakeClock, type FakeClock } from '@testing/fakeClock'
 import { sharedWorkElapsedMs, type SharedWorkClock } from '../../timing/SharedWorkClock'
+import { asMonotonicMs } from '../../time/clockDomains'
 
 const ROUNDS: SessionRoundSpec[] = [
   { workDurationMs: 10_000, restAfterMs: 5_000 },
@@ -283,14 +284,14 @@ describe.each([0, 1_000, 3_600_000, 86_400_000])(
       const h = at()
       h.session.start()
       h.run(2_000)
-      expect(h.session.workElapsedAt(h.clock.now() + 37)).toBe(2_037)
+      expect(h.session.workElapsedAt(asMonotonicMs(h.clock.now() + 37))).toBe(2_037)
     })
 
     it('places an instant stamped just before the tick that preceded it', () => {
       const h = at()
       h.session.start()
       h.run(2_000)
-      expect(h.session.workElapsedAt(h.clock.now() - 12)).toBe(1_988)
+      expect(h.session.workElapsedAt(asMonotonicMs(h.clock.now() - 12))).toBe(1_988)
     })
 
     it('is frozen for as long as the session is paused', () => {
@@ -302,7 +303,7 @@ describe.each([0, 1_000, 3_600_000, 86_400_000])(
       expect(h.session.workElapsedAt(h.clock.now())).toBe(3_000)
       // Even an instant "in the future" reads the frozen value: the work
       // clock is not running, so there is nothing to project.
-      expect(h.session.workElapsedAt(h.clock.now() + 500)).toBe(3_000)
+      expect(h.session.workElapsedAt(asMonotonicMs(h.clock.now() + 500))).toBe(3_000)
 
       h.session.resume()
       h.run(500)
@@ -323,7 +324,9 @@ describe.each([0, 1_000, 3_600_000, 86_400_000])(
       h.run(10_000 + 2_000)
       expect(h.session.snapshot().phase).toBe('rest')
       expect(h.session.workElapsedAt(h.clock.now())).toBe(h.session.snapshot().workElapsedMs)
-      expect(h.session.workElapsedAt(h.clock.now() + 900)).toBe(h.session.snapshot().workElapsedMs)
+      expect(h.session.workElapsedAt(asMonotonicMs(h.clock.now() + 900))).toBe(
+        h.session.snapshot().workElapsedMs,
+      )
     })
 
     it('carries a countdown overflow into the round it opens', () => {
@@ -343,7 +346,7 @@ describe.each([0, 1_000, 3_600_000, 86_400_000])(
       h.session.skipCountdown()
       expect(h.session.snapshot().phase).toBe('work')
       expect(h.session.workElapsedAt(h.clock.now())).toBe(0)
-      expect(h.session.workElapsedAt(h.clock.now() + 40)).toBe(40)
+      expect(h.session.workElapsedAt(asMonotonicMs(h.clock.now() + 40))).toBe(40)
     })
 
     it('opens the next round at zero when the rest is skipped', () => {
@@ -370,7 +373,9 @@ describe.each([0, 1_000, 3_600_000, 86_400_000])(
       }
       for (const deltaMs of [-20, 0, 17, 250]) {
         const instant = h.clock.now() + deltaMs
-        expect(h.session.workElapsedAt(instant)).toBe(sharedWorkElapsedMs(shared, instant))
+        expect(h.session.workElapsedAt(asMonotonicMs(instant))).toBe(
+          sharedWorkElapsedMs(shared, instant),
+        )
       }
     })
   },

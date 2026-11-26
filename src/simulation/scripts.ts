@@ -77,7 +77,6 @@ const BURST: ScriptStep[] = Array.from({ length: 24 }, (_, index) => ({
   velocityRaw: 8 + (index % 5),
 }))
 
-
 /**
  * `captured-jam` — real signatures, recorded off the gloves.
  *

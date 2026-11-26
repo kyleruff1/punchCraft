@@ -28,42 +28,24 @@ describe('runtimeCoachAssetResolver — combo-announce', () => {
     if (ref) {
       expect(ref.assetId).toContain('ca-1-2b-3')
     }
-    const uppercase = runtimeCoachAssetResolver(
-      'combo-announce',
-      'numeric',
-      ctx('1-2B-3'),
-    )
+    const uppercase = runtimeCoachAssetResolver('combo-announce', 'numeric', ctx('1-2B-3'))
     expect(uppercase).toBeUndefined()
   })
 
   it('returns undefined for an unknown combo signature', () => {
-    const ref = runtimeCoachAssetResolver(
-      'combo-announce',
-      'numeric',
-      ctx('9-9-9-9-9-9-9-nope'),
-    )
+    const ref = runtimeCoachAssetResolver('combo-announce', 'numeric', ctx('9-9-9-9-9-9-9-nope'))
     expect(ref).toBeUndefined()
   })
 
   it('returns undefined for an empty combo signature', () => {
-    expect(
-      runtimeCoachAssetResolver('combo-announce', 'numeric', ctx('')),
-    ).toBeUndefined()
+    expect(runtimeCoachAssetResolver('combo-announce', 'numeric', ctx(''))).toBeUndefined()
   })
 
   it('returns undefined for content kinds not yet wired', () => {
     expect(
-      runtimeCoachAssetResolver(
-        'sustained-instruction',
-        'numeric',
-        ctx('pump-jab'),
-      ),
+      runtimeCoachAssetResolver('sustained-instruction', 'numeric', ctx('pump-jab')),
     ).toBeUndefined()
-    expect(
-      runtimeCoachAssetResolver('coast-intro', 'numeric', ctx('coast-a')),
-    ).toBeUndefined()
-    expect(
-      runtimeCoachAssetResolver('encouragement', 'numeric', ctx('go')),
-    ).toBeUndefined()
+    expect(runtimeCoachAssetResolver('coast-intro', 'numeric', ctx('coast-a'))).toBeUndefined()
+    expect(runtimeCoachAssetResolver('encouragement', 'numeric', ctx('go'))).toBeUndefined()
   })
 })

@@ -28,13 +28,9 @@ it('never re-calls a repeat while its phrase is still sounding', () => {
       seed,
       cadenceProfile: 'pressure',
     })
-    for (const round of expandTimeline(workout, 'orthodox', 100).filter(
-      (r) => r.cues.length > 0,
-    )) {
+    for (const round of expandTimeline(workout, 'orthodox', 100).filter((r) => r.cues.length > 0)) {
       const map = compileRoundRhythmMap(round, { cadence: 'pressure', durationFor })
-      const calls = map.events
-        .filter((e) => e.kind === 'call')
-        .sort((a, b) => a.atMs - b.atMs)
+      const calls = map.events.filter((e) => e.kind === 'call').sort((a, b) => a.atMs - b.atMs)
       for (let i = 1; i < calls.length; i += 1) {
         const prev = calls[i - 1]!
         const cur = calls[i]!
@@ -58,13 +54,9 @@ it('still calls every change of combination, however crowded', () => {
   // even when it lands hot on the previous phrase's tail.
   for (const seed of ['thin-a', 'thin-b']) {
     const workout = generateWorkout({ ...defaultRecipe(), seed, cadenceProfile: 'pressure' })
-    for (const round of expandTimeline(workout, 'orthodox', 100).filter(
-      (r) => r.cues.length > 0,
-    )) {
+    for (const round of expandTimeline(workout, 'orthodox', 100).filter((r) => r.cues.length > 0)) {
       const map = compileRoundRhythmMap(round, { cadence: 'pressure', durationFor })
-      const calledCues = new Set(
-        map.events.filter((e) => e.kind === 'call').map((e) => e.cueId),
-      )
+      const calledCues = new Set(map.events.filter((e) => e.kind === 'call').map((e) => e.cueId))
       let prevCombo: string | null = null
       for (const cue of round.cues) {
         const combo = cue.tokens.join('-')

@@ -118,9 +118,7 @@ describe('decisive test 1 — `1-1-2 × 3` produces 9 unique strike events', () 
   it('coach events on both tracks cover the SAME strikes per rep', () => {
     // Numeric event i and technique event i should teach the same
     // strike set — the visual layer is vocabulary-independent.
-    const numericIds = compiled.coachTracks.numeric.events.map((e) =>
-      [...e.strikeEventIds].sort(),
-    )
+    const numericIds = compiled.coachTracks.numeric.events.map((e) => [...e.strikeEventIds].sort())
     const techniqueIds = compiled.coachTracks.technique.events.map((e) =>
       [...e.strikeEventIds].sort(),
     )

@@ -5,32 +5,74 @@ on:
     branches: [main]
   pull_request:
 
-# Android builds are done locally per §11.2 — CI does not set up the Android SDK.
+# A newer push to the same pull request makes the older run pointless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
-  ci:
+  # The fast half — the same things `npm run check` and the pre-push hook run
+  # locally. It used to sit IN FRONT of the test suite in one job; now it runs
+  # beside it, so a lint, format or guard failure reports in about a minute
+  # instead of waiting behind several minutes of tests.
+  static:
+    name: static checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
-      # Node 24 matches the workstation toolchain and, unlike Node 20, ships
-      # `node:sqlite` — the storage suite runs its migrations against a real
-      # in-memory SQLite instead of adding a native dependency (§21).
+      # Node 24 matches the workstation toolchain.
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
           cache: 'npm'
       - run: npm ci
       - run: npm run typecheck
+      # The verifier and guard scripts: plain .mjs the root tsconfig never sees.
+      - run: npm run typecheck:tools
       - run: npm run lint
-      # The suite is 176 files / ~4 100 tests and the runner OOM'd at Node's
-      # default ~2 GB heap ("Reached heap limit", exit 134) with the main
-      # process at 2 040 MB — the results accumulating in the parent, not a
-      # leak in any one test. Raise the ceiling and recycle workers that grow
+      - run: npm run format:check
+      - run: npm run guard:velocity-terminology
+      - run: npm run guard:playlist-sample-rate
+
+  test:
+    name: tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      # Node 24, unlike Node 20, ships `node:sqlite` — the storage suite runs
+      # its migrations against a real in-memory SQLite instead of adding a
+      # native dependency (§21).
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      # The suite is about 190 files / 4 500 tests and the runner OOM'd at
+      # Node's default ~2 GB heap ("Reached heap limit", exit 134) with the
+      # main process at 2 040 MB — the results accumulating in the parent, not
+      # a leak in any one test. Raise the ceiling and recycle workers that grow
       # past half a gig, so a suite that keeps growing degrades into a slower
       # run rather than a crash that looks like a test failure.
       - run: npm test -- --ci --colors --reporters=default --maxWorkers=2 --workerIdleMemoryLimit=512MB
         env:
           NODE_OPTIONS: --max-old-space-size=6144
-      - run: node tools/guards/velocity-terminology.mjs
-      - run: node tools/guards/playlist-sample-rate.mjs
+
+  # One stable name for "did CI pass", whatever the jobs above are called or
+  # split into later. Runs even when one of them failed, so it reports a
+  # failure rather than a skip.
+  ci:
+    name: ci
+    needs: [static, test]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Both halves passed
+        run: |
+          echo "static checks: ${{ needs.static.result }}"
+          echo "tests:         ${{ needs.test.result }}"
+          test "${{ needs.static.result }}" = "success"
+          test "${{ needs.test.result }}" = "success"

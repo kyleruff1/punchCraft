@@ -29,32 +29,45 @@ export class SettingsRepository {
   constructor(private readonly db: SqlPort) {}
 
   /**
-   * Read one setting, or `fallback` if it is absent or unreadable.
+   * Read one setting and CHECK it. This is the read to use.
    *
-   * `merge` decides how a stored value combines with the fallback, so a
-   * preference object that has gained a field since it was written comes back
-   * complete rather than missing the new one.
+   * A row is JSON, and JSON has no types: it may have been written by an
+   * older build, by a build with a bug, or edited by hand. `normalize` is
+   * handed whatever object was stored — every value `unknown`, and `{}` when
+   * the row is absent or unreadable — and must return a value this build
+   * trusts, field by field. There is no way to call this without saying how
+   * the value is checked, which is the point: the one setting that was ever
+   * trusted as stored was `overlayOptIn`, the consent to speak over someone
+   * else's audio, and a stored string `"false"` read as yes.
+   *
+   * `corrected` is true when a row existed and `normalize` changed it, so a
+   * store can write the healed value back. It is false for an absent row —
+   * a fresh install writes nothing just by loading.
+   */
+  readChecked<T extends object>(
+    key: SettingsKey,
+    normalize: (stored: Record<string, unknown>) => T,
+  ): { value: T; corrected: boolean } {
+    const stored = this.readObject(key)
+    const value = normalize(stored ?? {})
+    return {
+      value,
+      corrected: stored !== null && JSON.stringify(value) !== JSON.stringify(stored),
+    }
+  }
+
+  /**
+   * Read one setting, merged over `fallback`, WITHOUT checking its values.
+   *
+   * @deprecated Use {@link readChecked}. The type parameter here is a hope,
+   * not a check. Only the instrument settings store still calls this, and
+   * `settingsReadsAreChecked.test.ts` fails if anything else starts to.
    */
   read<T extends object>(key: SettingsKey, fallback: T): T {
-    const rows = this.select<RawSetting>('SELECT value_json FROM app_settings WHERE key = ?', [key])
-    const raw = rows[0]?.value_json
-    if (raw === undefined) return fallback
-
-    try {
-      const parsed: unknown = JSON.parse(raw)
-      if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
-        throw new Error(`expected an object, got ${Array.isArray(parsed) ? 'array' : typeof parsed}`)
-      }
-      // Fallback first: a key added since this row was written keeps its
-      // default rather than arriving undefined.
-      return { ...fallback, ...(parsed as Partial<T>) }
-    } catch (err) {
-      logger.warn('storage.settings.unreadable', 'stored setting ignored; using defaults', {
-        key: safe(key),
-        error: safe(String(err)),
-      })
-      return fallback
-    }
+    const stored = this.readObject(key)
+    // Fallback first: a key added since this row was written keeps its
+    // default rather than arriving undefined.
+    return stored === null ? fallback : { ...fallback, ...(stored as Partial<T>) }
   }
 
   write(key: SettingsKey, value: object, nowIso = new Date().toISOString()): void {
@@ -72,6 +85,29 @@ export class SettingsRepository {
   }
 
   /* -- internals -------------------------------------------------------- */
+
+  /** The stored object, or null when the row is absent or not an object. */
+  private readObject(key: SettingsKey): Record<string, unknown> | null {
+    const rows = this.select<RawSetting>('SELECT value_json FROM app_settings WHERE key = ?', [key])
+    const raw = rows[0]?.value_json
+    if (raw === undefined) return null
+
+    try {
+      const parsed: unknown = JSON.parse(raw)
+      if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        throw new Error(
+          `expected an object, got ${Array.isArray(parsed) ? 'array' : typeof parsed}`,
+        )
+      }
+      return parsed as Record<string, unknown>
+    } catch (err) {
+      logger.warn('storage.settings.unreadable', 'stored setting ignored; using defaults', {
+        key: safe(key),
+        error: safe(String(err)),
+      })
+      return null
+    }
+  }
 
   private run(sql: string, params: SqlBindValue[]): void {
     const stmt = this.db.prepareSync(sql)

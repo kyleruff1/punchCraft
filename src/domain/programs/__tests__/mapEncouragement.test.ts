@@ -38,12 +38,14 @@ describe('encouragement on the rhythm map', () => {
   })
 
   it('lands only in voiced gaps longer than the grid, density-capped', () => {
-    const map = compileRoundRhythmMap(round, { cadence: 'steady', durationFor, encouragement: true })
+    const map = compileRoundRhythmMap(round, {
+      cadence: 'steady',
+      durationFor,
+      encouragement: true,
+    })
     // Power call-outs share the kind but have their own placement rule —
     // they live INSIDE a slow window, not in the rotation's silence grid.
-    const lines = map.events.filter(
-      (e) => e.kind === 'encouragement' && !e.id.startsWith('power#'),
-    )
+    const lines = map.events.filter((e) => e.kind === 'encouragement' && !e.id.startsWith('power#'))
     // After A3 (round-fill padder) + A5 (refires on the shipped path),
     // three-round-fundamentals round 1 has no gap long enough for a
     // rotation line — the round is voiced end to end. The rule under
@@ -66,7 +68,11 @@ describe('encouragement on the rhythm map', () => {
     const workout = generateWorkout({ ...defaultRecipe(), seed: 'm4-encourage' })
     const timeline = expandTimeline(workout, 'orthodox', 100)
     const scored = timeline.find((r) => r.cues.length > 0)!
-    const on = compileRoundRhythmMap(scored, { cadence: 'steady', durationFor, encouragement: true })
+    const on = compileRoundRhythmMap(scored, {
+      cadence: 'steady',
+      durationFor,
+      encouragement: true,
+    })
     expect(silenceAudit(on, ENCOURAGEMENT_GAP_MS + 6_000).ok).toBe(true)
   })
 

@@ -135,11 +135,7 @@ export function useSharedTransportAnchor(
   nowRef.current = nowFrameTimestampMs
   useEffect(
     () =>
-      bindSharedTransportAnchor(
-        shared as unknown as AnchorSlot,
-        transport,
-        () => nowRef.current(),
-      ),
+      bindSharedTransportAnchor(shared as unknown as AnchorSlot, transport, () => nowRef.current()),
     [shared, transport],
   )
   return shared

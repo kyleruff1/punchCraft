@@ -25,6 +25,7 @@ import type { CueEvent } from '../CueState'
 import type { GeneratedWorkout } from '../../workout/GeneratedWorkout'
 import type { ProgramRound, WorkoutBlock, WorkoutToken } from '../../workout/WorkoutTokens'
 import type { TrackerPunchEvent } from '../../punch/PunchEvent'
+import { asWorkElapsedMs } from '../../time/clockDomains'
 
 const STEADY_BPM = CADENCE_PROFILES.steady.nominalBpm
 
@@ -73,7 +74,7 @@ function timelineFor(blocks: WorkoutBlock[], workDurationMs = 180_000): RoundTim
  * measures output, not timing, so one moment serves every punch — but the
  * matcher still requires it, separately from the event's monotonic stamp.
  */
-const BURST_AT_WORK_MS = 12_000
+const BURST_AT_WORK_MS = asWorkElapsedMs(12_000)
 
 let nextId = 0
 function punch(over: Partial<TrackerPunchEvent> = {}): TrackerPunchEvent {
@@ -151,7 +152,7 @@ describe('expansion (doc §14)', () => {
 })
 
 describe('open pressure carries a finishing constraint', () => {
-  it('takes the constraint from the block\'s last punch', () => {
+  it("takes the constraint from the block's last punch", () => {
     // "Punch freely, but finish every exchange with this" (doc §14).
     const cue = timelineFor([block({ kind: 'open-pressure' })])[0]!.cues[0]!
     expect(cue.countScored?.constraint).toEqual({ finisher: 2, hand: 'rear' })

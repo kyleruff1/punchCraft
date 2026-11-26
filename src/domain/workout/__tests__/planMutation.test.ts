@@ -77,11 +77,15 @@ describe('purity', () => {
     // Goal-seeking runs against a plan the cue engine is already walking;
     // mutating in place would change the timeline underneath it.
     const before = JSON.stringify(WORKOUT)
-    applyMutation(WORKOUT, {
-      roundTargets: [1, 2, 3],
-      insertBlocks: [{ roundIndex: 2, block: catchUp() }],
-      lengthenBlocks: [{ blockId: WORKOUT.schedule[2]!.blocks[0]!.id, addMs: 5_000 }],
-    }, { fromRoundIndex: 0 })
+    applyMutation(
+      WORKOUT,
+      {
+        roundTargets: [1, 2, 3],
+        insertBlocks: [{ roundIndex: 2, block: catchUp() }],
+        lengthenBlocks: [{ blockId: WORKOUT.schedule[2]!.blocks[0]!.id, addMs: 5_000 }],
+      },
+      { fromRoundIndex: 0 },
+    )
     expect(JSON.stringify(WORKOUT)).toBe(before)
   })
 
@@ -167,17 +171,17 @@ describe('behind adds volume, never speed (doc §17, §22)', () => {
     // the blocks around it. Synthetic `#pad` tail-fill blocks (A3/#258)
     // are stripped by relayout — filter them from both sides so the
     // comparison is over authored blocks only.
-    const before = WORKOUT.schedule[2]!.blocks
-      .filter((b) => !b.id.endsWith('#pad'))
-      .map((b) => b.gapBeats)
+    const before = WORKOUT.schedule[2]!.blocks.filter((b) => !b.id.endsWith('#pad')).map(
+      (b) => b.gapBeats,
+    )
     const result = applyMutation(
       WORKOUT,
       { insertBlocks: [{ roundIndex: 2, block: catchUp() }] },
       { fromRoundIndex: 2 },
     )
-    const after = result.schedule[2]!.blocks
-      .filter((b) => !b.id.startsWith('catch-') && !b.id.endsWith('#pad'))
-      .map((b) => b.gapBeats)
+    const after = result.schedule[2]!.blocks.filter(
+      (b) => !b.id.startsWith('catch-') && !b.id.endsWith('#pad'),
+    ).map((b) => b.gapBeats)
     expect(after).toEqual(before)
   })
 })

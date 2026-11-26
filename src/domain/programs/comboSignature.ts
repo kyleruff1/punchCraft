@@ -37,8 +37,6 @@ export function comboSignatureTokenPart(token: StrikeToken): string {
  * Empty list yields the empty string (no combo has zero strikes;
  * caller decides whether to treat that as a lookup miss).
  */
-export function comboSignatureFromStrikes(
-  strikes: readonly { token: StrikeToken }[],
-): string {
+export function comboSignatureFromStrikes(strikes: readonly { token: StrikeToken }[]): string {
   return strikes.map((s) => comboSignatureTokenPart(s.token)).join('-')
 }

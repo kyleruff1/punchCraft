@@ -22,9 +22,9 @@ describe('selectPerformanceState', () => {
     const atEdge = { ...base, startMsIntoRound: 180_000 - PUSH_TAIL_MS }
     expect(selectPerformanceState(atEdge)).toBe('push')
     // A hair before the tail is still work.
-    expect(selectPerformanceState({ ...atEdge, startMsIntoRound: atEdge.startMsIntoRound - 1 })).toBe(
-      'work',
-    )
+    expect(
+      selectPerformanceState({ ...atEdge, startMsIntoRound: atEdge.startMsIntoRound - 1 }),
+    ).toBe('work')
   })
 
   it('pushes for a pressure or sprint block regardless of position', () => {
@@ -59,7 +59,12 @@ describe('selectPerformanceState', () => {
 
   it('teaches the opening of a technical round but works the body', () => {
     expect(
-      selectPerformanceState({ ...base, startMsIntoRound: 0, isRoundOpening: true, cadenceProfile: 'technical' }),
+      selectPerformanceState({
+        ...base,
+        startMsIntoRound: 0,
+        isRoundOpening: true,
+        cadenceProfile: 'technical',
+      }),
     ).toBe('teach')
     expect(selectPerformanceState({ ...base, cadenceProfile: 'technical' })).toBe('work')
   })

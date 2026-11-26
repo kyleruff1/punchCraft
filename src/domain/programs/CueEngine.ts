@@ -620,9 +620,7 @@ export class CueEngine {
   }
 
   private assertSingleActive(): void {
-    const inPlay = this.runtimes.filter(
-      (r) => r.status === 'active' || r.status === 'accepting',
-    )
+    const inPlay = this.runtimes.filter((r) => r.status === 'active' || r.status === 'accepting')
     if (inPlay.length > 1) {
       throw new Error(
         `CueEngine: ${inPlay.length} cues active at once (${inPlay

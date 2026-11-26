@@ -8,11 +8,7 @@
  * rather than assumed.
  */
 
-import {
-  buildRoundSchedule,
-  totalScheduleMs,
-  type WorkoutDurationMinutes,
-} from '../roundSchedule'
+import { buildRoundSchedule, totalScheduleMs, type WorkoutDurationMinutes } from '../roundSchedule'
 
 const ALL_DURATIONS: WorkoutDurationMinutes[] = [20, 30, 40, 60]
 
@@ -46,7 +42,9 @@ describe('buildRoundSchedule — doc §9 table', () => {
 
   it('gives every duration exactly one cooldown', () => {
     for (const minutes of ALL_DURATIONS) {
-      expect(buildRoundSchedule(minutes).entries.filter((e) => e.kind === 'cooldown')).toHaveLength(1)
+      expect(buildRoundSchedule(minutes).entries.filter((e) => e.kind === 'cooldown')).toHaveLength(
+        1,
+      )
     }
   })
 
@@ -93,14 +91,13 @@ describe('countsTowardGoal', () => {
     // Including it would deflate every derived pace, since it is not punching
     // time.
     const schedule = buildRoundSchedule(30)
-    const allWorkSeconds =
-      schedule.entries.reduce((sum, e) => sum + e.workDurationMs, 0) / 1000
+    const allWorkSeconds = schedule.entries.reduce((sum, e) => sum + e.workDurationMs, 0) / 1000
     expect(allWorkSeconds).toBeGreaterThan(schedule.activeSeconds)
     expect(schedule.activeSeconds).toBe(6 * 240)
   })
 })
 
-describe('schedule totals — verifying the doc\'s own arithmetic', () => {
+describe("schedule totals — verifying the doc's own arithmetic", () => {
   it.each([
     [20, 20],
     [30, 30],

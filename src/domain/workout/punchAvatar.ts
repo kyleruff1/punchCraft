@@ -37,7 +37,6 @@ export const RESET_MS = 130
 /** The floor of `minHoldMs` — the tightest a full flip can ever be. */
 export const MIN_HOLD_MS = MIN_FRAME_MS * 2
 
-
 /**
  * 'step1' = strike art, 'step2' = the punch's own retracted art (legacy-
  * inverted names), 'guard' = the universal GUARD stance the cycle

@@ -65,7 +65,11 @@ export default function SummaryScreen(props: SummaryScreenProps): React.JSX.Elem
   const isShort = summary.grade.outcome === 'short'
 
   return (
-    <ScrollView style={styles.root} contentContainerStyle={styles.container} testID="summary-screen">
+    <ScrollView
+      style={styles.root}
+      contentContainerStyle={styles.container}
+      testID="summary-screen"
+    >
       <Stack.Screen options={{ title: 'Workout summary' }} />
 
       <Text style={styles.title}>{summary.recipeName}</Text>
@@ -100,21 +104,13 @@ export default function SummaryScreen(props: SummaryScreenProps): React.JSX.Elem
           label="Rounds completed"
           value={`${summary.completedRounds}`}
         />
-        <Metric
-          testID="summary-rate"
-          label="Average rate"
-          value={`${summary.avgRatePerMin}/min`}
-        />
+        <Metric testID="summary-rate" label="Average rate" value={`${summary.avgRatePerMin}/min`} />
         <Metric
           testID="summary-left-right"
           label="Left / right"
           value={`${summary.leftRightSplit.left} / ${summary.leftRightSplit.right}`}
         />
-        <Metric
-          testID="summary-extras"
-          label="Extra punches"
-          value={`${summary.extraPunches}`}
-        />
+        <Metric testID="summary-extras" label="Extra punches" value={`${summary.extraPunches}`} />
 
         {/* Omitted entirely rather than shown as zero when nothing measured
             it (D11). */}

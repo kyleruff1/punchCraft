@@ -101,7 +101,9 @@ export interface BleManagerFacade {
   isReady(): Promise<boolean>
 
   /** Subscribe to Bluetooth adapter state changes. */
-  onAdapterStateChange(cb: (state: 'unknown' | 'off' | 'on' | 'unauthorized') => void): UnsubscribeFn
+  onAdapterStateChange(
+    cb: (state: 'unknown' | 'off' | 'on' | 'unauthorized') => void,
+  ): UnsubscribeFn
 
   /** Bounded scan; each advertisement is delivered to onAdvertisement. */
   scan(options: ScanOptions, onAdvertisement: (ad: AdvertisementSnapshot) => void): Promise<void>
@@ -197,7 +199,9 @@ export function registerBleManagerFactory(factory: BleManagerFactory): void {
 let cached: BleManagerFacade | null = null
 export function getBleManager(): BleManagerFacade {
   if (!currentFactory) {
-    throw new Error('No BleManagerFactory registered — call registerBleManagerFactory during app bootstrap.')
+    throw new Error(
+      'No BleManagerFactory registered — call registerBleManagerFactory during app bootstrap.',
+    )
   }
   if (!cached) cached = currentFactory()
   return cached

@@ -8,13 +8,7 @@
 import { CLICK_MAPS } from '../clickMaps'
 import { allClickMaps } from '../allClickMaps'
 import { QUICK_WORKOUT_DEFS } from '../quickWorkouts'
-import {
-  CHUNKS,
-  chunkSignature,
-  chunksSelfCheck,
-  getChunk,
-  resolveRound,
-} from '../chunks'
+import { CHUNKS, chunkSignature, chunksSelfCheck, getChunk, resolveRound } from '../chunks'
 import { compose, resolveToClickMap, roundBudget } from '../composeFromChunks'
 
 describe('chunk library integrity', () => {
@@ -83,7 +77,10 @@ describe('resolveRound — chunk refs expand to a literal ClickRound', () => {
   })
 
   it('carries stance + rest through when present, omits them otherwise', () => {
-    const plain = resolveRound({ theme: 'A', sections: [{ chunk: 'jab-jab-jab-jab-x9', leadIn: 'x' }] })
+    const plain = resolveRound({
+      theme: 'A',
+      sections: [{ chunk: 'jab-jab-jab-jab-x9', leadIn: 'x' }],
+    })
     expect('stance' in plain).toBe(false)
     expect('rest' in plain).toBe(false)
     const dressed = resolveRound({
@@ -113,8 +110,13 @@ describe('roundBudget + compose — exact-fill discipline', () => {
   it('compose THROWS on a round that does not fill exactly', () => {
     expect(() =>
       compose({
-        id: 'bad', prefix: 'bad', bpm: 100, durationMinutes: 20,
-        rounds: [{ theme: 'Short', sections: [{ chunk: 'jab-cross-hook-cross-x18', leadIn: 'x' }] }],
+        id: 'bad',
+        prefix: 'bad',
+        bpm: 100,
+        durationMinutes: 20,
+        rounds: [
+          { theme: 'Short', sections: [{ chunk: 'jab-cross-hook-cross-x18', leadIn: 'x' }] },
+        ],
       }),
     ).toThrow(/must fill exactly/)
   })
@@ -137,7 +139,10 @@ describe('roundBudget + compose — exact-fill discipline', () => {
 
   it('resolveToClickMap yields a ClickMap-shaped object', () => {
     const map = resolveToClickMap({
-      id: 'x', prefix: 'x', bpm: 100, durationMinutes: 20,
+      id: 'x',
+      prefix: 'x',
+      bpm: 100,
+      durationMinutes: 20,
       rounds: [{ theme: 'R1', sections: [{ chunk: 'jab-jab-jab-jab-x9', leadIn: 'go' }] }],
     })
     expect(map.bpm).toBe(100)

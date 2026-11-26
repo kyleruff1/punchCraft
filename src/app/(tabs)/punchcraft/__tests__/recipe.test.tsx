@@ -62,9 +62,7 @@ afterEach(() => {
 })
 
 function textOf(node: ReactTestInstance): string {
-  return node.children
-    .map((child) => (typeof child === 'string' ? child : textOf(child)))
-    .join('')
+  return node.children.map((child) => (typeof child === 'string' ? child : textOf(child))).join('')
 }
 
 function allText(tree: ReactTestRenderer): string {
@@ -318,8 +316,7 @@ describe('conflicts', () => {
     expect(text).toContain('Error')
     // Every conflict states what to change, so the screen is never a dead end.
     const notices = tree.root.findAll(
-      (node) =>
-        typeof node.props.testID === 'string' && node.props.testID.startsWith('conflict-'),
+      (node) => typeof node.props.testID === 'string' && node.props.testID.startsWith('conflict-'),
     )
     expect(notices.length).toBeGreaterThan(0)
     for (const notice of notices) {
@@ -353,9 +350,7 @@ describe('start with a sample', () => {
     const text = allText(tree)
     for (const sample of listSampleWorkouts()) {
       expect(text).toContain(sample.name)
-      expect(() =>
-        tree.root.findByProps({ testID: `sample-option-${sample.key}` }),
-      ).not.toThrow()
+      expect(() => tree.root.findByProps({ testID: `sample-option-${sample.key}` })).not.toThrow()
     }
   })
 
@@ -476,9 +471,7 @@ describe('punchCraft workouts landing — the instrument', () => {
 
   it('lists the launch patches with the default selected', () => {
     const tree = render(<PuncheokieLanding />)
-    expect(() =>
-      tree.root.findByProps({ testID: 'patch-two-handed-pentatonic' }),
-    ).not.toThrow()
+    expect(() => tree.root.findByProps({ testID: 'patch-two-handed-pentatonic' })).not.toThrow()
     expect(allText(tree)).toContain('Two-Handed Pentatonic')
   })
 })

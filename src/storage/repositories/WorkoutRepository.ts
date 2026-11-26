@@ -459,10 +459,7 @@ export class WorkoutRepository {
    * per-session realized stream is what the caller needs.
    */
   getWorkoutById(id: string): GeneratedWorkout | null {
-    const row = this.select<RawWorkout>(
-      'SELECT * FROM generated_workouts WHERE id = ?',
-      [id],
-    )[0]
+    const row = this.select<RawWorkout>('SELECT * FROM generated_workouts WHERE id = ?', [id])[0]
     if (!row) return null
     return this.hydratePlan(row)
   }

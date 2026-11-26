@@ -13,10 +13,7 @@
 import { createMigratedDb } from '@storage/__tests__/helpers/memoryDb'
 import { SettingsRepository } from '@storage/repositories/SettingsRepository'
 import { SETTINGS_KEYS } from '@storage/migrations/006_app_settings'
-import {
-  __resetVoiceSettingsForTests,
-  useVoiceSettingsStore,
-} from '../useVoiceSettingsStore'
+import { __resetVoiceSettingsForTests, useVoiceSettingsStore } from '../useVoiceSettingsStore'
 import { defaultVoiceCoachPolicy, voiceAllowed } from '@domain/coach/VoiceCoachPolicy'
 
 function harness() {

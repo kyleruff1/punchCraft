@@ -52,11 +52,7 @@
  * module.
  */
 
-import type {
-  CoachAssetResolver,
-  CompiledCoachEvent,
-  CompiledStrikeEvent,
-} from './compileCue'
+import type { CoachAssetResolver, CompiledCoachEvent, CompiledStrikeEvent } from './compileCue'
 import { expandTimeline } from './CueTimeline'
 import { compileCueFromInstance, NULL_COACH_ASSET_RESOLVER } from './programCueBridge'
 import { hashTimelineContent } from './timelineHash'
@@ -134,9 +130,11 @@ export interface WorkoutScoreConfig {
 const DEFAULT_PRELOAD_MARGIN_TICKS = 300
 
 const DEFAULT_CAPABILITIES: CoachVariantCapabilities = Object.freeze({
-  allowedRelations: Object.freeze(['precall', 'synchronized', 'shared-block']) as unknown as readonly (
-    'precall' | 'synchronized' | 'shared-block'
-  )[],
+  allowedRelations: Object.freeze([
+    'precall',
+    'synchronized',
+    'shared-block',
+  ]) as unknown as readonly ('precall' | 'synchronized' | 'shared-block')[],
 })
 
 export interface WorkoutTimelineIdentity {
@@ -235,10 +233,7 @@ export interface CompiledCoachVariant {
    * Absent when no transformation was necessary.
    */
   transformReason?:
-    | 'compact-alias-substituted'
-    | 'moved-to-precall'
-    | 'converted-to-numeric'
-    | 'coach-silent'
+    'compact-alias-substituted' | 'moved-to-precall' | 'converted-to-numeric' | 'coach-silent'
 }
 
 /**
@@ -460,7 +455,11 @@ function buildCoachSlots(
   // Preserve emission order: the numeric track's order, then any
   // technique-only events not seen in numeric.
   const seenKeys = new Set<string>()
-  const ordered: Array<{ key: string; numeric?: CompiledCoachEvent; technique?: CompiledCoachEvent }> = []
+  const ordered: Array<{
+    key: string
+    numeric?: CompiledCoachEvent
+    technique?: CompiledCoachEvent
+  }> = []
   for (const event of numericEvents) {
     const key = slotKeyFor(event)
     if (seenKeys.has(key)) continue

@@ -138,7 +138,8 @@ export function HydroPulseScene({
     setSize({ w: Math.max(0, width), h: Math.max(0, height) })
   }
 
-  const ready = image !== null && grain !== null && displayEffect !== null && size.w > 0 && size.h > 0
+  const ready =
+    image !== null && grain !== null && displayEffect !== null && size.w > 0 && size.h > 0
 
   return (
     // Layout measured on a plain View: Fabric's Skia Canvas does not

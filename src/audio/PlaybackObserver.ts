@@ -335,7 +335,10 @@ export class PlaybackObserver {
         if (entry.lastPosition === null || position !== entry.lastPosition) {
           entry.lastPosition = position
           entry.lastPositionSinceMs = now
-        } else if (entry.lastPositionSinceMs !== null && now - entry.lastPositionSinceMs >= STALL_WINDOW_MS) {
+        } else if (
+          entry.lastPositionSinceMs !== null &&
+          now - entry.lastPositionSinceMs >= STALL_WINDOW_MS
+        ) {
           this.close(entry, 'stalled', now)
         }
       }
@@ -347,14 +350,17 @@ export class PlaybackObserver {
   private close(entry: Entry, outcome: ObservedOutcome, atMs: number = this.clock()): void {
     if (entry.closed) return
     entry.closed = true
-    const endMs = outcome === 'ok' || outcome === 'stalled' ? atMs : entry.onsetMs !== null ? atMs : null
+    const endMs =
+      outcome === 'ok' || outcome === 'stalled' ? atMs : entry.onsetMs !== null ? atMs : null
     const record: ObservedRecord = {
       ...entry.meta,
       method: entry.method,
       onsetMs: entry.onsetMs,
       endMs,
-      observedDurationMs: entry.onsetMs !== null && endMs !== null ? Math.round(endMs - entry.onsetMs) : null,
-      onsetLatencyMs: entry.onsetMs !== null ? Math.round(entry.onsetMs - entry.meta.dispatchMs) : null,
+      observedDurationMs:
+        entry.onsetMs !== null && endMs !== null ? Math.round(endMs - entry.onsetMs) : null,
+      onsetLatencyMs:
+        entry.onsetMs !== null ? Math.round(entry.onsetMs - entry.meta.dispatchMs) : null,
       positionAtOnsetMs: entry.positionAtOnsetMs,
       silentByVolume: entry.meta.volumeAtDispatch === 0,
       outcome,

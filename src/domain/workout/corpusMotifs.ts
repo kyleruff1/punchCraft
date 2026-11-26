@@ -100,9 +100,7 @@ function toMotif(combo: ComboDefinition): CorpusMotif {
   const parsed = parseCombo(notation)
   const punches = [
     ...new Set(
-      parsed
-        .filter((t) => t.kind === 'punch')
-        .map((t) => (t as { number: PunchNumber }).number),
+      parsed.filter((t) => t.kind === 'punch').map((t) => (t as { number: PunchNumber }).number),
     ),
   ]
   return {

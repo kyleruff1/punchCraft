@@ -50,11 +50,46 @@ const schedule = buildRoundSchedule(20)
  * in the analyzer.
  */
 const DIAGNOSTIC_R1: BlockSpec[] = [
-  { id: 'dts-r1-b1', kind: 'exact-combo', notation: '1-2', offsets: [0, 1], gapBeats: 4, spokenPhrase: 'Jab, cross.' },
-  { id: 'dts-r1-b2', kind: 'exact-combo', notation: '1-2b-3', offsets: [0, 1, 2], gapBeats: 4, spokenPhrase: 'Jab, body cross, hook.' },
-  { id: 'dts-r1-b3', kind: 'exact-combo', notation: '1-1-2', offsets: [0, 1, 2], gapBeats: 4, spokenPhrase: 'Double jab, cross.' },
-  { id: 'dts-r1-b4', kind: 'defense-counter', notation: 'slip-2-3-2', offsets: [0, 1, 2, 3], gapBeats: 4, spokenPhrase: 'Slip. Cross, hook, cross.' },
-  { id: 'dts-r1-b5', kind: 'exact-combo', notation: '1-2b', offsets: [0, 1], gapBeats: 4, spokenPhrase: 'Jab, body cross.' },
+  {
+    id: 'dts-r1-b1',
+    kind: 'exact-combo',
+    notation: '1-2',
+    offsets: [0, 1],
+    gapBeats: 4,
+    spokenPhrase: 'Jab, cross.',
+  },
+  {
+    id: 'dts-r1-b2',
+    kind: 'exact-combo',
+    notation: '1-2b-3',
+    offsets: [0, 1, 2],
+    gapBeats: 4,
+    spokenPhrase: 'Jab, body cross, hook.',
+  },
+  {
+    id: 'dts-r1-b3',
+    kind: 'exact-combo',
+    notation: '1-1-2',
+    offsets: [0, 1, 2],
+    gapBeats: 4,
+    spokenPhrase: 'Double jab, cross.',
+  },
+  {
+    id: 'dts-r1-b4',
+    kind: 'defense-counter',
+    notation: 'slip-2-3-2',
+    offsets: [0, 1, 2, 3],
+    gapBeats: 4,
+    spokenPhrase: 'Slip. Cross, hook, cross.',
+  },
+  {
+    id: 'dts-r1-b5',
+    kind: 'exact-combo',
+    notation: '1-2b',
+    offsets: [0, 1],
+    gapBeats: 4,
+    spokenPhrase: 'Jab, body cross.',
+  },
 ]
 
 /**

@@ -154,9 +154,7 @@ export function restAnnouncementText(
         gradeAccessibilityText(frozen.actual, frozen.target),
       ]
       if (frozen.avgVelocity) {
-        parts.push(
-          `Average ${Math.round(frozen.avgVelocity.value)} ${frozen.avgVelocity.label}.`,
-        )
+        parts.push(`Average ${Math.round(frozen.avgVelocity.value)} ${frozen.avgVelocity.label}.`)
       }
       return parts.join(' ')
     }
@@ -215,9 +213,7 @@ function BreathingCircle(props: { reducedMotion: boolean }): React.JSX.Element {
   const style = props.reducedMotion
     ? undefined
     : {
-        transform: [
-          { scale: breath.interpolate({ inputRange: [0, 1], outputRange: [0.82, 1] }) },
-        ],
+        transform: [{ scale: breath.interpolate({ inputRange: [0, 1], outputRange: [0.82, 1] }) }],
         opacity: breath.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] }),
       }
 
@@ -289,9 +285,7 @@ function GradeTile(props: {
  * confirm every technique, so the athlete may have thrown all the right
  * shots and had none of them land on a confirmable byte (H12).
  */
-function ResultView(props: {
-  frozen: FrozenRoundResult
-}): React.JSX.Element {
+function ResultView(props: { frozen: FrozenRoundResult }): React.JSX.Element {
   const { frozen } = props
   const outcome = gradeRound(frozen.actual, frozen.target).outcome
   // Two-decimal for a "precise reading" look on the grade tiles (Kyle
@@ -361,11 +355,7 @@ function RecoveryView(props: {
   return (
     <View style={styles.body} testID="rest-phase-recovery">
       <BreathingCircle reducedMotion={reducedMotion} />
-      <Line
-        testID="rest-balance"
-        label="Left / right"
-        value={`${frozen.left} / ${frozen.right}`}
-      />
+      <Line testID="rest-balance" label="Left / right" value={`${frozen.left} / ${frozen.right}`} />
       {best ? <Line testID="rest-best" label={best.label} value={best.value} /> : null}
       {frozen.trackerDropped ? (
         <Text style={styles.note} testID="rest-tracker-dropped">
@@ -400,7 +390,11 @@ function PreviewView(props: { nextRound?: RestNextRound }): React.JSX.Element {
       {combos.length > 0 ? (
         <View style={styles.comboRow} testID="rest-sample-combos">
           {combos.map((combo, index) => (
-            <Text key={`${combo}-${index}`} style={styles.combo} testID={`rest-sample-combo-${index}`}>
+            <Text
+              key={`${combo}-${index}`}
+              style={styles.combo}
+              testID={`rest-sample-combo-${index}`}
+            >
               {combo}
             </Text>
           ))}
@@ -442,11 +436,7 @@ export function RestPhases(props: RestPhasesProps): React.JSX.Element {
     <View style={styles.root} testID="rest-phases">
       <View style={styles.header} testID="rest-header">
         <StepMarker phase={phase} />
-        <Text
-          accessibilityLabel={chrome.glyphLabel}
-          style={styles.glyph}
-          testID="rest-phase-glyph"
-        >
+        <Text accessibilityLabel={chrome.glyphLabel} style={styles.glyph} testID="rest-phase-glyph">
           {chrome.glyph}
         </Text>
         <Text style={styles.heading} testID="rest-phase-heading">
@@ -474,12 +464,8 @@ export function RestPhases(props: RestPhasesProps): React.JSX.Element {
       ) : null}
 
       {phase === 'result' ? <ResultView frozen={frozen} /> : null}
-      {phase === 'recovery' ? (
-        <RecoveryView frozen={frozen} reducedMotion={reducedMotion} />
-      ) : null}
-      {phase === 'preview' ? (
-        <PreviewView {...(nextRound ? { nextRound } : {})} />
-      ) : null}
+      {phase === 'recovery' ? <RecoveryView frozen={frozen} reducedMotion={reducedMotion} /> : null}
+      {phase === 'preview' ? <PreviewView {...(nextRound ? { nextRound } : {})} /> : null}
 
       {/* One control, because there is one rest state (D6). Nothing here
           skips a single sub-phase — there is no such thing to skip. */}

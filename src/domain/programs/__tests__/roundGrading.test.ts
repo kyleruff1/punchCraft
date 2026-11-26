@@ -224,14 +224,12 @@ describe('module purity (spec §15.1)', () => {
   // ESM import with no CommonJS globals.
   const source = readFileSync('src/domain/programs/roundGrading.ts', 'utf8')
 
-  it.each([
-    /from '(react|react-native)'/,
-    /from 'expo/,
-    /from '.*sqlite/i,
-    /from '.*\/ble\//i,
-  ])('has no import matching %p', (pattern) => {
-    expect(source).not.toMatch(pattern)
-  })
+  it.each([/from '(react|react-native)'/, /from 'expo/, /from '.*sqlite/i, /from '.*\/ble\//i])(
+    'has no import matching %p',
+    (pattern) => {
+      expect(source).not.toMatch(pattern)
+    },
+  )
 
   it('reads no clock', () => {
     expect(source).not.toMatch(/Date\.now\(\)/)

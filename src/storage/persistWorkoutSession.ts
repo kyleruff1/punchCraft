@@ -84,9 +84,7 @@ export interface PersistedWorkoutSession {
  * The caller decides what a failure means for the UI; this only guarantees
  * that a failure leaves the database as it found it.
  */
-export function persistWorkoutSession(
-  args: PersistWorkoutSessionArgs,
-): PersistedWorkoutSession {
+export function persistWorkoutSession(args: PersistWorkoutSessionArgs): PersistedWorkoutSession {
   const {
     db,
     sessions,
@@ -165,9 +163,7 @@ export function persistWorkoutSession(
           : {}),
         ...(event.punchTypeRaw !== undefined ? { punchTypeRaw: event.punchTypeRaw } : {}),
         ...(event.punchType !== undefined ? { punchType: event.punchType } : {}),
-        ...(event.accelerationRaw !== undefined
-          ? { accelerationRaw: event.accelerationRaw }
-          : {}),
+        ...(event.accelerationRaw !== undefined ? { accelerationRaw: event.accelerationRaw } : {}),
         ...(event.velocityRaw !== undefined ? { velocityRaw: event.velocityRaw } : {}),
         velocityUnit: event.velocityUnit,
         recovered: event.recovered ?? false,

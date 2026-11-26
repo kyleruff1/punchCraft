@@ -112,10 +112,7 @@ export function TrackerLamp(props: {
       accessibilityLabel={`${hand === 'L' ? 'Left' : 'Right'} tracker ${
         lit ? 'connected' : 'not connected'
       }${batteryPct === undefined ? '' : `, battery ${Math.round(batteryPct)} percent`}`}
-      style={[
-        styles.lampHalo,
-        { width: haloSize, borderRadius: haloSize / 2 },
-      ]}
+      style={[styles.lampHalo, { width: haloSize, borderRadius: haloSize / 2 }]}
       testID={`tracker-lamp-${hand}`}
     >
       <View

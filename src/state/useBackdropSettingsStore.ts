@@ -37,8 +37,10 @@ export const useBackdropSettingsStore = create<BackdropSettingsState>((set) => (
 
   load(repo) {
     repository = repo
-    const stored = repo.read<BackdropSettings>(SETTINGS_KEYS.backdrop, defaultBackdropSettings())
-    set({ quality: normalizeBackdropQuality(stored.quality), loaded: true })
+    const stored = repo.readChecked<BackdropSettings>(SETTINGS_KEYS.backdrop, (row) => ({
+      quality: normalizeBackdropQuality(row.quality),
+    })).value
+    set({ quality: stored.quality, loaded: true })
   },
 
   setQuality(quality) {
@@ -47,8 +49,7 @@ export const useBackdropSettingsStore = create<BackdropSettingsState>((set) => (
   },
 }))
 
-export const useBackdropQuality = (): BackdropQuality =>
-  useBackdropSettingsStore((s) => s.quality)
+export const useBackdropQuality = (): BackdropQuality => useBackdropSettingsStore((s) => s.quality)
 
 /** Reset for tests — the module-level repository handle outlives a render. */
 export function __resetBackdropSettingsForTests(): void {

@@ -25,7 +25,8 @@ export interface PermissionOutcome {
 
 function requiredAndroidPermissions(): Permission[] {
   // Platform.Version is a number on Android.
-  const api = typeof Platform.Version === 'number' ? Platform.Version : parseInt(String(Platform.Version), 10)
+  const api =
+    typeof Platform.Version === 'number' ? Platform.Version : parseInt(String(Platform.Version), 10)
   if (api >= 31) {
     return [
       PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,

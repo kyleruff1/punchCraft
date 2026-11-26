@@ -18,12 +18,14 @@
  * Pure TypeScript — no React, Expo, SQLite or BLE imports (spec §15.1).
  */
 
+import { asMonotonicMs, type MonotonicMs } from './clockDomains'
+
 /** Cancels a scheduled callback. Calling it twice is safe. */
 export type CancelScheduled = () => void
 
 export interface MonotonicClock {
   /** Milliseconds from an arbitrary origin. Never decreases. */
-  now(): number
+  now(): MonotonicMs
   /**
    * Run `callback` after at least `delayMs`. A negative or zero delay runs
    * on the next tick, never synchronously — so a caller can always cancel.
@@ -42,8 +44,8 @@ export interface MonotonicClock {
 export function systemMonotonicClock(): MonotonicClock {
   const readNow =
     typeof performance !== 'undefined' && typeof performance.now === 'function'
-      ? () => performance.now()
-      : () => Date.now()
+      ? () => asMonotonicMs(performance.now())
+      : () => asMonotonicMs(Date.now())
 
   return {
     now: readNow,

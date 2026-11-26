@@ -55,7 +55,16 @@ describe('visibleBar', () => {
   it('pages to the first bar while the active slot is in it', () => {
     const shown = visibleBar(
       TWO_BARS,
-      states('completed', 'active', 'upcoming', 'upcoming', 'upcoming', 'upcoming', 'upcoming', 'upcoming'),
+      states(
+        'completed',
+        'active',
+        'upcoming',
+        'upcoming',
+        'upcoming',
+        'upcoming',
+        'upcoming',
+        'upcoming',
+      ),
     )
     expect(shown.map((s) => s.index)).toEqual([0, 1, 2, 3])
   })
@@ -63,7 +72,16 @@ describe('visibleBar', () => {
   it('pages to the SECOND bar once the active slot crosses the boundary', () => {
     const shown = visibleBar(
       TWO_BARS,
-      states('completed', 'completed', 'completed', 'completed', 'active', 'upcoming', 'upcoming', 'upcoming'),
+      states(
+        'completed',
+        'completed',
+        'completed',
+        'completed',
+        'active',
+        'upcoming',
+        'upcoming',
+        'upcoming',
+      ),
     )
     expect(shown.map((s) => s.index)).toEqual([4, 5, 6, 7])
     // And it carries the REAL punch identities, not renumbered ones.
@@ -73,7 +91,16 @@ describe('visibleBar', () => {
   it('preserves real indices so hand hints and the avatar stay addressed', () => {
     const shown = visibleBar(
       TWO_BARS,
-      states('completed', 'completed', 'completed', 'completed', 'completed', 'active', 'upcoming', 'upcoming'),
+      states(
+        'completed',
+        'completed',
+        'completed',
+        'completed',
+        'completed',
+        'active',
+        'upcoming',
+        'upcoming',
+      ),
     )
     // Index 5 is the active one; a renumbered view would report 1 here and
     // every index-keyed consumer would quietly read the wrong token.

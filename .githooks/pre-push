@@ -1,0 +1,28 @@
+#!/bin/sh
+# pre-push — the fast half of CI, before the push instead of after it.
+#
+# Runs `npm run check`: typecheck, lint, format and the two guards. About
+# fifteen seconds. It exists because the slow half (the test suite) was never
+# the thing that turned a push red: PR 390 sat red on a guard that takes half
+# a second to run locally.
+#
+# Install once per clone:   npm run hooks:install
+# Skip for one push:        git push --no-verify
+#
+# It checks the WORKING TREE, not the commits being pushed. With uncommitted
+# changes in the tree the two can differ; commit or stash first if it matters.
+
+zero=0000000000000000000000000000000000000000
+pushing=0
+while read -r _local_ref local_sha _remote_ref _remote_sha; do
+  # A deleted ref has no commits to check.
+  [ "$local_sha" != "$zero" ] && pushing=1
+done
+[ "$pushing" = 1 ] || exit 0
+
+echo "pre-push: typecheck, lint, format, guards (skip with --no-verify)"
+if ! npm run --silent check; then
+  echo ""
+  echo "pre-push: checks failed, so nothing was pushed."
+  exit 1
+fi

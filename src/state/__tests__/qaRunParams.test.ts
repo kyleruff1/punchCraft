@@ -86,8 +86,12 @@ describe('parseQaRunParams', () => {
   })
 
   it('bounds simBpm', () => {
-    expect(parseQaRunParams({ workout: 'body-work', simBpm: String(SIM_BPM_MIN - 1) }).ok).toBe(false)
-    expect(parseQaRunParams({ workout: 'body-work', simBpm: String(SIM_BPM_MAX + 1) }).ok).toBe(false)
+    expect(parseQaRunParams({ workout: 'body-work', simBpm: String(SIM_BPM_MIN - 1) }).ok).toBe(
+      false,
+    )
+    expect(parseQaRunParams({ workout: 'body-work', simBpm: String(SIM_BPM_MAX + 1) }).ok).toBe(
+      false,
+    )
     expect(parseQaRunParams({ workout: 'body-work', simBpm: 'fast' }).ok).toBe(false)
     expect(parseQaRunParams({ workout: 'body-work', simBpm: '120' })).toMatchObject({
       ok: true,

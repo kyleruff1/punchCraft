@@ -62,7 +62,9 @@ export function ConnectTrackersButton(): React.ReactElement {
     if (missing.length > 0) {
       // Almost always means the trackers are asleep. Firm tap on the button
       // wakes them; a second press then picks them up.
-      setNote(`Not advertising: ${missing.map((m) => m.hand).join(' + ')}. Tap the tracker to wake it, then try again.`)
+      setNote(
+        `Not advertising: ${missing.map((m) => m.hand).join(' + ')}. Tap the tracker to wake it, then try again.`,
+      )
       return
     }
     if (result.connectedCount > 0) {

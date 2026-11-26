@@ -36,15 +36,20 @@ import {
 } from '../CueTimeline'
 import { generateCase } from './helpers/timelineGen'
 import { CADENCE_PROFILES, beatsToMs } from '../../workout/cadence'
-import { legacyBodyWork as bodyWork, legacyEstablishTheJab20 as establishTheJab20, legacyHeavyHands as heavyHands, legacyPacePusher as pacePusher, legacyProgressiveBuildup as progressiveBuildup, legacySpeedCombos as speedCombos, legacySwitchByRound as switchByRound, legacyThreeRoundFundamentals as threeRoundFundamentals, legacyUppercutClinic as uppercutClinic } from '../../workout/samples/__fixtures__'
+import {
+  legacyBodyWork as bodyWork,
+  legacyEstablishTheJab20 as establishTheJab20,
+  legacyHeavyHands as heavyHands,
+  legacyPacePusher as pacePusher,
+  legacyProgressiveBuildup as progressiveBuildup,
+  legacySpeedCombos as speedCombos,
+  legacySwitchByRound as switchByRound,
+  legacyThreeRoundFundamentals as threeRoundFundamentals,
+  legacyUppercutClinic as uppercutClinic,
+} from '../../workout/samples/__fixtures__'
 import { resolveHand } from '../StanceMapper'
 import type { GeneratedWorkout } from '../../workout/GeneratedWorkout'
-import type {
-  ProgramRound,
-  Stance,
-  WorkoutBlock,
-  WorkoutToken,
-} from '../../workout/WorkoutTokens'
+import type { ProgramRound, Stance, WorkoutBlock, WorkoutToken } from '../../workout/WorkoutTokens'
 
 // ---------------------------------------------------------------------------
 // The matrix.
@@ -268,12 +273,10 @@ describe('case 2 — repeat 3 yields repeatIndex 0..2 re-based by combo duration
 describe('case 3 — clamps windowStartMs to 0 when graceBefore precedes the bell', () => {
   it.each(GRACES)('with a %ims before-grace', (grace) => {
     for (const startOffsetMs of [0, 50, grace, grace + 1, grace + 5_000]) {
-      const cue = expandTimeline(
-        workoutWith([block({ startOffsetMs })]),
-        'orthodox',
-        STEADY_BPM,
-        { graceBeforeMs: grace, graceAfterMs: grace },
-      )[0]!.cues[0]!
+      const cue = expandTimeline(workoutWith([block({ startOffsetMs })]), 'orthodox', STEADY_BPM, {
+        graceBeforeMs: grace,
+        graceAfterMs: grace,
+      })[0]!.cues[0]!
 
       // Floored, never widened: the formula is max(0, start − graceBefore).
       expect(cue.windowStartMs).toBe(Math.max(0, cue.scheduledStartMs - grace))
@@ -436,8 +439,11 @@ describe('case 6 — southpaw flips expectedPunches hands; switch block inverts 
       beatOffset: i,
     }))
     const handsFor = (stance: Stance): Array<'left' | 'right'> =>
-      expandTimeline(workoutWith([block({ tokens })]), stance, STEADY_BPM)[0]!
-        .cues[0]!.expectedPunches.map((p) => p.hand)
+      expandTimeline(
+        workoutWith([block({ tokens })]),
+        stance,
+        STEADY_BPM,
+      )[0]!.cues[0]!.expectedPunches.map((p) => p.hand)
 
     const orthodox = handsFor('orthodox')
     const southpaw = handsFor('southpaw')
@@ -447,8 +453,11 @@ describe('case 6 — southpaw flips expectedPunches hands; switch block inverts 
 
   it.each(STANCES)("a 'switch' block inverts a %s athlete's default", (stance) => {
     const forced = (blockStance: 'inherit' | 'switch' | Stance): Array<'left' | 'right'> =>
-      expandTimeline(workoutWith([block({ stance: blockStance })]), stance, STEADY_BPM)[0]!
-        .cues[0]!.expectedPunches.map((p) => p.hand)
+      expandTimeline(
+        workoutWith([block({ stance: blockStance })]),
+        stance,
+        STEADY_BPM,
+      )[0]!.cues[0]!.expectedPunches.map((p) => p.hand)
 
     const inherited = forced('inherit')
     expect(forced('switch')).toEqual(inherited.map((h) => (h === 'left' ? 'right' : 'left')))
@@ -569,9 +578,7 @@ describe('the graces stay structural, not tuned (M36-03 must not break this)', (
 
   it('lets a block override the defaults in both directions', () => {
     const cue = expandTimeline(
-      workoutWith([
-        block({ startOffsetMs: 20_000, graceBeforeMs: 0, graceAfterMs: 1 }),
-      ]),
+      workoutWith([block({ startOffsetMs: 20_000, graceBeforeMs: 0, graceAfterMs: 1 })]),
       'orthodox',
       STEADY_BPM,
     )[0]!.cues[0]!
@@ -589,11 +596,8 @@ describe('the graces stay structural, not tuned (M36-03 must not break this)', (
 
 describe('voicePolicy threads from block to every produced cue', () => {
   it('absent voicePolicy leaves cues with an undefined field (pre-M39 default)', () => {
-    const cues = expandTimeline(
-      workoutWith([block({ repeat: 3 })]),
-      'orthodox',
-      STEADY_BPM,
-    )[0]!.cues
+    const cues = expandTimeline(workoutWith([block({ repeat: 3 })]), 'orthodox', STEADY_BPM)[0]!
+      .cues
     for (const c of cues) expect(c.voicePolicy).toBeUndefined()
   })
 

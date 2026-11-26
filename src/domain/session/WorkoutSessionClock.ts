@@ -24,16 +24,17 @@
  * `Date.now()` (spec §15.1, §18.3).
  */
 
+import type { TrackerPunchEvent } from '../punch/PunchEvent'
+import {
+  asMonotonicMs,
+  asWorkElapsedMs,
+  type MonotonicMs,
+  type WorkElapsedMs,
+} from '../time/clockDomains'
 import type { MonotonicClock } from '../time/MonotonicClock'
 
 export type SessionPhase =
-  | 'idle'
-  | 'countdown'
-  | 'work'
-  | 'rest'
-  | 'paused'
-  | 'completed'
-  | 'cancelled'
+  'idle' | 'countdown' | 'work' | 'rest' | 'paused' | 'completed' | 'cancelled'
 
 export interface SessionRoundSpec {
   workDurationMs: number
@@ -54,7 +55,7 @@ export interface SessionSnapshot {
    * *work* interval. Holds its last value through a pause and resets at the
    * start of each round.
    */
-  workElapsedMs: number
+  workElapsedMs: WorkElapsedMs
 }
 
 export interface SessionClockOptions {
@@ -202,7 +203,7 @@ export class WorkoutSessionClock {
       roundCount: this.rounds.length,
       phaseElapsedMs: this.phaseElapsedMs,
       phaseRemainingMs: duration === null ? 0 : Math.max(0, duration - this.phaseElapsedMs),
-      workElapsedMs: this.workElapsedMs,
+      workElapsedMs: asWorkElapsedMs(this.workElapsedMs),
     }
   }
 
@@ -230,9 +231,26 @@ export class WorkoutSessionClock {
    * frozen reading is returned: a punch thrown while paused happened at the
    * moment the round was paused, as far as the round is concerned.
    */
-  workElapsedAt(monotonicMs: number): number {
-    if (this.phase !== 'work' || this.lastAdvanceAtMs === null) return this.workElapsedMs
-    return this.workElapsedMs + (monotonicMs - this.lastAdvanceAtMs)
+  workElapsedAt(monotonicMs: MonotonicMs): WorkElapsedMs {
+    if (this.phase !== 'work' || this.lastAdvanceAtMs === null) {
+      return asWorkElapsedMs(this.workElapsedMs)
+    }
+    return asWorkElapsedMs(this.workElapsedMs + (monotonicMs - this.lastAdvanceAtMs))
+  }
+
+  /**
+   * Where in the round a punch landed — the only way to get one.
+   *
+   * A punch carries `receivedMonotonicTimeMs`, an uptime stamp. It is a
+   * plain `number` on the event (the event type is shared with code that is
+   * not ours to change), so nothing in the types marks it as the wrong clock
+   * for a cue. This method is the answer to that: it takes the EVENT, reads
+   * the right field itself, and returns a `WorkElapsedMs` — which is the
+   * only thing the matcher will accept. A caller cannot hand it the tracker
+   * timestamp by mistake, and cannot skip it and pass the stamp along.
+   */
+  workElapsedAtPunch(event: Pick<TrackerPunchEvent, 'receivedMonotonicTimeMs'>): WorkElapsedMs {
+    return this.workElapsedAt(asMonotonicMs(event.receivedMonotonicTimeMs))
   }
 
   // -------------------------------------------------------------------------

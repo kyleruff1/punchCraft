@@ -54,10 +54,7 @@
  * timeline with empty coach tracks, which is exactly what a cue with
  * no rendered coach content should get.
  */
-import {
-  DEFAULT_COMBO_POLICY,
-  type VoicePolicy as V2VoicePolicy,
-} from '../coach/VoicePolicy'
+import { DEFAULT_COMBO_POLICY, type VoicePolicy as V2VoicePolicy } from '../coach/VoicePolicy'
 import type { CueInstance } from './CueTimeline'
 import {
   compileCue,
@@ -66,10 +63,7 @@ import {
   type ProgramCue,
 } from './compileCue'
 import type { StrikeToken } from '../strikes/strikeCatalog'
-import {
-  TRANSPORT_TICKS_PER_PULSE,
-  type BeatDivision,
-} from '../timing/TimingEngine'
+import { TRANSPORT_TICKS_PER_PULSE, type BeatDivision } from '../timing/TimingEngine'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -221,9 +215,7 @@ export function programCueFromInstance(
     voicePolicy: opts.voicePolicy ?? DEFAULT_COMBO_POLICY,
     coachAssets: opts.coachAssets,
     revision: opts.revision ?? 1,
-    ...(opts.responseGapTicks !== undefined
-      ? { responseGapTicks: opts.responseGapTicks }
-      : {}),
+    ...(opts.responseGapTicks !== undefined ? { responseGapTicks: opts.responseGapTicks } : {}),
   }
 }
 

@@ -216,7 +216,11 @@ export default function ShaderSpikeScreen(): React.JSX.Element {
     let count = 0
     rapidRef.current = setInterval(() => {
       count += 1
-      tap(0.2 + 0.6 * ((count * 7919) % 100) / 100, 0.3 + 0.4 * ((count * 104729) % 100) / 100, 0.9)
+      tap(
+        0.2 + (0.6 * ((count * 7919) % 100)) / 100,
+        0.3 + (0.4 * ((count * 104729) % 100)) / 100,
+        0.9,
+      )
       if (count >= 20 && rapidRef.current) clearInterval(rapidRef.current)
     }, 80)
   }

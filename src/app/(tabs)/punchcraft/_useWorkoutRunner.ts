@@ -35,10 +35,7 @@ import type { CueScore } from '@domain/programs/cueScoring'
 import { expandTimeline, type CueInstance } from '@domain/programs/CueTimeline'
 import { beatOrdinalAt } from '@domain/programs/beatProjection'
 import { CALLOUT_CLIPS } from '@audio/voiceAssets/calloutManifest'
-import {
-  findComboAnnounce,
-  findComboAnnounceById,
-} from '@audio/voiceAssets/comboAnnounceManifest'
+import { findComboAnnounce, findComboAnnounceById } from '@audio/voiceAssets/comboAnnounceManifest'
 import { runtimeCoachAssetResolver } from '@audio/coachAssetResolvers'
 import { SlotDispatcher } from '@audio/SlotDispatcher'
 import { compileWorkoutScore } from '@domain/programs/workoutScore'
@@ -47,14 +44,15 @@ import type { RoundWalkPlan } from '@/components/workout/useRingBeatClock'
 import { type SharedWorkClock } from '@domain/timing/SharedWorkClock'
 import { instructionClipFor } from '@audio/voiceAssets/instructionManifest'
 import { findClickScript } from '@audio/voiceAssets/clickScriptManifest'
-import { avatarTargetIndex, buildAvatarTrack, type AvatarTrackEntry } from '@domain/programs/avatarTrack'
-import { compileRoundRhythmMap } from '@domain/programs/RhythmMap'
 import {
-  compileRoundSpine,
-  pulseCursorAt,
-  type SpineSchedule,
-} from '@domain/programs/RhythmSpine'
+  avatarTargetIndex,
+  buildAvatarTrack,
+  type AvatarTrackEntry,
+} from '@domain/programs/avatarTrack'
+import { compileRoundRhythmMap } from '@domain/programs/RhythmMap'
+import { compileRoundSpine, pulseCursorAt, type SpineSchedule } from '@domain/programs/RhythmSpine'
 import { resolveCapabilityTier, sequenceScoreLabel } from '@domain/workout/capabilityTier'
+import { asWorkElapsedMs, type WorkElapsedMs } from '@domain/time/clockDomains'
 import { systemMonotonicClock, type MonotonicClock } from '@domain/time/MonotonicClock'
 import { WorkoutSessionClock, type SessionTransition } from '@domain/session/WorkoutSessionClock'
 import { RoundResultFreeze } from '@domain/session/restPhases'
@@ -73,20 +71,17 @@ import { selectPerformanceState } from '@domain/coach/performanceState'
 import { AUDIO_PRIORITY, type VoiceOutputPort } from '@domain/coach/VoiceOutputPort'
 import type { HapticOutputPort } from '@domain/coach/HapticOutputPort'
 import { TIMING_TIGHT_MS } from '@domain/programs/cueScoring'
-import {
-  shouldSpeak,
-  voiceAllowed,
-  type VoiceCoachPolicy,
-} from '@domain/coach/VoiceCoachPolicy'
+import { shouldSpeak, voiceAllowed, type VoiceCoachPolicy } from '@domain/coach/VoiceCoachPolicy'
 import type { ThirdPartyPlaybackDetector } from '@audio/ThirdPartyPlaybackDetector'
 import { getWorkoutPersistence, type WorkoutPersistence } from '@storage/getWorkoutPersistence'
 import { persistWorkoutSession, type PersistedWorkoutSession } from '@storage/persistWorkoutSession'
 import { toCueResultRows, type PendingCueResultRow } from '@storage/cueResultRows'
-import type {
-  AdaptationRecord,
-  RealizedTokenStream,
-} from '@storage/repositories/WorkoutRepository'
-import { CALL_DISPATCH_LAG_MS, callDispatchAtMs, leadInDispatchAtMs } from '@domain/coach/callPlacement'
+import type { AdaptationRecord, RealizedTokenStream } from '@storage/repositories/WorkoutRepository'
+import {
+  CALL_DISPATCH_LAG_MS,
+  callDispatchAtMs,
+  leadInDispatchAtMs,
+} from '@domain/coach/callPlacement'
 import { isQaEnabled } from '@state/useQaStore'
 import { getLive, resetLive, setLive, type LiveVelocity } from '@state/useWorkoutStore'
 
@@ -148,10 +143,7 @@ export const METRONOME_SWAP_LEAD_MS = 400
  * grid). Returns undefined when no rendered division lands on grid (the
  * caller falls back to the recipe's own division).
  */
-export function audibleDivisionForSlot(
-  slotMs: number,
-  baseBpm: number,
-): 1 | 2 | 3 | 4 | undefined {
+export function audibleDivisionForSlot(slotMs: number, baseBpm: number): 1 | 2 | 3 | 4 | undefined {
   if (!(slotMs > 0) || !(baseBpm > 0)) return undefined
   const beatMs = 60000 / baseBpm
   for (const d of [1, 2, 3, 4] as const) {
@@ -164,7 +156,6 @@ export function audibleDivisionForSlot(
   }
   return undefined
 }
-
 
 /**
  * Dim-until-called mask (Kyle 2026-09-04: "lit = spoken"). Two rules, both
@@ -277,7 +268,13 @@ export interface WorkoutRunner {
   /** Live vocabulary switch (numbers ⇄ techniques) — next call speaks it. */
   setVocabulary(vocabulary: 'numbers' | 'techniques'): void
   /** Cue views for the stage, kept out of the store (they hold token objects). */
-  readCues(): { current?: CueView; next?: CueView; walkPlan?: RoundWalkPlan; freeWork?: boolean; avatar?: { cue: CueInstance; tokenIndex: number } }
+  readCues(): {
+    current?: CueView
+    next?: CueView
+    walkPlan?: RoundWalkPlan
+    freeWork?: boolean
+    avatar?: { cue: CueInstance; tokenIndex: number }
+  }
   /** Settled matching so far. Read by M33-03 grading and M33-08 persistence. */
   readResults(): WorkoutRunnerResults
   /**
@@ -405,8 +402,17 @@ interface CueRenderState {
 }
 
 export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
-  const { workout, source, stance, persistence, onSessionEnded, voice, haptics, backdrop, countdownMs } =
-    args
+  const {
+    workout,
+    source,
+    stance,
+    persistence,
+    onSessionEnded,
+    voice,
+    haptics,
+    backdrop,
+    countdownMs,
+  } = args
   // The click is dev instrumentation; absent means audible (today's
   // behaviour) so existing callers/tests are unchanged. The live screen
   // passes the persisted `clickEnabled` (off by default).
@@ -428,10 +434,7 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
   // `enabled: false` this returns the same value as before, so all
   // pre-M39 samples produce a byte-identical timeline.
   const bpm = bpmForRecipe(workout.recipe)
-  const timeline = useMemo(
-    () => expandTimeline(workout, stance, bpm),
-    [workout, stance, bpm],
-  )
+  const timeline = useMemo(() => expandTimeline(workout, stance, bpm), [workout, stance, bpm])
 
   /**
    * The compiled per-token spine, one per round (A2 / issue #257).
@@ -446,7 +449,7 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
   const spinesRef = useRef(spines)
   spinesRef.current = spines
   /** Latest work-elapsed sample, mutated on every tick; read by the ring cursor. */
-  const workElapsedMsRef = useRef(0)
+  const workElapsedMsRef = useRef<WorkElapsedMs>(asWorkElapsedMs(0))
 
   /**
    * The compiled rhythm maps, one per round (M2): every call, refire and
@@ -589,7 +592,15 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
    * the whole plan crosses to the worklet in one staging, so no per-rep
    * handoff exists to race the engine's early completions.
    */
-  const walkPlanRef = useRef<{ roundIndex: number; bars: Array<{ epoch: string; scheduledStartMs: number; tokenOffsetsMs: readonly number[]; expectedTokenIndexes: number[] }> } | null>(null)
+  const walkPlanRef = useRef<{
+    roundIndex: number
+    bars: Array<{
+      epoch: string
+      scheduledStartMs: number
+      tokenOffsetsMs: readonly number[]
+      expectedTokenIndexes: number[]
+    }>
+  } | null>(null)
   const buildWalkPlan = useCallback((roundIndex: number): void => {
     const cues = timelineRef.current[roundIndex]?.cues ?? []
     walkPlanRef.current = {
@@ -654,7 +665,11 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
    * each form before its node lights. Cursor is monotonic — O(1)/read,
    * can trail under load, can never run ahead of the authored lead.
    */
-  const avatarTrackRef = useRef<{ roundIndex: number; entries: AvatarTrackEntry[]; cursor: number } | null>(null)
+  const avatarTrackRef = useRef<{
+    roundIndex: number
+    entries: AvatarTrackEntry[]
+    cursor: number
+  } | null>(null)
   const buildAvatarLeadTrack = useCallback((roundIndex: number): void => {
     avatarTrackRef.current = {
       roundIndex,
@@ -671,141 +686,144 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
   const clickVocabularyRef = useRef<'numbers' | 'techniques'>(
     voice?.policy.vocabulary === 'names' ? 'techniques' : 'numbers',
   )
-  const buildLeadInSchedule = useCallback((roundIndex: number): void => {
-    const vocabulary = clickVocabularyRef.current
-    // Lead-ins ride ahead of numbers by a fixed lead (Kyle, 2026-09-03);
-    // per-bar calls use the set-aware breath (breathForBar) instead, folded
-    // from the same tuned dense values via DENSE_BREATH_MS. Both leads now
-    // live inside `callPlacement`, which the manifest generator shares.
-    const cues = timelineRef.current[roundIndex]?.cues ?? []
-    const seenBlocks = new Set<string>()
-    type Entry = NonNullable<typeof leadInScheduleRef.current>['entries'][number]
-    const leadIns: Entry[] = []
-    const calls: Entry[] = []
-    // Build the per-bar call entry for one cue (its motif named so it
-    // FINISHES a set-aware breath before the bar's first shot). Anchored to
-    // the first PUNCH (a bar may open on a rest). `firstRep` marks a
-    // section's rep-0 call so the collision filter leaves it beside its
-    // lead-in.
-    const buildCall = (cue: CueInstance, firstRep: boolean): Entry | null => {
-      const motif = cue.tokens
-        .map((t) => (t.kind === 'punch' ? `${t.number}${t.body ? 'b' : ''}` : '.'))
-        .join('-')
-      const slot = `call/${motif}`
-      const clip = findClickScript(slot, vocabulary)
-      if (!clip) return null
-      // The placement itself lives in the domain (`callPlacement`) so the
-      // manifest generator computes the identical number instead of its own.
-      const { dispatchAtMs, firstNodeMs, breathMs } = callDispatchAtMs({
-        cue,
-        scheduledStartMs: cue.scheduledStartMs,
-        vocabulary,
-        slot,
-        clipDurationMs: clip.durationMs,
-      })
-      return {
-        kind: 'call',
-        slot,
-        text: clip.text,
-        module: clip.module,
-        durationMs: clip.durationMs,
-        breathMs,
-        // Asks CALL_DISPATCH_LAG_MS early: the scheduler fires late and the
-        // player takes time to sound, and the measured sum of the two was
-        // eating ~71 ms out of every bar's breath.
-        dispatchAtMs,
-        // A call that could not start by the bar's first beats is noise —
-        // the next bar's call is seconds away.
-        giveUpAtMs: firstNodeMs + 500,
-        firstNodeMs,
-        state: 'pending',
-        cueId: cue.id,
-        ...(firstRep ? { firstRep: true } : {}),
-      }
-    }
-    for (const cue of cues) {
-      if (cue.scoring !== 'sequence') continue
-      if (cue.repeatIndex === 0 && !seenBlocks.has(cue.blockId)) {
-        seenBlocks.add(cue.blockId)
-        // Kyle, 2026-09-04: the first set of every section was MUTED — the
-        // whisper described it, rep 0 threw silent, the coach entered on
-        // rep 1. Now EVERY section's rep 0 gets its call — including the
-        // round opener (Variant B, "fit in the missing audio for the first
-        // rep"): each round's first row now carries an authored
-        // setupMeasures pad (fit-round-openers.mjs), so the bell releases
-        // into a breath, the rep-0 call, then the first punches. The
-        // opener is still NAMED pre-bell (round 1 in the intro sequence,
-        // rounds 2+ in the warn playlist) — that ceremony is unchanged;
-        // only the per-bar call was missing.
-        const rep0Call = buildCall(cue, true)
-        if (rep0Call) calls.push(rep0Call)
-        // Section index is the block's ORDER in the round, not its id —
-        // blockId prefixes ('jab1-b2') do not match workout ids. Section 1
-        // has NO mid-round lead-in whisper (pre-bell ceremony owns that);
-        // sections 2+ sequence whisper → rep-0 call inside their pads.
-        if (seenBlocks.size > 1) {
-          const slot = `lead-in/${workout.id}/r${roundIndex + 1}s${seenBlocks.size}`
-          const clip = findClickScript(slot, vocabulary)
-          if (clip) {
-            // End before the rep-0 call starts (fallback: before the first
-            // shot, the old target, if there is no rep-0 call). Shared with
-            // the manifest generator, which used to anchor to the first shot
-            // unconditionally and so expected every lead-in ~2 s late.
-            const { dispatchAtMs, endByMs } = leadInDispatchAtMs({
-              ...(rep0Call ? { rep0CallDispatchAtMs: rep0Call.dispatchAtMs } : {}),
-              scheduledStartMs: cue.scheduledStartMs,
-              clipDurationMs: clip.durationMs,
-              vocabulary,
-            })
-            leadIns.push({
-              kind: 'lead-in',
-              slot,
-              text: clip.text,
-              module: clip.module,
-              durationMs: clip.durationMs,
-              dispatchAtMs,
-              giveUpAtMs: endByMs,
-              state: 'pending',
-            })
-          }
+  const buildLeadInSchedule = useCallback(
+    (roundIndex: number): void => {
+      const vocabulary = clickVocabularyRef.current
+      // Lead-ins ride ahead of numbers by a fixed lead (Kyle, 2026-09-03);
+      // per-bar calls use the set-aware breath (breathForBar) instead, folded
+      // from the same tuned dense values via DENSE_BREATH_MS. Both leads now
+      // live inside `callPlacement`, which the manifest generator shares.
+      const cues = timelineRef.current[roundIndex]?.cues ?? []
+      const seenBlocks = new Set<string>()
+      type Entry = NonNullable<typeof leadInScheduleRef.current>['entries'][number]
+      const leadIns: Entry[] = []
+      const calls: Entry[] = []
+      // Build the per-bar call entry for one cue (its motif named so it
+      // FINISHES a set-aware breath before the bar's first shot). Anchored to
+      // the first PUNCH (a bar may open on a rest). `firstRep` marks a
+      // section's rep-0 call so the collision filter leaves it beside its
+      // lead-in.
+      const buildCall = (cue: CueInstance, firstRep: boolean): Entry | null => {
+        const motif = cue.tokens
+          .map((t) => (t.kind === 'punch' ? `${t.number}${t.body ? 'b' : ''}` : '.'))
+          .join('-')
+        const slot = `call/${motif}`
+        const clip = findClickScript(slot, vocabulary)
+        if (!clip) return null
+        // The placement itself lives in the domain (`callPlacement`) so the
+        // manifest generator computes the identical number instead of its own.
+        const { dispatchAtMs, firstNodeMs, breathMs } = callDispatchAtMs({
+          cue,
+          scheduledStartMs: cue.scheduledStartMs,
+          vocabulary,
+          slot,
+          clipDurationMs: clip.durationMs,
+        })
+        return {
+          kind: 'call',
+          slot,
+          text: clip.text,
+          module: clip.module,
+          durationMs: clip.durationMs,
+          breathMs,
+          // Asks CALL_DISPATCH_LAG_MS early: the scheduler fires late and the
+          // player takes time to sound, and the measured sum of the two was
+          // eating ~71 ms out of every bar's breath.
+          dispatchAtMs,
+          // A call that could not start by the bar's first beats is noise —
+          // the next bar's call is seconds away.
+          giveUpAtMs: firstNodeMs + 500,
+          firstNodeMs,
+          state: 'pending',
+          cueId: cue.id,
+          ...(firstRep ? { firstRep: true } : {}),
         }
-        continue
       }
-      const call = buildCall(cue, false)
-      if (call) calls.push(call)
-    }
-    // Deterministic collision resolution: a call whose window overlaps a
-    // lead-in's (padded) window is dropped at BUILD time, so the coach
-    // lane is guaranteed free when the lead-in comes due — lead-ins must
-    // never starve behind call-saturated busy checks.
-    const survivors = calls.filter((call) => {
-      // The rep-0 call is deliberately sequenced right after its section's
-      // lead-in — never drop it as a "collision" with that lead-in.
-      if (call.firstRep) return true
-      const callEnd = call.dispatchAtMs + call.durationMs
-      return !leadIns.some((li) => {
-        const liStart = li.dispatchAtMs - 500
-        const liEnd = li.dispatchAtMs + li.durationMs
-        return call.dispatchAtMs < liEnd && callEnd > liStart
+      for (const cue of cues) {
+        if (cue.scoring !== 'sequence') continue
+        if (cue.repeatIndex === 0 && !seenBlocks.has(cue.blockId)) {
+          seenBlocks.add(cue.blockId)
+          // Kyle, 2026-09-04: the first set of every section was MUTED — the
+          // whisper described it, rep 0 threw silent, the coach entered on
+          // rep 1. Now EVERY section's rep 0 gets its call — including the
+          // round opener (Variant B, "fit in the missing audio for the first
+          // rep"): each round's first row now carries an authored
+          // setupMeasures pad (fit-round-openers.mjs), so the bell releases
+          // into a breath, the rep-0 call, then the first punches. The
+          // opener is still NAMED pre-bell (round 1 in the intro sequence,
+          // rounds 2+ in the warn playlist) — that ceremony is unchanged;
+          // only the per-bar call was missing.
+          const rep0Call = buildCall(cue, true)
+          if (rep0Call) calls.push(rep0Call)
+          // Section index is the block's ORDER in the round, not its id —
+          // blockId prefixes ('jab1-b2') do not match workout ids. Section 1
+          // has NO mid-round lead-in whisper (pre-bell ceremony owns that);
+          // sections 2+ sequence whisper → rep-0 call inside their pads.
+          if (seenBlocks.size > 1) {
+            const slot = `lead-in/${workout.id}/r${roundIndex + 1}s${seenBlocks.size}`
+            const clip = findClickScript(slot, vocabulary)
+            if (clip) {
+              // End before the rep-0 call starts (fallback: before the first
+              // shot, the old target, if there is no rep-0 call). Shared with
+              // the manifest generator, which used to anchor to the first shot
+              // unconditionally and so expected every lead-in ~2 s late.
+              const { dispatchAtMs, endByMs } = leadInDispatchAtMs({
+                ...(rep0Call ? { rep0CallDispatchAtMs: rep0Call.dispatchAtMs } : {}),
+                scheduledStartMs: cue.scheduledStartMs,
+                clipDurationMs: clip.durationMs,
+                vocabulary,
+              })
+              leadIns.push({
+                kind: 'lead-in',
+                slot,
+                text: clip.text,
+                module: clip.module,
+                durationMs: clip.durationMs,
+                dispatchAtMs,
+                giveUpAtMs: endByMs,
+                state: 'pending',
+              })
+            }
+          }
+          continue
+        }
+        const call = buildCall(cue, false)
+        if (call) calls.push(call)
+      }
+      // Deterministic collision resolution: a call whose window overlaps a
+      // lead-in's (padded) window is dropped at BUILD time, so the coach
+      // lane is guaranteed free when the lead-in comes due — lead-ins must
+      // never starve behind call-saturated busy checks.
+      const survivors = calls.filter((call) => {
+        // The rep-0 call is deliberately sequenced right after its section's
+        // lead-in — never drop it as a "collision" with that lead-in.
+        if (call.firstRep) return true
+        const callEnd = call.dispatchAtMs + call.durationMs
+        return !leadIns.some((li) => {
+          const liStart = li.dispatchAtMs - 500
+          const liEnd = li.dispatchAtMs + li.durationMs
+          return call.dispatchAtMs < liEnd && callEnd > liStart
+        })
       })
-    })
-    const entries = [...leadIns, ...survivors].sort((a, b) => a.dispatchAtMs - b.dispatchAtMs)
-    leadInScheduleRef.current = { roundIndex, entries }
+      const entries = [...leadIns, ...survivors].sort((a, b) => a.dispatchAtMs - b.dispatchAtMs)
+      leadInScheduleRef.current = { roundIndex, entries }
 
-    const calledIds = new Set(
-      survivors.filter((e) => e.cueId !== undefined).map((e) => e.cueId as string),
-    )
-    maskedCueIdsRef.current = maskedBarIds(
-      cues,
-      calledIds,
-      // "Lit = spoken" only holds while the coach is calling punches. With
-      // the coach off, or on Minimal (no punch calls), the visuals are the
-      // workout and nothing may be dimmed waiting for a call that is not
-      // coming.
-      !!voice && shouldSpeak(voice.policy, 'punch-command', false),
-      bpm,
-    )
-  }, [workout.id, voice, bpm])
+      const calledIds = new Set(
+        survivors.filter((e) => e.cueId !== undefined).map((e) => e.cueId as string),
+      )
+      maskedCueIdsRef.current = maskedBarIds(
+        cues,
+        calledIds,
+        // "Lit = spoken" only holds while the coach is calling punches. With
+        // the coach off, or on Minimal (no punch calls), the visuals are the
+        // workout and nothing may be dimmed waiting for a call that is not
+        // coming.
+        !!voice && shouldSpeak(voice.policy, 'punch-command', false),
+        bpm,
+      )
+    },
+    [workout.id, voice, bpm],
+  )
   /**
    * Round-scoped audible-metronome schedule (W2, Kyle 2026-09-04 "roll
    * into the grid"). One loop for the round opener plus a per-SECTION
@@ -822,58 +840,65 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
     firstLoop: MetronomeLoop | undefined
     swaps: Array<{ dispatchAtMs: number; loop: MetronomeLoop; state: 'pending' | 'played' }>
   } | null>(null)
-  const buildMetronomeSchedule = useCallback((roundIndex: number): void => {
-    const recipe = workout.recipe
-    if (!recipe.metronome.enabled) {
-      metronomeScheduleRef.current = { roundIndex, firstLoop: undefined, swaps: [] }
-      return
-    }
-    const baseBpm = recipe.coachTempo.baseBpm
-    const swing = recipe.coachTempo.swing
-    // The recipe's own division is the safety net for a section whose slot
-    // finds no on-grid rendered loop — never worse than pre-W2.
-    const fallback = metronomeLoopFor(recipe.coachTempo.division, swing, baseBpm)
-    const cues = timelineRef.current[roundIndex]?.cues ?? []
-    const seenBlocks = new Set<string>()
-    const swaps: Array<{ dispatchAtMs: number; loop: MetronomeLoop; state: 'pending' | 'played' }> = []
-    let firstLoop: MetronomeLoop | undefined
-    let currentModule: number | undefined
-    for (const cue of cues) {
-      if (cue.scoring !== 'sequence') continue
-      if (cue.repeatIndex !== 0 || seenBlocks.has(cue.blockId)) continue
-      seenBlocks.add(cue.blockId)
-      // slotMs = the inter-PUNCH interval on the (locked) visual grid — the
-      // same measure `breathForBar` reads. A single-punch bar has no
-      // interval → treat it as one master beat (division 1 / the base).
-      const punchIdx: number[] = []
-      cue.tokens.forEach((t, i) => {
-        if (t.kind === 'punch') punchIdx.push(i)
-      })
-      const slotMs =
-        punchIdx.length >= 2
-          ? (cue.tokenOffsetsMs[punchIdx[1]!] ?? 0) - (cue.tokenOffsetsMs[punchIdx[0]!] ?? 0)
-          : 60000 / baseBpm
-      const division = audibleDivisionForSlot(slotMs, baseBpm)
-      const loop = (division ? metronomeLoopFor(division, swing, baseBpm) : undefined) ?? fallback
-      if (!loop) continue
-      if (seenBlocks.size === 1) {
-        firstLoop = loop
-        currentModule = loop.module
-        continue
+  const buildMetronomeSchedule = useCallback(
+    (roundIndex: number): void => {
+      const recipe = workout.recipe
+      if (!recipe.metronome.enabled) {
+        metronomeScheduleRef.current = { roundIndex, firstLoop: undefined, swaps: [] }
+        return
       }
-      // Sections 2+: only emit a swap when the loop actually changes — a
-      // uniform-rate round plays one continuous loop, no rebuilds. Land it
-      // in the punch-free setup gap ahead of the section's first node.
-      if (loop.module === currentModule) continue
-      currentModule = loop.module
-      swaps.push({
-        dispatchAtMs: Math.max(0, cue.scheduledStartMs - METRONOME_SWAP_LEAD_MS),
-        loop,
-        state: 'pending',
-      })
-    }
-    metronomeScheduleRef.current = { roundIndex, firstLoop: firstLoop ?? fallback, swaps }
-  }, [workout])
+      const baseBpm = recipe.coachTempo.baseBpm
+      const swing = recipe.coachTempo.swing
+      // The recipe's own division is the safety net for a section whose slot
+      // finds no on-grid rendered loop — never worse than pre-W2.
+      const fallback = metronomeLoopFor(recipe.coachTempo.division, swing, baseBpm)
+      const cues = timelineRef.current[roundIndex]?.cues ?? []
+      const seenBlocks = new Set<string>()
+      const swaps: Array<{
+        dispatchAtMs: number
+        loop: MetronomeLoop
+        state: 'pending' | 'played'
+      }> = []
+      let firstLoop: MetronomeLoop | undefined
+      let currentModule: number | undefined
+      for (const cue of cues) {
+        if (cue.scoring !== 'sequence') continue
+        if (cue.repeatIndex !== 0 || seenBlocks.has(cue.blockId)) continue
+        seenBlocks.add(cue.blockId)
+        // slotMs = the inter-PUNCH interval on the (locked) visual grid — the
+        // same measure `breathForBar` reads. A single-punch bar has no
+        // interval → treat it as one master beat (division 1 / the base).
+        const punchIdx: number[] = []
+        cue.tokens.forEach((t, i) => {
+          if (t.kind === 'punch') punchIdx.push(i)
+        })
+        const slotMs =
+          punchIdx.length >= 2
+            ? (cue.tokenOffsetsMs[punchIdx[1]!] ?? 0) - (cue.tokenOffsetsMs[punchIdx[0]!] ?? 0)
+            : 60000 / baseBpm
+        const division = audibleDivisionForSlot(slotMs, baseBpm)
+        const loop = (division ? metronomeLoopFor(division, swing, baseBpm) : undefined) ?? fallback
+        if (!loop) continue
+        if (seenBlocks.size === 1) {
+          firstLoop = loop
+          currentModule = loop.module
+          continue
+        }
+        // Sections 2+: only emit a swap when the loop actually changes — a
+        // uniform-rate round plays one continuous loop, no rebuilds. Land it
+        // in the punch-free setup gap ahead of the section's first node.
+        if (loop.module === currentModule) continue
+        currentModule = loop.module
+        swaps.push({
+          dispatchAtMs: Math.max(0, cue.scheduledStartMs - METRONOME_SWAP_LEAD_MS),
+          loop,
+          state: 'pending',
+        })
+      }
+      metronomeScheduleRef.current = { roundIndex, firstLoop: firstLoop ?? fallback, swaps }
+    },
+    [workout],
+  )
   const announcerRef = useRef<CueAnnouncer | null>(null)
   /**
    * D1 third-party-playback state, mirrored out of the detector so the
@@ -1264,8 +1289,7 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
       // meet, and the session clock — the only thing that knows both — does
       // the conversion. Nothing downstream subtracts one from the other.
       const landedAtWorkMs =
-        sessionRef.current?.workElapsedAt(event.receivedMonotonicTimeMs) ??
-        workElapsedMsRef.current
+        sessionRef.current?.workElapsedAtPunch(event) ?? workElapsedMsRef.current
       matcherRef.current?.onPunchEvent(event, landedAtWorkMs)
 
       syncFromEngine()
@@ -1469,221 +1493,224 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
     [clock, onSessionEnded, persistence, workout],
   )
 
-  const applyTransitions = useCallback((transitions: SessionTransition[]): void => {
-    const engine = engineRef.current
-    if (!engine) return
-    // M39-V1b: the metronome click is the master pulse. It plays only
-    // during WORK — every rest, pause, and terminal phase tears it down
-    // so the next work-entered restarts on the downbeat and drift can't
-    // accumulate across a boundary. `metronome` is optional on the port
-    // (unavailable in headless tests / older `VoiceOutputExpo` builds).
-    // The audible loop in force at `workElapsedMs` — the round opener
-    // (firstLoop) until a section swap's dispatch time has passed, then
-    // that swap's loop. Used so a resume mid-round re-anchors on the
-    // CURRENT section's subdivision, not the round opener's.
-    const metronomeLoopAt = (workElapsedMs: number): MetronomeLoop | undefined => {
-      const sched = metronomeScheduleRef.current
-      if (!sched) return undefined
-      let loop = sched.firstLoop
-      for (const s of sched.swaps) {
-        if (s.dispatchAtMs <= workElapsedMs) loop = s.loop
-        else break
-      }
-      return loop
-    }
-    const startMetronome = (): void => {
-      if (!workout.recipe.metronome.enabled) return
-      const port = voice?.output.metronome
-      if (!port) return
-      const atMs = sessionRef.current?.snapshot()?.workElapsedMs ?? 0
-      const loop =
-        metronomeLoopAt(atMs) ??
-        metronomeLoopFor(
-          workout.recipe.coachTempo.division,
-          workout.recipe.coachTempo.swing,
-          workout.recipe.coachTempo.baseBpm,
-        )
-      if (!loop) {
-        logger.warn('workout.metronome', 'no loop for tempo', {
-          division: safe(workout.recipe.coachTempo.division),
-          swing: safe(workout.recipe.coachTempo.swing),
-          baseBpm: safe(workout.recipe.coachTempo.baseBpm),
-        })
-        return
-      }
-      // A resume past one or more section swaps must not let those swaps
-      // re-fire from the tick loop — starting here already puts us on the
-      // right loop.
-      const sched = metronomeScheduleRef.current
-      if (sched) for (const s of sched.swaps) if (s.dispatchAtMs <= atMs) s.state = 'played'
-      // baseBpm from the recipe drives the shared logical transport
-      // (M39-V2 Phase W0-a) alongside the audible loop — one call,
-      // both lifecycles synced. Consumers reading
-      // `port.transport.snapshot()` see the fresh generation on
-      // this start. The transport rate is bpmForRecipe (the locked
-      // visual clock), independent of which subdivision WAV plays.
-      // clickAudible gates ONLY the loop volume (mute-only): the transport
-      // still starts, so the avatar flip and everything else are unchanged
-      // whether the click sounds or not.
-      const clickVolume = clickAudibleRef.current ? workout.recipe.metronome.volume : 0
-      port.start(loop, clickVolume, bpmForRecipe(workout.recipe))
-    }
-    const stopMetronome = (): void => {
-      // Gate stop on the same flag as start — a legacy recipe never
-      // touched the port, so the tear-down side shouldn't either.
-      if (!workout.recipe.metronome.enabled) return
-      voice?.output.metronome?.stop()
-    }
-    for (const transition of transitions) {
-      // Mapped rather than cast: `SessionTransition` and `SessionPhaseEvent`
-      // are different shapes, and `completed` is `finishing` on the other
-      // side. A cast here would compile and then silently deliver a phase the
-      // announcer does not recognise.
-      const phase = toSessionPhaseEvent(transition, clock.now())
-      if (phase) announcerRef.current?.onSessionPhase(phase)
-      // Round boundaries are the inspection harness's only way to know which
-      // round a captured event belongs to, and until now NOTHING marked them
-      // in logcat — the drive harness waited on the literal string
-      // 'rest-entered', which is a domain event TYPE that was never logged, so
-      // every capture burned its full timeout and ran past the round it meant
-      // to record (GH #305). Cheap: two lines per round, not per tick.
-      // MVP v2 (GH #305): re-anchor the UI-thread work clock at every
-      // discontinuity. Running only while an unpaused WORK phase is on —
-      // projecting through rest/pause would advance a clock the session
-      // itself holds still.
-      if (args.workClock) {
-        const s = sessionRef.current?.snapshot()
-        args.workClock.value = Object.freeze({
-          roundIndex: s?.roundIndex ?? -1,
-          workElapsedAtPublishMs: s?.workElapsedMs ?? 0,
-          publishFrameTimestampMs:
-            typeof performance !== 'undefined' && typeof performance.now === 'function'
-              ? performance.now()
-              : Date.now(),
-          running: s?.phase === 'work',
-        })
-      }
-      logger.info('workout.round.boundary', 'session phase boundary', {
-        transition: safe(transition.type),
-        roundIndex: safe(
-          transition.type === 'work-entered'
-            ? transition.roundIndex
-            : (sessionRef.current?.snapshot()?.roundIndex ?? -1),
-        ),
-        workElapsedMs: safe(sessionRef.current?.snapshot()?.workElapsedMs ?? -1),
-        // Same clock as cue.tokenDue and every voice.play dispatchMs, so a
-        // bell's onset can be measured from the boundary it answers. The log
-        // sink prints fields only — a record's own timestamp never reaches
-        // logcat.
-        monotonicTimeMs: safe(clock.now()),
-      })
-      switch (transition.type) {
-        case 'work-entered': {
-          // A new round opens fresh tallies, and the previous round's frozen
-          // result leaves the store rather than lingering behind the cues.
-          freezeRef.current.beginRound(transition.roundIndex)
-          buildWalkPlan(transition.roundIndex)
-          buildLeadInSchedule(transition.roundIndex)
-          buildAvatarLeadTrack(transition.roundIndex)
-          buildMetronomeSchedule(transition.roundIndex)
-          setLive({ frozenRoundResult: undefined })
-
-          // Install the round's compiled rhythm map (M2): from here the map
-          // owns every call time and the conductor tick dispatches them.
-          const round = timelineRef.current[transition.roundIndex]
-          const map = rhythmMapsRef.current[transition.roundIndex]
-          announcerRef.current?.setRound(round ?? null, map ?? null)
-
-          // Bank the previous round's active time so the pacing clock spans
-          // the whole workout rather than restarting each round.
-          const previous = workout.schedule[transition.roundIndex - 1]
-          if (previous?.countsTowardGoal) {
-            completedActiveSecondsRef.current += previous.workDurationMs / 1000
-          }
-          engine.onSessionPhase({
-            type: 'work-entered',
-            roundIndex: transition.roundIndex,
-            nowMs: clock.now(),
-          })
-          startMetronome()
-          break
+  const applyTransitions = useCallback(
+    (transitions: SessionTransition[]): void => {
+      const engine = engineRef.current
+      if (!engine) return
+      // M39-V1b: the metronome click is the master pulse. It plays only
+      // during WORK — every rest, pause, and terminal phase tears it down
+      // so the next work-entered restarts on the downbeat and drift can't
+      // accumulate across a boundary. `metronome` is optional on the port
+      // (unavailable in headless tests / older `VoiceOutputExpo` builds).
+      // The audible loop in force at `workElapsedMs` — the round opener
+      // (firstLoop) until a section swap's dispatch time has passed, then
+      // that swap's loop. Used so a resume mid-round re-anchors on the
+      // CURRENT section's subdivision, not the round opener's.
+      const metronomeLoopAt = (workElapsedMs: number): MetronomeLoop | undefined => {
+        const sched = metronomeScheduleRef.current
+        if (!sched) return undefined
+        let loop = sched.firstLoop
+        for (const s of sched.swaps) {
+          if (s.dispatchAtMs <= workElapsedMs) loop = s.loop
+          else break
         }
-        case 'rest-entered': {
-          // The bell. Everything the rest screen shows is fixed here; later
-          // punches reach a closed accumulator and change nothing (doc §23).
-          const target = workout.schedule[transition.roundIndex]?.targetPunches ?? 0
-          const frozen = freezeRef.current.freeze(target)
-          if (frozen) setLive({ frozenRoundResult: frozen })
-
-          engine.onSessionPhase({ type: 'rest-entered', nowMs: clock.now() })
-          stopMetronome()
-          // 2026-08-31 audio-append fix side-effect drain:
-          // playSequence's new append-not-clear semantic keeps clips
-          // from the ending round queued if they hadn't fired yet.
-          // Without a drain those pending clips continue playing
-          // through rest and into round 2, so round 2 rings light
-          // on time but audio is behind by round 1's tail. Cancel
-          // everything below bell priority (keeps the round-end bell
-          // itself intact but drops pending punch commands / coach
-          // reminders).
-          voice?.output.cancel(AUDIO_PRIORITY.bell)
-          // A rest is a safe boundary (doc §22) — the only place pacing may
-          // propose anything.
-          const restSnapshot = sessionRef.current?.snapshot()
-          const decision = pacingRef.current?.onBoundary('rest', {
-            roundIndex: restSnapshot?.roundIndex ?? 0,
-            atWorkElapsedMs: restSnapshot?.workElapsedMs ?? 0,
-            activeElapsedSeconds: activeElapsedSecondsRef.current,
+        return loop
+      }
+      const startMetronome = (): void => {
+        if (!workout.recipe.metronome.enabled) return
+        const port = voice?.output.metronome
+        if (!port) return
+        const atMs = sessionRef.current?.snapshot()?.workElapsedMs ?? 0
+        const loop =
+          metronomeLoopAt(atMs) ??
+          metronomeLoopFor(
+            workout.recipe.coachTempo.division,
+            workout.recipe.coachTempo.swing,
+            workout.recipe.coachTempo.baseBpm,
+          )
+        if (!loop) {
+          logger.warn('workout.metronome', 'no loop for tempo', {
+            division: safe(workout.recipe.coachTempo.division),
+            swing: safe(workout.recipe.coachTempo.swing),
+            baseBpm: safe(workout.recipe.coachTempo.baseBpm),
           })
-          pacingCueRef.current = decision?.cueText
-          if (decision && decision.action.kind !== 'none') {
-            // Only real changes are recorded. A decision to leave the plan
-            // alone is not an adaptation, and counting it would tell the
-            // athlete the workout adapted when it did not.
-            adaptationsRef.current.push({
-              decidedAtMonotonicMs: clock.now(),
-              boundary: 'rest',
-              inputs: decision.inputs,
-              decision: decision.action,
+          return
+        }
+        // A resume past one or more section swaps must not let those swaps
+        // re-fire from the tick loop — starting here already puts us on the
+        // right loop.
+        const sched = metronomeScheduleRef.current
+        if (sched) for (const s of sched.swaps) if (s.dispatchAtMs <= atMs) s.state = 'played'
+        // baseBpm from the recipe drives the shared logical transport
+        // (M39-V2 Phase W0-a) alongside the audible loop — one call,
+        // both lifecycles synced. Consumers reading
+        // `port.transport.snapshot()` see the fresh generation on
+        // this start. The transport rate is bpmForRecipe (the locked
+        // visual clock), independent of which subdivision WAV plays.
+        // clickAudible gates ONLY the loop volume (mute-only): the transport
+        // still starts, so the avatar flip and everything else are unchanged
+        // whether the click sounds or not.
+        const clickVolume = clickAudibleRef.current ? workout.recipe.metronome.volume : 0
+        port.start(loop, clickVolume, bpmForRecipe(workout.recipe))
+      }
+      const stopMetronome = (): void => {
+        // Gate stop on the same flag as start — a legacy recipe never
+        // touched the port, so the tear-down side shouldn't either.
+        if (!workout.recipe.metronome.enabled) return
+        voice?.output.metronome?.stop()
+      }
+      for (const transition of transitions) {
+        // Mapped rather than cast: `SessionTransition` and `SessionPhaseEvent`
+        // are different shapes, and `completed` is `finishing` on the other
+        // side. A cast here would compile and then silently deliver a phase the
+        // announcer does not recognise.
+        const phase = toSessionPhaseEvent(transition, clock.now())
+        if (phase) announcerRef.current?.onSessionPhase(phase)
+        // Round boundaries are the inspection harness's only way to know which
+        // round a captured event belongs to, and until now NOTHING marked them
+        // in logcat — the drive harness waited on the literal string
+        // 'rest-entered', which is a domain event TYPE that was never logged, so
+        // every capture burned its full timeout and ran past the round it meant
+        // to record (GH #305). Cheap: two lines per round, not per tick.
+        // MVP v2 (GH #305): re-anchor the UI-thread work clock at every
+        // discontinuity. Running only while an unpaused WORK phase is on —
+        // projecting through rest/pause would advance a clock the session
+        // itself holds still.
+        if (args.workClock) {
+          const s = sessionRef.current?.snapshot()
+          args.workClock.value = Object.freeze({
+            roundIndex: s?.roundIndex ?? -1,
+            workElapsedAtPublishMs: s?.workElapsedMs ?? 0,
+            publishFrameTimestampMs:
+              typeof performance !== 'undefined' && typeof performance.now === 'function'
+                ? performance.now()
+                : Date.now(),
+            running: s?.phase === 'work',
+          })
+        }
+        logger.info('workout.round.boundary', 'session phase boundary', {
+          transition: safe(transition.type),
+          roundIndex: safe(
+            transition.type === 'work-entered'
+              ? transition.roundIndex
+              : (sessionRef.current?.snapshot()?.roundIndex ?? -1),
+          ),
+          workElapsedMs: safe(sessionRef.current?.snapshot()?.workElapsedMs ?? -1),
+          // Same clock as cue.tokenDue and every voice.play dispatchMs, so a
+          // bell's onset can be measured from the boundary it answers. The log
+          // sink prints fields only — a record's own timestamp never reaches
+          // logcat.
+          monotonicTimeMs: safe(clock.now()),
+        })
+        switch (transition.type) {
+          case 'work-entered': {
+            // A new round opens fresh tallies, and the previous round's frozen
+            // result leaves the store rather than lingering behind the cues.
+            freezeRef.current.beginRound(transition.roundIndex)
+            buildWalkPlan(transition.roundIndex)
+            buildLeadInSchedule(transition.roundIndex)
+            buildAvatarLeadTrack(transition.roundIndex)
+            buildMetronomeSchedule(transition.roundIndex)
+            setLive({ frozenRoundResult: undefined })
+
+            // Install the round's compiled rhythm map (M2): from here the map
+            // owns every call time and the conductor tick dispatches them.
+            const round = timelineRef.current[transition.roundIndex]
+            const map = rhythmMapsRef.current[transition.roundIndex]
+            announcerRef.current?.setRound(round ?? null, map ?? null)
+
+            // Bank the previous round's active time so the pacing clock spans
+            // the whole workout rather than restarting each round.
+            const previous = workout.schedule[transition.roundIndex - 1]
+            if (previous?.countsTowardGoal) {
+              completedActiveSecondsRef.current += previous.workDurationMs / 1000
+            }
+            engine.onSessionPhase({
+              type: 'work-entered',
+              roundIndex: transition.roundIndex,
+              nowMs: clock.now(),
             })
+            startMetronome()
+            break
           }
-          break
+          case 'rest-entered': {
+            // The bell. Everything the rest screen shows is fixed here; later
+            // punches reach a closed accumulator and change nothing (doc §23).
+            const target = workout.schedule[transition.roundIndex]?.targetPunches ?? 0
+            const frozen = freezeRef.current.freeze(target)
+            if (frozen) setLive({ frozenRoundResult: frozen })
+
+            engine.onSessionPhase({ type: 'rest-entered', nowMs: clock.now() })
+            stopMetronome()
+            // 2026-08-31 audio-append fix side-effect drain:
+            // playSequence's new append-not-clear semantic keeps clips
+            // from the ending round queued if they hadn't fired yet.
+            // Without a drain those pending clips continue playing
+            // through rest and into round 2, so round 2 rings light
+            // on time but audio is behind by round 1's tail. Cancel
+            // everything below bell priority (keeps the round-end bell
+            // itself intact but drops pending punch commands / coach
+            // reminders).
+            voice?.output.cancel(AUDIO_PRIORITY.bell)
+            // A rest is a safe boundary (doc §22) — the only place pacing may
+            // propose anything.
+            const restSnapshot = sessionRef.current?.snapshot()
+            const decision = pacingRef.current?.onBoundary('rest', {
+              roundIndex: restSnapshot?.roundIndex ?? 0,
+              atWorkElapsedMs: restSnapshot?.workElapsedMs ?? 0,
+              activeElapsedSeconds: activeElapsedSecondsRef.current,
+            })
+            pacingCueRef.current = decision?.cueText
+            if (decision && decision.action.kind !== 'none') {
+              // Only real changes are recorded. A decision to leave the plan
+              // alone is not an adaptation, and counting it would tell the
+              // athlete the workout adapted when it did not.
+              adaptationsRef.current.push({
+                decidedAtMonotonicMs: clock.now(),
+                boundary: 'rest',
+                inputs: decision.inputs,
+                decision: decision.action,
+              })
+            }
+            break
+          }
+          case 'paused':
+            engine.onSessionPhase({ type: 'paused', nowMs: clock.now() })
+            stopMetronome()
+            break
+          case 'resumed':
+            engine.onSessionPhase({ type: 'resumed', nowMs: clock.now() })
+            // Re-anchor: a paused loop that resumes from its previous
+            // position would land off the downbeat by the pause duration.
+            // Starting fresh keeps the click on the grid.
+            startMetronome()
+            break
+          case 'completed':
+            engine.onSessionPhase({ type: 'finishing', nowMs: clock.now() })
+            stopMetronome()
+            // After the engine, so the last cue has settled and its rows are
+            // in hand before the transaction opens.
+            endSession(false)
+            break
+          case 'cancelled':
+            engine.onSessionPhase({ type: 'cancelled', nowMs: clock.now() })
+            stopMetronome()
+            // A cancelled workout is still a workout that happened; it is
+            // written with status 'cancelled' rather than discarded.
+            endSession(true)
+            break
+          default:
+            break
         }
-        case 'paused':
-          engine.onSessionPhase({ type: 'paused', nowMs: clock.now() })
-          stopMetronome()
-          break
-        case 'resumed':
-          engine.onSessionPhase({ type: 'resumed', nowMs: clock.now() })
-          // Re-anchor: a paused loop that resumes from its previous
-          // position would land off the downbeat by the pause duration.
-          // Starting fresh keeps the click on the grid.
-          startMetronome()
-          break
-        case 'completed':
-          engine.onSessionPhase({ type: 'finishing', nowMs: clock.now() })
-          stopMetronome()
-          // After the engine, so the last cue has settled and its rows are
-          // in hand before the transaction opens.
-          endSession(false)
-          break
-        case 'cancelled':
-          engine.onSessionPhase({ type: 'cancelled', nowMs: clock.now() })
-          stopMetronome()
-          // A cancelled workout is still a workout that happened; it is
-          // written with status 'cancelled' rather than discarded.
-          endSession(true)
-          break
-        default:
-          break
       }
-    }
+    },
     // args.workClock is a stable SharedValue slot (or a stable plain
     // object in tests); its .value writes are imperative and identity
     // never changes across renders, so it is deliberately not a dep —
     // the same treatment the transport anchor slot gets.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clock, endSession, voice, workout])
+    [clock, endSession, voice, workout],
+  )
 
   // -------------------------------------------------------------------------
   // Wiring. Keyed on the timeline + source so a recipe change rebuilds
@@ -1833,14 +1860,13 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
       const compiledScore = compileScore()
       timelineHash = compiledScore.identity.timelineHash
       slotDispatcher = new SlotDispatcher({
-        getCurrentVocabulary: () =>
-          voice.policy.vocabulary === 'names' ? 'technique' : 'numeric',
+        getCurrentVocabulary: () => (voice.policy.vocabulary === 'names' ? 'technique' : 'numeric'),
         onSkipped: (slot, reason) => {
-          logger.warn(
-            'workout.slotDispatcher.skipped',
-            'coach slot dropped without playing',
-            { slotId: safe(slot.slotId), roundIndex: safe(slot.roundIndex), reason: safe(reason) },
-          )
+          logger.warn('workout.slotDispatcher.skipped', 'coach slot dropped without playing', {
+            slotId: safe(slot.slotId),
+            roundIndex: safe(slot.roundIndex),
+            reason: safe(reason),
+          })
         },
         play: (assetId, atTick, slotId) => {
           // The gates the announcer applies before ANY combo-announce.
@@ -1946,9 +1972,7 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
           }
         }
       }
-      const enqueuableSlots = compiledScore.coachSlots.filter((slot) =>
-        atwCueIds.has(slot.cueId),
-      )
+      const enqueuableSlots = compiledScore.coachSlots.filter((slot) => atwCueIds.has(slot.cueId))
       roundStartTicks = roundStartTicksFrom(compiledScore)
       slotDispatcher.enqueueAll(enqueuableSlots)
       announcer.setScoreOwnsCombos(true)
@@ -2146,10 +2170,14 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
               // when the coach was silent on purpose: nothing was lost,
               // and "the lane never freed" would be a false report.
               if (entry.kind === 'lead-in' && mayCall) {
-                logger.warn('workout.clickScript.skipped', 'lead-in window expired before the lane freed', {
-                  slot: safe(entry.slot),
-                  workElapsedMs: safe(snapshot.workElapsedMs),
-                })
+                logger.warn(
+                  'workout.clickScript.skipped',
+                  'lead-in window expired before the lane freed',
+                  {
+                    slot: safe(entry.slot),
+                    workElapsedMs: safe(snapshot.workElapsedMs),
+                  },
+                )
               }
               continue
             }
@@ -2393,11 +2421,11 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
           if (entry && cue) avatar = { cue, tokenIndex: entry.tokenIndex }
         }
         return {
-        ...(currentRef.current ? { current: currentRef.current } : {}),
-        ...(nextRef.current ? { next: nextRef.current } : {}),
-        ...(walkPlanRef.current ? { walkPlan: walkPlanRef.current } : {}),
-        ...(freeWorkRef.current ? { freeWork: true } : {}),
-        ...(avatar ? { avatar } : {}),
+          ...(currentRef.current ? { current: currentRef.current } : {}),
+          ...(nextRef.current ? { next: nextRef.current } : {}),
+          ...(walkPlanRef.current ? { walkPlan: walkPlanRef.current } : {}),
+          ...(freeWorkRef.current ? { freeWork: true } : {}),
+          ...(avatar ? { avatar } : {}),
         }
       },
       readResults: () => ({

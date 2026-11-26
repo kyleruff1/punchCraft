@@ -87,9 +87,9 @@ function hexToBase64(hex: string): string {
     const b2 = i < bytes.length ? bytes[i++]! : -1
     const b3 = i < bytes.length ? bytes[i++]! : -1
     const c1 = b1 >> 2
-    const c2 = ((b1 & 0x03) << 4) | (b2 === -1 ? 0 : (b2 >> 4))
-    const c3 = b2 === -1 ? -1 : (((b2 & 0x0f) << 2) | (b3 === -1 ? 0 : (b3 >> 6)))
-    const c4 = b3 === -1 ? -1 : (b3 & 0x3f)
+    const c2 = ((b1 & 0x03) << 4) | (b2 === -1 ? 0 : b2 >> 4)
+    const c3 = b2 === -1 ? -1 : ((b2 & 0x0f) << 2) | (b3 === -1 ? 0 : b3 >> 6)
+    const c4 = b3 === -1 ? -1 : b3 & 0x3f
     out += BASE64_ALPHABET.charAt(c1)
     out += BASE64_ALPHABET.charAt(c2)
     out += c3 === -1 ? '=' : BASE64_ALPHABET.charAt(c3)
@@ -217,14 +217,20 @@ export class BleManagerBlePlxImpl implements BleManagerFacade {
     return state === 'PoweredOn'
   }
 
-  onAdapterStateChange(cb: (state: 'unknown' | 'off' | 'on' | 'unauthorized') => void): UnsubscribeFn {
+  onAdapterStateChange(
+    cb: (state: 'unknown' | 'off' | 'on' | 'unauthorized') => void,
+  ): UnsubscribeFn {
     const sub = this.ensure().onStateChange((s) => cb(mapAdapterState(s)), true)
     return () => sub.remove()
   }
 
-  async scan(options: ScanOptions, onAdvertisement: (ad: AdvertisementSnapshot) => void): Promise<void> {
+  async scan(
+    options: ScanOptions,
+    onAdvertisement: (ad: AdvertisementSnapshot) => void,
+  ): Promise<void> {
     const timeoutMs = options.timeoutMs ?? DEFAULT_SCAN_TIMEOUT_MS
-    const uuids = options.serviceUuids && options.serviceUuids.length > 0 ? options.serviceUuids : null
+    const uuids =
+      options.serviceUuids && options.serviceUuids.length > 0 ? options.serviceUuids : null
     const seen = new Set<string>()
     const stopAfter = options.stopAfterDevices ?? Infinity
 
@@ -235,7 +241,9 @@ export class BleManagerBlePlxImpl implements BleManagerFacade {
     // window terminates via stopScan (called from stopAfter, the internal
     // timeout, or externally).
     let resolveScan: () => void = () => {}
-    const scanPromise = new Promise<void>((resolve) => { resolveScan = resolve })
+    const scanPromise = new Promise<void>((resolve) => {
+      resolveScan = resolve
+    })
     this.scanResolvers.push(resolveScan)
 
     // Register the callback WITHOUT awaiting.
@@ -261,7 +269,9 @@ export class BleManagerBlePlxImpl implements BleManagerFacade {
     })
 
     if (this.scanTimeout) clearTimeout(this.scanTimeout)
-    this.scanTimeout = setTimeout(() => { void this.stopScan() }, timeoutMs)
+    this.scanTimeout = setTimeout(() => {
+      void this.stopScan()
+    }, timeoutMs)
 
     return scanPromise
   }
@@ -272,7 +282,11 @@ export class BleManagerBlePlxImpl implements BleManagerFacade {
       this.scanTimeout = null
     }
     if (this.manager) {
-      try { await this.manager.stopDeviceScan() } catch { /* already stopped is fine */ }
+      try {
+        await this.manager.stopDeviceScan()
+      } catch {
+        /* already stopped is fine */
+      }
     }
     const resolvers = this.scanResolvers
     this.scanResolvers = []
@@ -293,7 +307,11 @@ export class BleManagerBlePlxImpl implements BleManagerFacade {
     const set = this.connectionListeners.get(status.deviceId)
     if (!set) return
     for (const cb of set) {
-      try { cb(status) } catch { /* listener errors must not break the facade */ }
+      try {
+        cb(status)
+      } catch {
+        /* listener errors must not break the facade */
+      }
     }
   }
 
@@ -360,7 +378,11 @@ export class BleManagerBlePlxImpl implements BleManagerFacade {
         })
       }
       if (options?.requestMtu) {
-        try { await manager.requestMTUForDevice(deviceId, options.requestMtu) } catch { /* ignore MTU negotiation failures */ }
+        try {
+          await manager.requestMTUForDevice(deviceId, options.requestMtu)
+        } catch {
+          /* ignore MTU negotiation failures */
+        }
       }
       this.watchDisconnect(manager, deviceId)
       const status: ConnectionStatus = {
@@ -459,9 +481,16 @@ export class BleManagerBlePlxImpl implements BleManagerFacade {
 
   async disconnect(deviceId: string): Promise<void> {
     const sub = this.disconnectSubs.get(deviceId)
-    if (sub) { sub.remove(); this.disconnectSubs.delete(deviceId) }
+    if (sub) {
+      sub.remove()
+      this.disconnectSubs.delete(deviceId)
+    }
     if (!this.manager) return
-    try { await this.manager.cancelDeviceConnection(deviceId) } catch { /* already disconnected is fine */ }
+    try {
+      await this.manager.cancelDeviceConnection(deviceId)
+    } catch {
+      /* already disconnected is fine */
+    }
     this.emitStatus({
       deviceId,
       state: 'dormant',
@@ -472,7 +501,10 @@ export class BleManagerBlePlxImpl implements BleManagerFacade {
 
   onConnectionChange(deviceId: string, cb: (status: ConnectionStatus) => void): UnsubscribeFn {
     let set = this.connectionListeners.get(deviceId)
-    if (!set) { set = new Set(); this.connectionListeners.set(deviceId, set) }
+    if (!set) {
+      set = new Set()
+      this.connectionListeners.set(deviceId, set)
+    }
     set.add(cb)
     return () => {
       const s = this.connectionListeners.get(deviceId)
@@ -573,7 +605,11 @@ export class BleManagerBlePlxImpl implements BleManagerFacade {
       const chars = await manager.characteristicsForDevice(deviceId, serviceUuid)
       const match = chars.find((c) => c.uuid.toLowerCase() === characteristicUuid.toLowerCase())
       if (match) {
-        direction = match.isNotifiable ? 'notification' : (match.isIndicatable ? 'indication' : 'notification')
+        direction = match.isNotifiable
+          ? 'notification'
+          : match.isIndicatable
+            ? 'indication'
+            : 'notification'
       }
     } catch {
       // Non-fatal — direction defaults to 'notification'.
@@ -607,7 +643,9 @@ export class BleManagerBlePlxImpl implements BleManagerFacade {
     // optimistically (subscription accepted, just no data yet).
     let setupObserved = false
     let resolveOutcome: (r: SubscriptionResult) => void = () => {}
-    const setupOutcome = new Promise<SubscriptionResult>((resolve) => { resolveOutcome = resolve })
+    const setupOutcome = new Promise<SubscriptionResult>((resolve) => {
+      resolveOutcome = resolve
+    })
     const result: SubscriptionResult = {
       serviceUuid,
       characteristicUuid,
@@ -663,10 +701,11 @@ export class BleManagerBlePlxImpl implements BleManagerFacade {
             // Corrupt payload — drop this frame rather than crashing the sub.
             return
           }
-          const frameDirection: 'notification' | 'indication' =
-            characteristic.isNotifiable
-              ? 'notification'
-              : (characteristic.isIndicatable ? 'indication' : direction)
+          const frameDirection: 'notification' | 'indication' = characteristic.isNotifiable
+            ? 'notification'
+            : characteristic.isIndicatable
+              ? 'indication'
+              : direction
           const frame: RawBleFrame = {
             id: `${this.getCaptureId()}-${this.seq++}`,
             captureId: this.getCaptureId(),
@@ -704,7 +743,9 @@ export class BleManagerBlePlxImpl implements BleManagerFacade {
               logger.warn('ble.monitor.listener.threw', 'a frame listener threw', {
                 deviceId: deviceSensitive(deviceId),
                 characteristicUuid: deviceSensitive(characteristicUuid),
-                errorMessage: safe(listenerErr instanceof Error ? listenerErr.message : String(listenerErr)),
+                errorMessage: safe(
+                  listenerErr instanceof Error ? listenerErr.message : String(listenerErr),
+                ),
               })
             }
           }
@@ -734,7 +775,9 @@ export class BleManagerBlePlxImpl implements BleManagerFacade {
       return {
         result: failed,
         setupOutcome: Promise.resolve(failed),
-        unsubscribe: () => { /* no-op — nothing installed */ },
+        unsubscribe: () => {
+          /* no-op — nothing installed */
+        },
       }
     }
   }
@@ -749,7 +792,11 @@ export class BleManagerBlePlxImpl implements BleManagerFacade {
     return entry
   }
 
-  private joinMonitor(key: SubKey, entry: MonitorEntry, listener: MonitorListener): SubscriptionHandle {
+  private joinMonitor(
+    key: SubKey,
+    entry: MonitorEntry,
+    listener: MonitorListener,
+  ): SubscriptionHandle {
     entry.listeners.add(listener)
     logger.info('ble.monitor.joined', 'a second listener joined an existing monitor', {
       characteristicUuid: deviceSensitive(entry.result.characteristicUuid),
@@ -766,7 +813,11 @@ export class BleManagerBlePlxImpl implements BleManagerFacade {
    * a handle from a dead connection must never reach the monitor that
    * succeeded it.
    */
-  private monitorHandle(key: SubKey, entry: MonitorEntry, listener: MonitorListener): SubscriptionHandle {
+  private monitorHandle(
+    key: SubKey,
+    entry: MonitorEntry,
+    listener: MonitorListener,
+  ): SubscriptionHandle {
     return {
       result: entry.result,
       setupOutcome: entry.setupOutcome,
@@ -790,7 +841,11 @@ export class BleManagerBlePlxImpl implements BleManagerFacade {
   /** Tear down a monitor nobody is listening to, or that is being replaced. */
   private retireMonitor(key: SubKey, entry: MonitorEntry): void {
     this.markMonitorDead(key, entry)
-    try { entry.sub?.remove() } catch { /* already removed by the native side */ }
+    try {
+      entry.sub?.remove()
+    } catch {
+      /* already removed by the native side */
+    }
   }
 
   async monitorAllNotifiable(
@@ -809,18 +864,22 @@ export class BleManagerBlePlxImpl implements BleManagerFacade {
             result: {
               serviceUuid: svc.uuid,
               characteristicUuid: c.uuid,
-              direction: (c.properties.notify ? 'notification' : 'indication') as 'notification' | 'indication',
+              direction: (c.properties.notify ? 'notification' : 'indication') as
+                'notification' | 'indication',
               success: false,
               errorMessage: (e as Error)?.message ?? String(e),
             },
             setupOutcome: Promise.resolve<SubscriptionResult>({
               serviceUuid: svc.uuid,
               characteristicUuid: c.uuid,
-              direction: (c.properties.notify ? 'notification' : 'indication') as 'notification' | 'indication',
+              direction: (c.properties.notify ? 'notification' : 'indication') as
+                'notification' | 'indication',
               success: false,
               errorMessage: (e as Error)?.message ?? String(e),
             }),
-            unsubscribe: () => { /* no-op */ },
+            unsubscribe: () => {
+              /* no-op */
+            },
           }
           handles.push(failed)
         }
@@ -935,7 +994,11 @@ export class BleManagerBlePlxImpl implements BleManagerFacade {
       const valueBase64 = characteristic.value ?? undefined
       let valueHex: string | undefined
       if (valueBase64 != null) {
-        try { valueHex = base64ToHex(valueBase64) } catch { valueHex = undefined }
+        try {
+          valueHex = base64ToHex(valueBase64)
+        } catch {
+          valueHex = undefined
+        }
       }
       logger.info('ble.read.ok', 'developer-mode read completed', {
         deviceId: deviceSensitive(deviceId),
@@ -963,16 +1026,28 @@ export class BleManagerBlePlxImpl implements BleManagerFacade {
     await this.stopScan().catch(() => {})
     for (const entry of this.monitors.values()) {
       entry.dead = true
-      try { entry.sub?.remove() } catch { /* ignore */ }
+      try {
+        entry.sub?.remove()
+      } catch {
+        /* ignore */
+      }
     }
     this.monitors.clear()
     for (const sub of this.disconnectSubs.values()) {
-      try { sub.remove() } catch { /* ignore */ }
+      try {
+        sub.remove()
+      } catch {
+        /* ignore */
+      }
     }
     this.disconnectSubs.clear()
     this.connectionListeners.clear()
     if (this.manager) {
-      try { this.manager.destroy() } catch { /* already destroyed */ }
+      try {
+        this.manager.destroy()
+      } catch {
+        /* already destroyed */
+      }
       this.manager = null
     }
     resetBleManagerSingleton()

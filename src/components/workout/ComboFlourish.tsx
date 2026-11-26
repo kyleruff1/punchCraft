@@ -54,7 +54,13 @@ export function ComboFlourish(props: ComboFlourishProps): React.JSX.Element | nu
   if (fireKey === undefined) return null
 
   if (reducedMotion) {
-    return <Animated.View pointerEvents="none" style={[styles.surround, styles.static]} testID="combo-flourish-static" />
+    return (
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.surround, styles.static]}
+        testID="combo-flourish-static"
+      />
+    )
   }
 
   return (
@@ -66,7 +72,12 @@ export function ComboFlourish(props: ComboFlourishProps): React.JSX.Element | nu
         {
           opacity: progress.interpolate({ inputRange: [0, 1, 2], outputRange: [0.85, 1, 0] }),
           transform: [
-            { scale: progress.interpolate({ inputRange: [0, 1, 2], outputRange: [0.96, 1.06, 1.12] }) },
+            {
+              scale: progress.interpolate({
+                inputRange: [0, 1, 2],
+                outputRange: [0.96, 1.06, 1.12],
+              }),
+            },
           ],
         },
       ]}

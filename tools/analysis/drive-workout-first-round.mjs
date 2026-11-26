@@ -48,7 +48,6 @@ const REPO_ROOT = import.meta.url
   : process.cwd()
 
 export const PACKAGE = 'com.kyleruff.punchcraft'
-const MAIN_ACTIVITY = `${PACKAGE}/.MainActivity`
 /** What every capture streams: JS records, the app's native tag, crashes. */
 export const LOGCAT_FILTER = ['ReactNativeJS:V', 'workouts:V', 'AndroidRuntime:E', 'System.err:W', '*:S']
 
@@ -137,6 +136,10 @@ export function dumpUi(deviceId) {
 /**
  * Find a node in the UI dump by resource-id (exact) OR content-desc
  * (substring). Returns center coordinates or null.
+ *
+ * @param {string} xml
+ * @param {{ resourceId?: string, contentDescSubstring?: string }} query
+ *   Either key; callers pass one.
  */
 export function findTapTarget(xml, { resourceId, contentDescSubstring }) {
   const nodeRe = /<node[^>]*>/g

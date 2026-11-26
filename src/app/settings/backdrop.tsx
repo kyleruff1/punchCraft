@@ -61,8 +61,8 @@ export default function BackdropSettingsScreen(): React.JSX.Element {
       </View>
 
       <Text style={styles.note}>
-        The backdrop is decoration. It never carries a cue, and turning it off changes nothing
-        about how a workout is scored.
+        The backdrop is decoration. It never carries a cue, and turning it off changes nothing about
+        how a workout is scored.
       </Text>
     </ScrollView>
   )

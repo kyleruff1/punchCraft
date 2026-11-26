@@ -17,11 +17,7 @@
  * are allowed by §15.1.
  */
 
-import type {
-  AdvertisementSnapshot,
-  GattSnapshot,
-  RawBleFrame,
-} from '@ble/bleTypes'
+import type { AdvertisementSnapshot, GattSnapshot, RawBleFrame } from '@ble/bleTypes'
 import type {
   CommandContext,
   DecodeResult,

@@ -31,10 +31,7 @@
  * combo-announce manifest is audio-side.
  */
 
-import {
-  findComboAnnounce,
-  type ComboAnnounceClip,
-} from './voiceAssets/comboAnnounceManifest'
+import { findComboAnnounce, type ComboAnnounceClip } from './voiceAssets/comboAnnounceManifest'
 import type {
   CoachAssetContext,
   CoachAssetRef,
@@ -60,9 +57,7 @@ function refFromCombo(clip: ComboAnnounceClip): CoachAssetRef {
     : base
 }
 
-function vocabForCatalog(
-  vocabulary: 'numeric' | 'technique',
-): 'numbers' | 'techniques' {
+function vocabForCatalog(vocabulary: 'numeric' | 'technique'): 'numbers' | 'techniques' {
   return vocabulary === 'numeric' ? 'numbers' : 'techniques'
 }
 

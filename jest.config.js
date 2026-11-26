@@ -13,6 +13,9 @@ module.exports = {
     '^.+\\.mjs$': expoPreset.transform['\\.[jt]sx?$'],
   },
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'mjs', 'json', 'node'],
+  // App logging is off in tests unless `JEST_LOGS=1` — see the file. Jest
+  // appends this to the preset's own setup files rather than replacing them.
+  setupFiles: ['<rootDir>/src/testing/silenceLogs.ts'],
   // Two exclusions, for different reasons:
   //
   // - `.claude/worktrees/**` holds git worktrees for parallel agent

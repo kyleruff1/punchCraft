@@ -90,35 +90,26 @@ export const useVoiceSettingsStore = create<VoiceSettingsState>((set, get) => ({
 
   load(repo) {
     repository = repo
-    // `read` merges over the defaults, so a policy stored before a field
-    // existed comes back complete rather than missing it. What it cannot do
-    // is vouch for the VALUES: the row is JSON, and the type parameter below
-    // is a hope, not a check.
-    const stored = repo.read<VoiceCoachPolicy>(
-      SETTINGS_KEYS.voicePolicy,
-      defaultVoiceCoachPolicy(),
-    )
-    // So every field is checked. This is where a retired style is migrated
-    // (an install carrying `coach-shorthand` would otherwise keep beeping its
-    // repetitions with no control left in the UI to explain why, D22) — and
-    // where a stored `overlayOptIn` that is anything but literal `true` is
-    // closed. `voiceAllowed` asks `!overlayOptIn`; the string "false" is
-    // truthy, and would have had the coach speaking over someone's music.
-    const policy = normalizeVoiceCoachPolicy(stored)
+    // Every field of the stored policy is checked: the row is JSON, and JSON
+    // has no types. This is where a retired style is migrated (an install
+    // carrying `coach-shorthand` would otherwise keep beeping its repetitions
+    // with no control left in the UI to explain why, D22) — and where a
+    // stored `overlayOptIn` that is anything but literal `true` is closed.
+    // `voiceAllowed` asks `!overlayOptIn`; the string "false" is truthy, and
+    // would have had the coach speaking over someone's music.
+    const policy = repo.readChecked(SETTINGS_KEYS.voicePolicy, normalizeVoiceCoachPolicy)
     // Heal the row when it was corrected. This never OPENS the opt-in: the
     // normalizer can only turn it off, so the rule at the top of this file
     // — only the athlete's toggle sets it — still holds.
-    if (JSON.stringify(policy) !== JSON.stringify(stored)) persistPolicy(policy)
+    if (policy.corrected) persistPolicy(policy.value)
 
-    const volumes = normalizeVolumes(
-      repo.read<Volumes>(SETTINGS_KEYS.voiceVolumes, { ...DEFAULT_VOLUMES }),
-    )
-    // A pre-click install has no row → defaults off, the safe direction for
-    // dev instrumentation. A corrupt/non-object row also merges to the default.
-    const click = repo.read<{ enabled: boolean }>(SETTINGS_KEYS.click, {
-      enabled: DEFAULT_CLICK_ENABLED,
-    })
-    set({ policy, volumes, clickEnabled: click.enabled === true, loaded: true })
+    const volumes = repo.readChecked(SETTINGS_KEYS.voiceVolumes, normalizeVolumes).value
+    // A pre-click install has no row → off, the safe direction for dev
+    // instrumentation. Anything but literal `true` is off too.
+    const click = repo.readChecked(SETTINGS_KEYS.click, (stored) => ({
+      enabled: stored.enabled === true,
+    })).value
+    set({ policy: policy.value, volumes, clickEnabled: click.enabled, loaded: true })
   },
 
   setPolicy(patch) {

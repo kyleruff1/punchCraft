@@ -51,11 +51,17 @@ describe('breathForBar — set-aware call breath', () => {
   it('a single-punch bar floors to the DELIVERED floor (no interval to track)', () => {
     expect(breathForBar(bar([0]), 'numbers', 'call/z').breathMs).toBe(DELIVERED_FLOOR_MS)
     // and what the athlete hears is the floor Kyle set, which is the point
-    expect(breathForBar(bar([0]), 'numbers', 'call/z').breathMs - DELIVERED_BREATH_SHORTFALL_MS).toBe(MIN_BREATH_MS)
+    expect(
+      breathForBar(bar([0]), 'numbers', 'call/z').breathMs - DELIVERED_BREATH_SHORTFALL_MS,
+    ).toBe(MIN_BREATH_MS)
   })
 
   it('anchors to the first PUNCH when the bar opens on a rest', () => {
-    const { firstPunchOffsetMs } = breathForBar(bar([600, 1200], { leadRest: true }), 'numbers', 'call/r')
+    const { firstPunchOffsetMs } = breathForBar(
+      bar([600, 1200], { leadRest: true }),
+      'numbers',
+      'call/r',
+    )
     expect(firstPunchOffsetMs).toBe(600)
   })
 

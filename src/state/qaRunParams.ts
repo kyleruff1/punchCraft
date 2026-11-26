@@ -41,9 +41,7 @@ export interface QaRunRequest {
   nonce?: string
 }
 
-export type QaRunParseResult =
-  | { ok: true; request: QaRunRequest }
-  | { ok: false; errors: string[] }
+export type QaRunParseResult = { ok: true; request: QaRunRequest } | { ok: false; errors: string[] }
 
 /** expo-router hands back `string | string[]`; a repeated key takes its first value. */
 type RawParams = Record<string, string | string[] | undefined>
@@ -92,7 +90,10 @@ export function parseQaRunParams(raw: RawParams): QaRunParseResult {
   let sim: QaRunRequest['sim'] = 'none'
   if (simRaw !== undefined) {
     if (simRaw === 'none' || isSimScriptId(simRaw)) sim = simRaw
-    else errors.push(`sim: unknown script '${simRaw}' (known: ${Object.keys(SIM_SCRIPTS).join(', ')}, none)`)
+    else
+      errors.push(
+        `sim: unknown script '${simRaw}' (known: ${Object.keys(SIM_SCRIPTS).join(', ')}, none)`,
+      )
   }
 
   const simForce = parseFlag(first(raw, 'simForce'), 'simForce', errors) ?? false

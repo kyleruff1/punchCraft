@@ -91,7 +91,9 @@ describe('breathForBar', () => {
       }
       // ...and through the shrink band, until the raised floor takes over at
       // `dense − (slotMs − REF) = MIN + SHORTFALL`, i.e. slotMs 655 / 805.
-      const bites = BREATH_REF_SLOT_MS + (dense - (MIN_BREATH_MS + DELIVERED_BREATH_SHORTFALL_MS)) / BREATH_TRACK_GAIN
+      const bites =
+        BREATH_REF_SLOT_MS +
+        (dense - (MIN_BREATH_MS + DELIVERED_BREATH_SHORTFALL_MS)) / BREATH_TRACK_GAIN
       expect(breathForBar(bar([0, bites - 5]), vocabulary, 'call/track').breathMs).toBe(
         dense - (bites - 5 - BREATH_REF_SLOT_MS),
       )
@@ -102,7 +104,9 @@ describe('breathForBar', () => {
   })
 
   it('anchors to the first PUNCH, not the bar start — a bar may open on a rest', () => {
-    expect(breathForBar(bar([600, 1200], { leadRest: true }), 'numbers', 'call/r').firstPunchOffsetMs).toBe(600)
+    expect(
+      breathForBar(bar([600, 1200], { leadRest: true }), 'numbers', 'call/r').firstPunchOffsetMs,
+    ).toBe(600)
   })
 })
 
@@ -119,7 +123,9 @@ describe('callDispatchAtMs', () => {
     expect(placed.firstNodeMs).toBe(10_000)
     expect(placed.breathMs).toBe(DENSE_BREATH_MS.numbers)
     // 10000 − 1400 − 600 − 71
-    expect(placed.dispatchAtMs).toBe(10_000 - 1_400 - DENSE_BREATH_MS.numbers - CALL_DISPATCH_LAG_MS)
+    expect(placed.dispatchAtMs).toBe(
+      10_000 - 1_400 - DENSE_BREATH_MS.numbers - CALL_DISPATCH_LAG_MS,
+    )
   })
 
   it('never goes negative at the very top of a round', () => {
@@ -163,7 +169,9 @@ describe('leadInDispatchAtMs — the anchor that drifted', () => {
     // this much later — the ~2 s that made every quick workout report WARN.
     const anchoredToStrike = SECTION_START - LEAD_CLIP_MS - LEAD_IN_PAD_MS
     expect(placed.dispatchAtMs).toBeLessThan(anchoredToStrike)
-    expect(anchoredToStrike - placed.dispatchAtMs).toBe(CALL_CLIP_MS + DENSE_BREATH_MS.numbers + CALL_DISPATCH_LAG_MS)
+    expect(anchoredToStrike - placed.dispatchAtMs).toBe(
+      CALL_CLIP_MS + DENSE_BREATH_MS.numbers + CALL_DISPATCH_LAG_MS,
+    )
   })
 
   it('falls back to the first strike only when the section has no rep-0 call', () => {
@@ -177,7 +185,11 @@ describe('leadInDispatchAtMs — the anchor that drifted', () => {
   })
 
   it('techniques lead-ins carry their extra lead; numbers carry none', () => {
-    const shared = { rep0CallDispatchAtMs: rep0.dispatchAtMs, scheduledStartMs: SECTION_START, clipDurationMs: LEAD_CLIP_MS }
+    const shared = {
+      rep0CallDispatchAtMs: rep0.dispatchAtMs,
+      scheduledStartMs: SECTION_START,
+      clipDurationMs: LEAD_CLIP_MS,
+    }
     const numbers = leadInDispatchAtMs({ ...shared, vocabulary: 'numbers' })
     const techniques = leadInDispatchAtMs({ ...shared, vocabulary: 'techniques' })
     expect(numbers.dispatchAtMs - techniques.dispatchAtMs).toBe(TECHNIQUE_LEADIN_LEAD_MS)

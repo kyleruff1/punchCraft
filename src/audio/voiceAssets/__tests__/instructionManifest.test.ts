@@ -16,10 +16,7 @@
  *    sample workouts have any coverage, the covered ones round-trip
  *    through `instructionClipFor` back to the same clip.
  */
-import {
-  INSTRUCTION_CLIPS,
-  instructionClipFor,
-} from '../instructionManifest'
+import { INSTRUCTION_CLIPS, instructionClipFor } from '../instructionManifest'
 
 describe('instructionManifest — the lookup contract', () => {
   it('returns undefined for unknown text', () => {

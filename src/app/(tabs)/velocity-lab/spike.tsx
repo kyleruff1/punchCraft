@@ -126,8 +126,12 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
 
 function errMessage(e: unknown): string {
   if (e instanceof Error) return e.message
-  try { return String(e) } catch { return 'unknown error' }
+  try {
+    return String(e)
+  } catch {
+    return 'unknown error'
   }
+}
 
 export default function SpikeScreen() {
   // Opens a capture for this screen so the spike's notification frames are
@@ -154,7 +158,11 @@ export default function SpikeScreen() {
       allHandlesRef.current = []
       subscriptionRef.current = null
       for (const h of handles) {
-        try { h.unsubscribe() } catch { /* best-effort */ }
+        try {
+          h.unsubscribe()
+        } catch {
+          /* best-effort */
+        }
       }
     }
   }, [])
@@ -182,10 +190,20 @@ export default function SpikeScreen() {
     {
       const prev = allHandlesRef.current
       allHandlesRef.current = []
-      for (const h of prev) { try { h.unsubscribe() } catch { /* best-effort */ } }
+      for (const h of prev) {
+        try {
+          h.unsubscribe()
+        } catch {
+          /* best-effort */
+        }
+      }
       const prevDeviceId = deviceIdRef.current
       if (prevDeviceId) {
-        try { await getBleManager().disconnect(prevDeviceId) } catch { /* best-effort */ }
+        try {
+          await getBleManager().disconnect(prevDeviceId)
+        } catch {
+          /* best-effort */
+        }
       }
     }
     cancelledRef.current = false
@@ -200,7 +218,11 @@ export default function SpikeScreen() {
     // Reset can tear them down. Returns after the frame-wait window
     // closes or a frame arrives.
     const runSubscribeStage = async (snapshot: GattSnapshot, deviceId: string): Promise<void> => {
-      safeSetState((s) => ({ ...s, phase: 'subscribing', message: 'Subscribing to every notify/indicate characteristic…' }))
+      safeSetState((s) => ({
+        ...s,
+        phase: 'subscribing',
+        message: 'Subscribing to every notify/indicate characteristic…',
+      }))
       const notifiables: Array<{ serviceUuid: string; characteristicUuid: string }> = []
       for (const svc of snapshot.services) {
         for (const c of svc.characteristics) {
@@ -211,20 +233,37 @@ export default function SpikeScreen() {
       }
       if (notifiables.length === 0) {
         const missing: SubscriptionResult = {
-          serviceUuid: '', characteristicUuid: '', direction: 'notification',
-          success: false, errorMessage: 'no notify characteristic on this device',
+          serviceUuid: '',
+          characteristicUuid: '',
+          direction: 'notification',
+          success: false,
+          errorMessage: 'no notify characteristic on this device',
         }
         patchReport((r) => {
-          r.subscribe = { ok: false, subscribed: 0, subscriptions: [missing], errorMessage: 'no notify characteristic on this device' }
+          r.subscribe = {
+            ok: false,
+            subscribed: 0,
+            subscriptions: [missing],
+            errorMessage: 'no notify characteristic on this device',
+          }
           r.finishedAtIso = new Date().toISOString()
         })
-        safeSetState((s) => ({ ...s, phase: 'done', message: 'Done — subscribe skipped (no notifiables).' }))
+        safeSetState((s) => ({
+          ...s,
+          phase: 'done',
+          message: 'Done — subscribe skipped (no notifiables).',
+        }))
         return
       }
 
       let firstFrameAt: number | null = null
       let firstFrameHex: string | undefined
-      const capturedFrames: Array<{ serviceUuid: string; characteristicUuid: string; monotonicTimeMs: number; valueHex: string }> = []
+      const capturedFrames: Array<{
+        serviceUuid: string
+        characteristicUuid: string
+        monotonicTimeMs: number
+        valueHex: string
+      }> = []
       const handles: SubscriptionHandle[] = []
       let subReady = false
       const onFrame = (frame: RawBleFrame) => {
@@ -252,40 +291,78 @@ export default function SpikeScreen() {
         for (const target of notifiables) {
           if (cancelledRef.current) break
           try {
-            const h = await facade.monitorCharacteristic(deviceId, target.serviceUuid, target.characteristicUuid, onFrame)
+            const h = await facade.monitorCharacteristic(
+              deviceId,
+              target.serviceUuid,
+              target.characteristicUuid,
+              onFrame,
+            )
             handles.push(h)
           } catch (e) {
             handles.push({
-              result: { serviceUuid: target.serviceUuid, characteristicUuid: target.characteristicUuid, direction: 'notification', success: false, errorMessage: errMessage(e) },
-              setupOutcome: Promise.resolve({ serviceUuid: target.serviceUuid, characteristicUuid: target.characteristicUuid, direction: 'notification' as const, success: false, errorMessage: errMessage(e) }),
-              unsubscribe: () => { /* no-op */ },
+              result: {
+                serviceUuid: target.serviceUuid,
+                characteristicUuid: target.characteristicUuid,
+                direction: 'notification',
+                success: false,
+                errorMessage: errMessage(e),
+              },
+              setupOutcome: Promise.resolve({
+                serviceUuid: target.serviceUuid,
+                characteristicUuid: target.characteristicUuid,
+                direction: 'notification' as const,
+                success: false,
+                errorMessage: errMessage(e),
+              }),
+              unsubscribe: () => {
+                /* no-op */
+              },
             })
           }
         }
       } catch (e) {
-        logger.error('spike.subscribe.unexpected', 'Subscribe loop threw', { error: safe(errMessage(e)) })
+        logger.error('spike.subscribe.unexpected', 'Subscribe loop threw', {
+          error: safe(errMessage(e)),
+        })
       }
 
       if (cancelledRef.current) {
-        for (const h of handles) { try { h.unsubscribe() } catch { /* best-effort */ } }
+        for (const h of handles) {
+          try {
+            h.unsubscribe()
+          } catch {
+            /* best-effort */
+          }
+        }
         return
       }
       const setupResults = await Promise.all(handles.map((h) => h.setupOutcome))
       if (cancelledRef.current) {
-        for (const h of handles) { try { h.unsubscribe() } catch { /* best-effort */ } }
+        for (const h of handles) {
+          try {
+            h.unsubscribe()
+          } catch {
+            /* best-effort */
+          }
+        }
         return
       }
       const subscribedCount = setupResults.filter((r) => r.success).length
       if (subscribedCount === 0) {
         patchReport((r) => {
-          r.subscribe = { ok: false, subscribed: 0, subscriptions: setupResults, errorMessage: 'every subscribe attempt failed' }
+          r.subscribe = {
+            ok: false,
+            subscribed: 0,
+            subscriptions: setupResults,
+            errorMessage: 'every subscribe attempt failed',
+          }
           r.finishedAtIso = new Date().toISOString()
         })
         safeSetState((s) => ({ ...s, phase: 'done', message: 'Done — every subscribe failed.' }))
         return
       }
 
-      subscriptionRef.current = handles.length > 0 ? handles[0] ?? null : null
+      subscriptionRef.current = handles.length > 0 ? (handles[0] ?? null) : null
       allHandlesRef.current = handles
       safeSetState((s) => ({
         ...s,
@@ -299,7 +376,8 @@ export default function SpikeScreen() {
         await new Promise((r) => setTimeout(r, 50))
       }
       if (cancelledRef.current) return
-      const firstFrameWithinMs = firstFrameAt !== null ? Math.round(firstFrameAt - subStart) : undefined
+      const firstFrameWithinMs =
+        firstFrameAt !== null ? Math.round(firstFrameAt - subStart) : undefined
       const gotFrame = firstFrameAt !== null
       patchReport((r) => {
         r.subscribe = {
@@ -308,7 +386,9 @@ export default function SpikeScreen() {
           firstFrameWithinMs,
           subscriptions: setupResults,
           frames: capturedFrames,
-          errorMessage: gotFrame ? undefined : `no frame received within ${FIRST_FRAME_TIMEOUT_MS}ms across ${subscribedCount} channels`,
+          errorMessage: gotFrame
+            ? undefined
+            : `no frame received within ${FIRST_FRAME_TIMEOUT_MS}ms across ${subscribedCount} channels`,
         }
         r.finishedAtIso = new Date().toISOString()
       })
@@ -324,14 +404,21 @@ export default function SpikeScreen() {
           firstFrameHex,
         }))
       } else {
-        safeSetState((s) => ({ ...s, phase: 'done', message: `Done — subscribed to ${subscribedCount} channel(s) but no frame observed. Try punching harder or waking the tracker.` }))
+        safeSetState((s) => ({
+          ...s,
+          phase: 'done',
+          message: `Done — subscribed to ${subscribedCount} channel(s) but no frame observed. Try punching harder or waking the tracker.`,
+        }))
       }
     }
 
     const stackLabel = `${info.appVersion}@${info.gitSha}`
     const report = emptyReport(runId, stackLabel)
     setState({ phase: 'permissions', message: 'Requesting permissions…', candidates: [], report })
-    logger.info('spike.start', 'Spike run started', { runId: safe(runId), stackLabel: safe(stackLabel) })
+    logger.info('spike.start', 'Spike run started', {
+      runId: safe(runId),
+      stackLabel: safe(stackLabel),
+    })
 
     const facade = getBleManager()
 
@@ -345,9 +432,10 @@ export default function SpikeScreen() {
           missing: safe(outcome.missing),
           permanentlyDenied: safe(outcome.permanentlyDenied),
         })
-        const guidance = outcome.permanentlyDenied.length > 0
-          ? 'Permissions permanently denied. Opening Settings…'
-          : `Permissions denied (${outcome.missing.join(', ') || 'unknown'}). Grant them and retry.`
+        const guidance =
+          outcome.permanentlyDenied.length > 0
+            ? 'Permissions permanently denied. Opening Settings…'
+            : `Permissions denied (${outcome.missing.join(', ') || 'unknown'}). Grant them and retry.`
         safeSetState((s) => ({ ...s, phase: 'idle', message: guidance }))
         if (outcome.permanentlyDenied.length > 0) {
           void PermissionService.openSettings()
@@ -356,8 +444,14 @@ export default function SpikeScreen() {
       }
     } catch (e) {
       if (cancelledRef.current) return
-      logger.error('spike.permissions.error', 'Permission request threw', { error: safe(errMessage(e)) })
-      safeSetState((s) => ({ ...s, phase: 'idle', message: `Permission request failed: ${errMessage(e)}` }))
+      logger.error('spike.permissions.error', 'Permission request threw', {
+        error: safe(errMessage(e)),
+      })
+      safeSetState((s) => ({
+        ...s,
+        phase: 'idle',
+        message: `Permission request failed: ${errMessage(e)}`,
+      }))
       return
     }
 
@@ -368,13 +462,21 @@ export default function SpikeScreen() {
       if (cancelledRef.current) return
       if (!ready) {
         logger.warn('spike.adapter.off', 'Bluetooth adapter not powered on')
-        safeSetState((s) => ({ ...s, phase: 'idle', message: 'Bluetooth is off. Turn it on and retry.' }))
+        safeSetState((s) => ({
+          ...s,
+          phase: 'idle',
+          message: 'Bluetooth is off. Turn it on and retry.',
+        }))
         return
       }
     } catch (e) {
       if (cancelledRef.current) return
       logger.error('spike.adapter.error', 'isReady threw', { error: safe(errMessage(e)) })
-      safeSetState((s) => ({ ...s, phase: 'idle', message: `Adapter check failed: ${errMessage(e)}` }))
+      safeSetState((s) => ({
+        ...s,
+        phase: 'idle',
+        message: `Adapter check failed: ${errMessage(e)}`,
+      }))
       return
     }
 
@@ -394,10 +496,14 @@ export default function SpikeScreen() {
           r.scan = { ok: true, devicesFound: 0, durationMs: 0, topDevices: [] }
           r.connect = { ok: true, deviceId: reused.deviceId, durationMs: 0 }
         })
-        logger.info('spike.reuseCoordinator', 'Reusing coordinator connection; skipping scan+connect', {
-          deviceId: deviceSensitive(reused.deviceId),
-          slotName: safe(reused.name ?? null),
-        })
+        logger.info(
+          'spike.reuseCoordinator',
+          'Reusing coordinator connection; skipping scan+connect',
+          {
+            deviceId: deviceSensitive(reused.deviceId),
+            slotName: safe(reused.name ?? null),
+          },
+        )
         safeSetState((s) => ({
           ...s,
           phase: 'discovering',
@@ -411,19 +517,38 @@ export default function SpikeScreen() {
           const charCount = snapshot.services.reduce((n, s) => n + s.characteristics.length, 0)
           const services = snapshot.services.map((svc) => ({
             uuid: svc.uuid,
-            characteristics: svc.characteristics.map((c) => ({ uuid: c.uuid, properties: c.properties })),
+            characteristics: svc.characteristics.map((c) => ({
+              uuid: c.uuid,
+              properties: c.properties,
+            })),
           }))
           patchReport((r) => {
-            r.discover = { ok: true, serviceCount: snapshot.services.length, characteristicCount: charCount, durationMs, services }
+            r.discover = {
+              ok: true,
+              serviceCount: snapshot.services.length,
+              characteristicCount: charCount,
+              durationMs,
+              services,
+            }
           })
           await runSubscribeStage(snapshot, reused.deviceId)
         } catch (e) {
           if (cancelledRef.current) return
           patchReport((r) => {
-            r.discover = { ok: false, serviceCount: 0, characteristicCount: 0, durationMs: 0, errorMessage: errMessage(e) }
+            r.discover = {
+              ok: false,
+              serviceCount: 0,
+              characteristicCount: 0,
+              durationMs: 0,
+              errorMessage: errMessage(e),
+            }
             r.finishedAtIso = new Date().toISOString()
           })
-          safeSetState((s) => ({ ...s, phase: 'done', message: `Discover failed on reused connection: ${errMessage(e)}` }))
+          safeSetState((s) => ({
+            ...s,
+            phase: 'done',
+            message: `Discover failed on reused connection: ${errMessage(e)}`,
+          }))
         }
         return
       }
@@ -432,7 +557,11 @@ export default function SpikeScreen() {
     // Stage 2 — scan. Discovery mode: no service filter.
     // Ownership: TrackerScanner runs a bounded scan and calls stopScan itself.
     // The spike screen never calls facade.stopScan().
-    safeSetState((s) => ({ ...s, phase: 'scanning', message: `Scanning for up to ${SCAN_TIMEOUT_MS / 1000}s…` }))
+    safeSetState((s) => ({
+      ...s,
+      phase: 'scanning',
+      message: `Scanning for up to ${SCAN_TIMEOUT_MS / 1000}s…`,
+    }))
     const scanStart = performance.now()
     let discovered: AdvertisementSnapshot[] = []
     let sortedForUi: AdvertisementSnapshot[] = []
@@ -453,14 +582,23 @@ export default function SpikeScreen() {
         name: d.name,
         rssi: d.rssi,
         serviceUuids: d.serviceUuids,
-        manufacturerDataHex: d.manufacturerDataBase64 ? base64ToHex(d.manufacturerDataBase64) : undefined,
+        manufacturerDataHex: d.manufacturerDataBase64
+          ? base64ToHex(d.manufacturerDataBase64)
+          : undefined,
       }))
       patchReport((r) => {
-        r.scan = { ok: discovered.length > 0, devicesFound: discovered.length, durationMs, topDevices }
+        r.scan = {
+          ok: discovered.length > 0,
+          devicesFound: discovered.length,
+          durationMs,
+          topDevices,
+        }
       })
       safeSetState((s) => ({ ...s, candidates: sortedForUi }))
       if (discovered.length === 0) {
-        logger.warn('spike.scan.empty', 'No advertisements observed', { durationMs: safe(durationMs) })
+        logger.warn('spike.scan.empty', 'No advertisements observed', {
+          durationMs: safe(durationMs),
+        })
         safeSetState((s) => ({ ...s, phase: 'idle', message: 'Scan finished with no devices.' }))
         return
       }
@@ -472,7 +610,12 @@ export default function SpikeScreen() {
       if (cancelledRef.current) return
       const durationMs = Math.round(performance.now() - scanStart)
       patchReport((r) => {
-        r.scan = { ok: false, devicesFound: discovered.length, durationMs, errorMessage: errMessage(e) }
+        r.scan = {
+          ok: false,
+          devicesFound: discovered.length,
+          durationMs,
+          errorMessage: errMessage(e),
+        }
       })
       logger.error('spike.scan.error', 'Scan failed', { error: safe(errMessage(e)) })
       safeSetState((s) => ({ ...s, phase: 'idle', message: `Scan failed: ${errMessage(e)}` }))
@@ -483,14 +626,22 @@ export default function SpikeScreen() {
     let picked: AdvertisementSnapshot | null =
       sortedForUi.find((ad) => ad.name != null && CANDIDATE_NAME.test(ad.name)) ?? null
     if (!picked) {
-      safeSetState((s) => ({ ...s, phase: 'awaiting-pick', message: `Pick one of ${sortedForUi.length} devices (named first, then by RSSI).` }))
+      safeSetState((s) => ({
+        ...s,
+        phase: 'awaiting-pick',
+        message: `Pick one of ${sortedForUi.length} devices (named first, then by RSSI).`,
+      }))
       picked = await new Promise<AdvertisementSnapshot | null>((resolve) => {
         pickResolverRef.current = resolve
       })
       pickResolverRef.current = null
       if (cancelledRef.current) return
       if (!picked) {
-        safeSetState((s) => ({ ...s, phase: 'idle', message: 'Cancelled — copy the report to see the 15 nearest devices scanned.' }))
+        safeSetState((s) => ({
+          ...s,
+          phase: 'idle',
+          message: 'Cancelled — copy the report to see the 15 nearest devices scanned.',
+        }))
         return
       }
     }
@@ -506,13 +657,19 @@ export default function SpikeScreen() {
     // than issuing a second connect (which the underlying stack may
     // reject with GATT_CONN_TERMINATE_LOCAL_HOST or, worse, silently
     // rewire and drop subscriptions).
-    safeSetState((s) => ({ ...s, phase: 'connecting', message: `Connecting (timeout ${CONNECT_TIMEOUT_MS / 1000}s)…` }))
+    safeSetState((s) => ({
+      ...s,
+      phase: 'connecting',
+      message: `Connecting (timeout ${CONNECT_TIMEOUT_MS / 1000}s)…`,
+    }))
     const connectStart = performance.now()
     try {
       const slots = getTrackerSlots()
       const alreadyConnected =
-        (slots.left?.deviceId === picked.deviceId && (slots.left.state === 'ready' || slots.left.state === 'streaming')) ||
-        (slots.right?.deviceId === picked.deviceId && (slots.right.state === 'ready' || slots.right.state === 'streaming'))
+        (slots.left?.deviceId === picked.deviceId &&
+          (slots.left.state === 'ready' || slots.left.state === 'streaming')) ||
+        (slots.right?.deviceId === picked.deviceId &&
+          (slots.right.state === 'ready' || slots.right.state === 'streaming'))
       if (alreadyConnected) {
         const durationMs = Math.round(performance.now() - connectStart)
         patchReport((r) => {
@@ -538,7 +695,12 @@ export default function SpikeScreen() {
       if (cancelledRef.current) return
       const durationMs = Math.round(performance.now() - connectStart)
       patchReport((r) => {
-        r.connect = { ok: false, deviceId: picked!.deviceId, durationMs, errorMessage: errMessage(e) }
+        r.connect = {
+          ok: false,
+          deviceId: picked!.deviceId,
+          durationMs,
+          errorMessage: errMessage(e),
+        }
       })
       logger.error('spike.connect.error', 'Connect failed', { error: safe(errMessage(e)) })
       safeSetState((s) => ({ ...s, phase: 'idle', message: `Connect failed: ${errMessage(e)}` }))
@@ -546,7 +708,11 @@ export default function SpikeScreen() {
     }
 
     // Stage 5 — discover.
-    safeSetState((s) => ({ ...s, phase: 'discovering', message: 'Discovering services & characteristics…' }))
+    safeSetState((s) => ({
+      ...s,
+      phase: 'discovering',
+      message: 'Discovering services & characteristics…',
+    }))
     const discoverStart = performance.now()
     let snapshot: GattSnapshot
     try {
@@ -556,10 +722,19 @@ export default function SpikeScreen() {
       const charCount = snapshot.services.reduce((n, s) => n + s.characteristics.length, 0)
       const services = snapshot.services.map((svc) => ({
         uuid: svc.uuid,
-        characteristics: svc.characteristics.map((c) => ({ uuid: c.uuid, properties: c.properties })),
+        characteristics: svc.characteristics.map((c) => ({
+          uuid: c.uuid,
+          properties: c.properties,
+        })),
       }))
       patchReport((r) => {
-        r.discover = { ok: true, serviceCount: snapshot.services.length, characteristicCount: charCount, durationMs, services }
+        r.discover = {
+          ok: true,
+          serviceCount: snapshot.services.length,
+          characteristicCount: charCount,
+          durationMs,
+          services,
+        }
       })
       logger.info('spike.discover.ok', 'Discover finished', {
         durationMs: safe(durationMs),
@@ -570,7 +745,13 @@ export default function SpikeScreen() {
       if (cancelledRef.current) return
       const durationMs = Math.round(performance.now() - discoverStart)
       patchReport((r) => {
-        r.discover = { ok: false, serviceCount: 0, characteristicCount: 0, durationMs, errorMessage: errMessage(e) }
+        r.discover = {
+          ok: false,
+          serviceCount: 0,
+          characteristicCount: 0,
+          durationMs,
+          errorMessage: errMessage(e),
+        }
       })
       logger.error('spike.discover.error', 'Discover failed', { error: safe(errMessage(e)) })
       safeSetState((s) => ({ ...s, phase: 'idle', message: `Discover failed: ${errMessage(e)}` }))
@@ -598,7 +779,9 @@ export default function SpikeScreen() {
       logger.info('spike.report.copied', 'Report copied to clipboard')
       setState((s) => ({ ...s, message: 'Report copied to clipboard.' }))
     } catch (e) {
-      logger.warn('spike.report.copyFailed', 'Clipboard copy failed', { error: safe(errMessage(e)) })
+      logger.warn('spike.report.copyFailed', 'Clipboard copy failed', {
+        error: safe(errMessage(e)),
+      })
       setState((s) => ({ ...s, message: 'Clipboard unavailable — report shown below.' }))
     }
   }, [state.report])
@@ -613,19 +796,26 @@ export default function SpikeScreen() {
     allHandlesRef.current = []
     subscriptionRef.current = null
     for (const h of handles) {
-      try { h.unsubscribe() } catch { /* best-effort */ }
+      try {
+        h.unsubscribe()
+      } catch {
+        /* best-effort */
+      }
     }
     const deviceId = deviceIdRef.current
     deviceIdRef.current = null
     if (deviceId) {
       const facade = getBleManager()
-      facade.disconnect(deviceId).catch(() => { /* best-effort */ })
+      facade.disconnect(deviceId).catch(() => {
+        /* best-effort */
+      })
     }
     setState({ phase: 'idle', message: 'Tap Run spike to begin.', candidates: [], report: null })
     logger.info('spike.reset', 'Spike state reset')
   }, [])
 
-  const isRunning = state.phase !== 'idle' && state.phase !== 'done' && state.phase !== 'awaiting-pick'
+  const isRunning =
+    state.phase !== 'idle' && state.phase !== 'done' && state.phase !== 'awaiting-pick'
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
@@ -637,7 +827,9 @@ export default function SpikeScreen() {
         <Pressable
           style={[styles.btn, isRunning && styles.btnDisabled]}
           disabled={isRunning}
-          onPress={() => { void runSpike() }}
+          onPress={() => {
+            void runSpike()
+          }}
         >
           <Text style={styles.btnText}>Run spike</Text>
         </Pressable>
@@ -647,7 +839,9 @@ export default function SpikeScreen() {
         <Pressable
           style={[styles.btn, !state.report && styles.btnDisabled]}
           disabled={!state.report}
-          onPress={() => { void onCopyReport() }}
+          onPress={() => {
+            void onCopyReport()
+          }}
         >
           <Text style={styles.btnText}>Copy report as JSON</Text>
         </Pressable>
@@ -656,14 +850,22 @@ export default function SpikeScreen() {
       {state.phase === 'awaiting-pick' ? (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Pick a device ({state.candidates.length})</Text>
-          <Text style={styles.sectionHint}>Named devices are listed first, then by RSSI (strongest signal at top). If neither tracker appears, wake them (rub / tap them) — many BLE trackers only advertise briefly after motion.</Text>
+          <Text style={styles.sectionHint}>
+            Named devices are listed first, then by RSSI (strongest signal at top). If neither
+            tracker appears, wake them (rub / tap them) — many BLE trackers only advertise briefly
+            after motion.
+          </Text>
           {state.candidates.map((ad) => (
             <Pressable key={ad.deviceId} style={styles.deviceRow} onPress={() => onPickDevice(ad)}>
-              <Text style={[styles.deviceName, !ad.name && styles.deviceNameFaint]}>{ad.name ?? '(no name)'}</Text>
+              <Text style={[styles.deviceName, !ad.name && styles.deviceNameFaint]}>
+                {ad.name ?? '(no name)'}
+              </Text>
               <Text style={styles.deviceMeta}>
                 {ad.deviceId} · rssi {ad.rssi ?? '?'}
                 {ad.serviceUuids.length ? ` · ${ad.serviceUuids.length} svc` : ''}
-                {ad.manufacturerDataBase64 ? ` · mfg ${base64ToHex(ad.manufacturerDataBase64).slice(0, 16)}` : ''}
+                {ad.manufacturerDataBase64
+                  ? ` · mfg ${base64ToHex(ad.manufacturerDataBase64).slice(0, 16)}`
+                  : ''}
               </Text>
             </Pressable>
           ))}
@@ -673,18 +875,41 @@ export default function SpikeScreen() {
       {state.report ? (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Report</Text>
-          <StageRow label='scan' ok={state.report.scan.ok} durationMs={state.report.scan.durationMs} note={`${state.report.scan.devicesFound} devices`} error={state.report.scan.errorMessage} />
-          <StageRow label='connect' ok={state.report.connect.ok} durationMs={state.report.connect.durationMs} error={state.report.connect.errorMessage} />
-          <StageRow label='discover' ok={state.report.discover.ok} durationMs={state.report.discover.durationMs} note={`${state.report.discover.serviceCount} svcs / ${state.report.discover.characteristicCount} chars`} error={state.report.discover.errorMessage} />
           <StageRow
-            label='subscribe'
+            label="scan"
+            ok={state.report.scan.ok}
+            durationMs={state.report.scan.durationMs}
+            note={`${state.report.scan.devicesFound} devices`}
+            error={state.report.scan.errorMessage}
+          />
+          <StageRow
+            label="connect"
+            ok={state.report.connect.ok}
+            durationMs={state.report.connect.durationMs}
+            error={state.report.connect.errorMessage}
+          />
+          <StageRow
+            label="discover"
+            ok={state.report.discover.ok}
+            durationMs={state.report.discover.durationMs}
+            note={`${state.report.discover.serviceCount} svcs / ${state.report.discover.characteristicCount} chars`}
+            error={state.report.discover.errorMessage}
+          />
+          <StageRow
+            label="subscribe"
             ok={state.report.subscribe.ok}
             durationMs={state.report.subscribe.firstFrameWithinMs ?? 0}
-            note={state.report.subscribe.firstFrameWithinMs !== undefined ? `first frame ${state.report.subscribe.firstFrameWithinMs}ms` : 'no frame'}
+            note={
+              state.report.subscribe.firstFrameWithinMs !== undefined
+                ? `first frame ${state.report.subscribe.firstFrameWithinMs}ms`
+                : 'no frame'
+            }
             error={state.report.subscribe.errorMessage}
           />
           {state.firstFrameHex ? (
-            <Text style={styles.hex} numberOfLines={2}>frame: {state.firstFrameHex}</Text>
+            <Text style={styles.hex} numberOfLines={2}>
+              frame: {state.firstFrameHex}
+            </Text>
           ) : null}
           <Text style={styles.json} selectable>
             {JSON.stringify(state.report, null, 2)}
@@ -695,7 +920,13 @@ export default function SpikeScreen() {
   )
 }
 
-function StageRow(props: { label: string; ok: boolean; durationMs: number; note?: string; error?: string }) {
+function StageRow(props: {
+  label: string
+  ok: boolean
+  durationMs: number
+  note?: string
+  error?: string
+}) {
   return (
     <View style={styles.stageRow}>
       <Text style={[styles.stageLabel, props.ok ? styles.pass : styles.fail]}>
@@ -716,7 +947,12 @@ const styles = StyleSheet.create({
   subtitle: { color: colors.textSecondary, marginTop: 4 },
   phase: { color: colors.textMuted, marginTop: 2, fontFamily: 'monospace' },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
-  btn: { backgroundColor: colors.accent, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8 },
+  btn: {
+    backgroundColor: colors.accent,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
   btnDisabled: { opacity: 0.4 },
   btnText: { color: colors.textPrimary, fontWeight: '600' },
   section: { marginTop: 20 },

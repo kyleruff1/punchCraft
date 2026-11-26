@@ -58,20 +58,23 @@ describe('avatarFrameAt — one flip per node', () => {
     expect(avatarFrameAt(0, windowMs)).toBe('step1')
   })
 
-  it.each(windows)('window %sms strikes, retracts for a flip-frame, then parks on guard', (windowMs) => {
-    // strike [0, strikeEnd) -> retract [strikeEnd, +flip) -> GUARD, once.
-    // "Guard is designed to be parked on" (Kyle): every combo ends via
-    // retract->guard with no last-punch special case; rests, breaths and
-    // gaps inherit the parked guard for free.
-    const flip = flipFrameMs(windowMs)
-    const strikeEnd = Math.max(MIN_FRAME_MS, windowMs - flip)
-    expect(avatarFrameAt(strikeEnd - 1, windowMs)).toBe('step1')
-    expect(avatarFrameAt(strikeEnd, windowMs)).toBe('step2')
-    expect(avatarFrameAt(strikeEnd + flip - 1, windowMs)).toBe('step2')
-    for (const t of [strikeEnd + flip, strikeEnd + flip + 500, 60_000]) {
-      expect(avatarFrameAt(t, windowMs)).toBe('guard')
-    }
-  })
+  it.each(windows)(
+    'window %sms strikes, retracts for a flip-frame, then parks on guard',
+    (windowMs) => {
+      // strike [0, strikeEnd) -> retract [strikeEnd, +flip) -> GUARD, once.
+      // "Guard is designed to be parked on" (Kyle): every combo ends via
+      // retract->guard with no last-punch special case; rests, breaths and
+      // gaps inherit the parked guard for free.
+      const flip = flipFrameMs(windowMs)
+      const strikeEnd = Math.max(MIN_FRAME_MS, windowMs - flip)
+      expect(avatarFrameAt(strikeEnd - 1, windowMs)).toBe('step1')
+      expect(avatarFrameAt(strikeEnd, windowMs)).toBe('step2')
+      expect(avatarFrameAt(strikeEnd + flip - 1, windowMs)).toBe('step2')
+      for (const t of [strikeEnd + flip, strikeEnd + flip + 500, 60_000]) {
+        expect(avatarFrameAt(t, windowMs)).toBe('guard')
+      }
+    },
+  )
 
   it.each(windows)('window %sms shows both frames across the cycle', (windowMs) => {
     const seen = new Set<string>()
@@ -120,13 +123,16 @@ describe('avatarFrameAt — the pump lead (repeated same punch, Kyle 2026-09-04)
     expect(avatarFrameAt(flip, windowMs, false, true)).toBe('step1')
   })
 
-  it.each(windows)('window %sms keeps the strike floored and retract-tails to guard', (windowMs) => {
-    const flip = flipFrameMs(windowMs)
-    const strikeEnd = Math.max(flip + MIN_FRAME_MS, windowMs - flip)
-    expect(avatarFrameAt(strikeEnd - 1, windowMs, false, true)).toBe('step1')
-    expect(avatarFrameAt(strikeEnd, windowMs, false, true)).toBe('step2')
-    expect(avatarFrameAt(strikeEnd + flip, windowMs, false, true)).toBe('guard')
-  })
+  it.each(windows)(
+    'window %sms keeps the strike floored and retract-tails to guard',
+    (windowMs) => {
+      const flip = flipFrameMs(windowMs)
+      const strikeEnd = Math.max(flip + MIN_FRAME_MS, windowMs - flip)
+      expect(avatarFrameAt(strikeEnd - 1, windowMs, false, true)).toBe('step1')
+      expect(avatarFrameAt(strikeEnd, windowMs, false, true)).toBe('step2')
+      expect(avatarFrameAt(strikeEnd + flip, windowMs, false, true)).toBe('guard')
+    },
+  )
 
   it('pump=false stays byte-identical to the plain cycle — every existing call site untouched', () => {
     for (const windowMs of [0, 50, 120, 300, 600, 1500]) {

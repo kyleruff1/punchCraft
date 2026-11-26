@@ -9,12 +9,14 @@ import { compileRoundRhythmMap } from '../../programs/RhythmMap'
 import { coverageAudit, silenceAudit } from '../../programs/mapValidation'
 import { generateWorkout } from '../generateWorkout'
 import { defaultRecipe, type WorkoutRecipe } from '../WorkoutRecipe'
-import { scoredRounds, validateGeneratedWorkout } from '../GeneratedWorkout'
+import { scoredRounds, type GeneratedWorkout } from '../GeneratedWorkout'
 import { expandTimeline } from '../../programs/CueTimeline'
 import { punchTokens } from '../WorkoutTokens'
 import { CADENCE_PROFILES } from '../cadence'
-import { MANDATORY_SAME_MOVE_MS } from '../setupCallouts'
-import { roundSpanMs } from '../roundFill'
+import { comboSpecFor, roundSpanMs } from '../roundFill'
+import { layBlocks, type BlockSpec } from '../samples/authoring'
+import type { ProgramRound } from '../WorkoutTokens'
+import { CEREMONIES, contractViolations, grid, sweepViolations } from './helpers/generatorContract'
 
 const durationFor = (combination: string): number | undefined =>
   combination.includes('-') ? 1200 : undefined
@@ -36,7 +38,11 @@ describe.each(SEEDS)('D26 fill properties (seed %s)', (seed) => {
       const coverage = coverageAudit(round.blocks, round.workDurationMs)
       expect(coverage.ok).toBe(true)
 
-      const timelineRound = timeline.find((t) => t.workDurationMs === round.workDurationMs && t.roundIndex === workout.schedule.indexOf(round))
+      const timelineRound = timeline.find(
+        (t) =>
+          t.workDurationMs === round.workDurationMs &&
+          t.roundIndex === workout.schedule.indexOf(round),
+      )
       if (!timelineRound) continue
       const map = compileRoundRhythmMap(timelineRound, {
         cadence: workout.recipe.cadenceProfile,
@@ -64,15 +70,23 @@ describe.each(SEEDS)('D26 fill properties (seed %s)', (seed) => {
 })
 
 // ---------------------------------------------------------------------------
-// D26 at any punch goal (generator 1.3.0)
+// The generator contract, wherever the recipe goes (generator 1.3.1)
 //
 // The suite above samples ONE goal — the default, at twenty minutes — which
-// is why a fill that under-ran at low goals passed it for as long as it did.
-// A repeat phase whose punch share asked for few reps kept those few even
-// when its gap had clamped at the ceiling, so the phase spanned a fraction of
-// its time share; a twenty-minute goal kept for sixty minutes ran every round
-// out 41-61 s before its bell. Before the fix 775 of the 1,152 cells sampled
-// below (with a fourth cadence and a second option set) failed this audit.
+// is why three different ways of stopping a round early passed it for as
+// long as they did:
+//
+// - a low punch goal: a repeat phase kept its few reps even when its gap had
+//   clamped at the ceiling, so a twenty-minute goal kept for sixty minutes
+//   ran every round out 41-61 s early. 775 of 1,152 sampled cells failed.
+// - sprint tempo: the repair pass was bounded by a COUNT of passes, each
+//   worth under a second, and ran out 5-7 s early on 6 of 144 sprint cells.
+// - low variety: the "settle in" announcement was paid for by dropping whole
+//   trailing blocks, 15-25 s at a time — and no sweep ran that pass at all,
+//   because every one generated without options.
+//
+// So the contract lives in one helper and every grid here runs it under
+// both option sets. See `helpers/generatorContract.ts`.
 // ---------------------------------------------------------------------------
 
 const DURATIONS = [20, 30, 40, 60] as const
@@ -80,140 +94,37 @@ const GOALS = [50, 100, 150, 200, 300, 450, 600, 900, 1_200, 2_000, 3_000, 6_000
 const GOAL_SEEDS = ['a', 'b', 'c']
 const ALL_CADENCES = Object.keys(CADENCE_PROFILES) as Array<WorkoutRecipe['cadenceProfile']>
 
-describe.each(DURATIONS)('D26 at any goal — %i minutes', (durationMinutes) => {
-  it.each(GOALS)('covers every scored round to the bell at a goal of %i', (totalPunchGoal) => {
-    // Every cadence, sprint included. Sprint was left out of this sweep
-    // through generator 1.3.0 and pinned separately as a known residual: the
-    // repair pass was bounded by a COUNT of passes (24 two-rep, then 6
-    // single), and at sprint tempo a pass adds well under a second, so around
-    // 250 punches a round the count ran out 5-7 s before the bell on 6 of the
-    // 144 sprint cells. Lifting either count closed all six; the pass is
-    // bounded by progress toward the bell now (1.3.1).
-    for (const cadenceProfile of ALL_CADENCES) {
-      for (const seed of GOAL_SEEDS) {
-        const workout = make({ seed, durationMinutes, totalPunchGoal, cadenceProfile })
-        for (const round of scoredRounds(workout.schedule)) {
-          const coverage = coverageAudit(round.blocks, round.workDurationMs)
-          // Named in the failure, so a regression says which round and by how much.
-          expect({
-            cadenceProfile,
-            seed,
-            round: round.id,
-            shortByMs: coverage.ok ? 0 : round.workDurationMs - coverage.spanMs,
-          }).toEqual({ cadenceProfile, seed, round: round.id, shortByMs: 0 })
-        }
-      }
-    }
+describe.each(DURATIONS)('the contract at any goal — %i minutes', (durationMinutes) => {
+  it.each(GOALS)('holds at a goal of %i, at every cadence and option set', (totalPunchGoal) => {
+    expect(
+      sweepViolations(
+        grid({
+          durationMinutes: [durationMinutes],
+          totalPunchGoal: [totalPunchGoal],
+          cadenceProfile: ALL_CADENCES,
+          seed: GOAL_SEEDS,
+        }),
+      ),
+    ).toEqual([])
   })
 })
 
-describe('the repair pass never runs a round past its bell', () => {
-  // The other half of re-bounding it: a pass that no longer stops at a count
-  // must still stop at the bell. `validateGeneratedWorkout` rejects a block
-  // that overruns its round, so a sweep with no errors is the proof.
-  it.each(ALL_CADENCES)('%s: every generated workout still validates', (cadenceProfile) => {
-    for (const durationMinutes of DURATIONS) {
-      for (const totalPunchGoal of GOALS) {
-        for (const seed of GOAL_SEEDS) {
-          const workout = make({ seed, durationMinutes, totalPunchGoal, cadenceProfile })
-          expect({
-            durationMinutes,
-            totalPunchGoal,
-            seed,
-            errors: validateGeneratedWorkout(workout).map((e) => e.code),
-          }).toEqual({ durationMinutes, totalPunchGoal, seed, errors: [] })
-        }
-      }
-    }
-  })
-})
-
-// ---------------------------------------------------------------------------
-// D26 with set ceremonies priced in (generator 1.3.1)
-//
-// Every sweep above generates WITHOUT `setupCallouts`, so none of them runs
-// the pass that announces a long same-move stretch — the app always does.
-// That pass adds a 6-7 s "settle in" reservation after the round has been
-// filled to the bell, and used to pay for it by dropping whole trailing
-// blocks with nothing refilling the round: on one measured round a 6.6 s
-// reservation cost a 2.1 s block and then a 25.7 s one, and the round ended
-// 15 s early. It needs a long run of one combination, so it showed up where
-// variety is low — a combination cap of 2 is enough, with every punch enabled.
-// ---------------------------------------------------------------------------
-
-/** Every ceremony priced at a typical measured length. */
-const CEREMONIES = { setupCallouts: { reserveMsFor: () => 6_500 } }
 const LOW_VARIETY: Array<[string, Partial<WorkoutRecipe>]> = [
-  ['the default recipe', {}],
   ['combinations capped at 2', { maximumComboPunches: 2 }],
+  ['combinations capped at 3', { maximumComboPunches: 3 }],
   ['jab only', { enabledPunches: [1] }],
   ['jab and cross, capped at 2', { enabledPunches: [1, 2], maximumComboPunches: 2 }],
+  ['jab, cross and hook', { enabledPunches: [1, 2, 3] }],
 ]
-const CEREMONY_SEEDS = ['a', 'b', 'x']
 
-const notationOf = (block: { tokens: ReadonlyArray<{ kind: string }> }): string =>
-  block.tokens
-    .map((t) => {
-      const token = t as { kind: string; number?: number; body?: boolean }
-      return token.kind === 'punch' ? `${token.number}${token.body ? 'b' : ''}` : token.kind
+describe.each(LOW_VARIETY)('the contract with little to work with — %s', (_label, over) => {
+  it('holds at every cadence and option set', () => {
+    const cells = grid({
+      cadenceProfile: ALL_CADENCES,
+      durationMinutes: [20, 40] as const,
+      seed: ['a', 'b', 'x'],
     })
-    .join('-')
-
-describe.each(LOW_VARIETY)('with ceremonies priced in — %s', (_label, over) => {
-  const workouts = (): Array<ReturnType<typeof generateWorkout>> =>
-    ALL_CADENCES.flatMap((cadenceProfile) =>
-      ([20, 40] as const).flatMap((durationMinutes) =>
-        CEREMONY_SEEDS.map((seed) =>
-          generateWorkout(
-            { ...defaultRecipe(), ...over, seed, durationMinutes, cadenceProfile },
-            CEREMONIES,
-          ),
-        ),
-      ),
-    )
-
-  it('covers every scored round to the bell', () => {
-    for (const workout of workouts()) {
-      for (const round of scoredRounds(workout.schedule)) {
-        const coverage = coverageAudit(round.blocks, round.workDurationMs)
-        const at = `${workout.recipe.cadenceProfile}/${workout.recipe.durationMinutes}/${workout.recipe.seed}/${round.id}`
-        expect({ at, shortByMs: coverage.ok ? 0 : Math.round(round.workDurationMs - coverage.spanMs) }).toEqual({ at, shortByMs: 0 })
-      }
-    }
-  })
-
-  it('never runs a round past its bell', () => {
-    for (const workout of workouts()) {
-      expect(validateGeneratedWorkout(workout).map((e) => e.code)).toEqual([])
-    }
-  })
-
-  it('announces every same-move stretch longer than a minute', () => {
-    for (const workout of workouts()) {
-      for (const round of scoredRounds(workout.schedule)) {
-        const blocks = round.blocks
-        let start = 0
-        while (start < blocks.length) {
-          const first = blocks[start]!
-          let end = start + 1
-          while (
-            end < blocks.length &&
-            first.kind === 'repeated-combo' &&
-            blocks[end]!.kind === 'repeated-combo' &&
-            notationOf(blocks[end]!) === notationOf(first)
-          ) {
-            end += 1
-          }
-          const last = blocks[end - 1]!
-          const runMs = last.startOffsetMs + last.durationMs - first.startOffsetMs
-          if (runMs > MANDATORY_SAME_MOVE_MS) {
-            const at = `${workout.recipe.cadenceProfile}/${workout.recipe.seed}/${round.id}/${first.id}`
-            expect({ at, announced: first.setupCallout !== undefined }).toEqual({ at, announced: true })
-          }
-          start = end
-        }
-      }
-    }
+    expect(sweepViolations(cells.map((cell) => ({ ...over, ...cell })))).toEqual([])
   })
 })
 
@@ -247,5 +158,68 @@ describe('after paying for an announcement the round is topped back up', () => {
       }
     }
     expect(worst.tailMs).toBeLessThanOrEqual(2_500)
+  })
+})
+
+describe('the contract helper reports what it is meant to', () => {
+  // A sweep that returns [] proves something only if the helper would have
+  // said otherwise. Three hand-laid rounds, one per rule.
+  const BPM = 100
+  const roundOf = (workDurationMs: number, specs: BlockSpec[]): ProgramRound => ({
+    id: 'r1',
+    order: 1,
+    kind: 'round',
+    countsTowardGoal: true,
+    theme: 'Hand-laid',
+    workDurationMs,
+    restAfterMs: 0,
+    targetPunches: 0,
+    blocks: layBlocks(specs, BPM),
+  })
+  const workoutOf = (round: ProgramRound): GeneratedWorkout => ({
+    id: 'hand-laid',
+    recipe: defaultRecipe(),
+    schedule: [round],
+    roundPunchTargets: [0],
+    expectedTechniqueDistribution: {},
+    estimatedActivePunchesPerMinute: 60,
+    warnings: [],
+  })
+  const spanOf = (specs: BlockSpec[]): number => roundSpanMs(layBlocks(specs, BPM))
+
+  it('says nothing about a round that is full, valid and announced', () => {
+    const specs = [comboSpecFor('a', '1-2', 10, 1), comboSpecFor('b', '1-2-3', 10, 1)]
+    const workout = workoutOf(roundOf(spanOf(specs) + 1_000, specs))
+    expect(contractViolations(workout, CEREMONIES)).toEqual([])
+  })
+
+  it('reports a round that stops before its bell', () => {
+    const specs = [comboSpecFor('a', '1-2', 10, 1)]
+    const workout = workoutOf(roundOf(spanOf(specs) + 20_000, specs))
+    expect(contractViolations(workout)).toEqual([
+      expect.stringMatching(/^covered: r1 stops 20000 ms before its bell$/),
+    ])
+  })
+
+  it('reports a block that runs past the bell', () => {
+    const specs = [comboSpecFor('a', '1-2', 10, 1)]
+    const workout = workoutOf(roundOf(spanOf(specs) - 3_000, specs))
+    expect(contractViolations(workout)).toEqual([
+      expect.stringMatching(/^valid: block-overruns-round/),
+    ])
+  })
+
+  it('reports a long same-move stretch with no announcement, only when ceremonies are on', () => {
+    // Two blocks of one combination, back to back, over a minute between them.
+    const specs = [comboSpecFor('a', '1-2', 40, 1), comboSpecFor('b', '1-2', 40, 1)]
+    expect(spanOf(specs)).toBeGreaterThan(60_000)
+    const workout = workoutOf(roundOf(spanOf(specs) + 1_000, specs))
+
+    expect(contractViolations(workout, CEREMONIES)).toEqual([
+      expect.stringMatching(/^announced: r1\/a is \d+ s of 1-2 with no announcement$/),
+    ])
+    // Without ceremonies the announcement pass does not run, so there is no
+    // rule to break.
+    expect(contractViolations(workout)).toEqual([])
   })
 })

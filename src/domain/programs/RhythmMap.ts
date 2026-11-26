@@ -89,9 +89,7 @@ export interface PhasePayload {
  * clip, or a recitation of the set's notation replayed from the phrase
  * library at technical cadence.
  */
-export type SetCalloutPayload =
-  | { asset: string }
-  | { recite: string; cadence: 'technical' }
+export type SetCalloutPayload = { asset: string } | { recite: string; cadence: 'technical' }
 
 /**
  * Block-level cornerman instruction (WS4 / A23). Compiled on the FIRST
@@ -147,20 +145,23 @@ export const ROUND_OPEN_QUIET_MS = 1_500
 export const CLOSER_AT_REMAINING_MS = 30_000
 export const CLOSER_SEARCH_BACK_MS = 4_000
 export const CLOSER_ROTATION: readonly string[] = [
-  'co-closer-01', 'co-closer-02', 'co-closer-03', 'co-closer-04',
-  'co-closer-05', 'co-closer-06', 'co-closer-07', 'co-closer-08',
-  'co-closer-09', 'co-closer-10', 'co-closer-11', 'co-closer-12',
+  'co-closer-01',
+  'co-closer-02',
+  'co-closer-03',
+  'co-closer-04',
+  'co-closer-05',
+  'co-closer-06',
+  'co-closer-07',
+  'co-closer-08',
+  'co-closer-09',
+  'co-closer-10',
+  'co-closer-11',
+  'co-closer-12',
   'co-closer-13',
 ]
 
 export interface EncouragementPayload {
-  asset:
-    | 'double-up'
-    | 'put-it-on-em'
-    | 'touch-and-go'
-    | 'breathe'
-    | 'hands-up'
-    | 'power-strikes'
+  asset: 'double-up' | 'put-it-on-em' | 'touch-and-go' | 'breathe' | 'hands-up' | 'power-strikes'
 }
 
 /**
@@ -320,10 +321,7 @@ export interface CompileOptions {
 }
 
 /** Compile one round's audio schedule from its expanded timeline. */
-export function compileRoundRhythmMap(
-  round: RoundTimeline,
-  opts: CompileOptions,
-): RoundRhythmMap {
+export function compileRoundRhythmMap(round: RoundTimeline, opts: CompileOptions): RoundRhythmMap {
   const leadTimes = opts.leadTimes ?? { ...DEFAULT_ANNOUNCE_LEAD_TIMES }
   const events: RhythmEvent[] = []
   // The repeat-thinning window: the phrase currently "on air", so a
@@ -395,10 +393,12 @@ export function compileRoundRhythmMap(
       // via phraseTokenTimesMs. Without wordMarks the old placement holds
       // and ring cadence stays on the beat grid.
       const marks = opts.wordMarksFor?.(combination, cadence)
-      const railMarks = marks && marks.length === cue.tokens.length &&
+      const railMarks =
+        marks &&
+        marks.length === cue.tokens.length &&
         marks.every((m) => typeof m.endOffsetMs === 'number')
-        ? marks
-        : null
+          ? marks
+          : null
 
       const finishBy = cue.scheduledStartMs - leadTimes.readyToneMs
       const phraseShift = opts.phraseShiftFor?.(combination, cadence) ?? 0
@@ -438,7 +438,6 @@ export function compileRoundRhythmMap(
           cancelsWith: 'cue-end',
         })
       }
-
     }
 
     // A5 (#259): the count-scored refire loop USED to be nested inside
@@ -489,9 +488,7 @@ export function compileRoundRhythmMap(
       if (sentenceMs !== undefined) {
         const prev = round.cues[cueIndex - 1]
         const earliest =
-          prev === undefined
-            ? ROUND_OPEN_QUIET_MS
-            : prev.scheduledEndMs + SET_CALLOUT_MIN_CLEAR_MS
+          prev === undefined ? ROUND_OPEN_QUIET_MS : prev.scheduledEndMs + SET_CALLOUT_MIN_CLEAR_MS
         const anchor = callStartAt - SET_CALLOUT_QUIET_MS
         const reciteMs =
           ceremony.notation === undefined
@@ -553,9 +550,7 @@ export function compileRoundRhythmMap(
       cue.instruction !== undefined &&
       opts.instructionClipFor !== undefined
     ) {
-      const hasCeremony = events.some(
-        (ev) => ev.cueId === cue.id && ev.kind === 'set-callout',
-      )
+      const hasCeremony = events.some((ev) => ev.cueId === cue.id && ev.kind === 'set-callout')
       if (!hasCeremony) {
         const clip = opts.instructionClipFor(cue.instruction)
         if (clip !== undefined) {
@@ -675,8 +670,8 @@ export function compileRoundRhythmMap(
               const payload = e.payload as SetCalloutPayload
               lengthMs =
                 'recite' in payload
-                  ? opts.durationFor(payload.recite, payload.cadence) ?? 2_000
-                  : opts.setupCalloutDurationFor?.(payload.asset) ?? 2_500
+                  ? (opts.durationFor(payload.recite, payload.cadence) ?? 2_000)
+                  : (opts.setupCalloutDurationFor?.(payload.asset) ?? 2_500)
             } else if (e.kind === 'call' || e.kind === 'refire') {
               const payload = e.payload as CallPayload
               lengthMs = opts.durationFor(payload.combination, payload.cadence) ?? 1_500
@@ -722,8 +717,8 @@ export function compileRoundRhythmMap(
           const payload = e.payload as SetCalloutPayload
           const lengthMs =
             'recite' in payload
-              ? opts.durationFor(payload.recite, payload.cadence) ?? 2_000
-              : opts.setupCalloutDurationFor?.(payload.asset) ?? 2_500
+              ? (opts.durationFor(payload.recite, payload.cadence) ?? 2_000)
+              : (opts.setupCalloutDurationFor?.(payload.asset) ?? 2_500)
           return [e.atMs, e.atMs + lengthMs]
         }
         if (e.kind === 'call' || e.kind === 'refire') {

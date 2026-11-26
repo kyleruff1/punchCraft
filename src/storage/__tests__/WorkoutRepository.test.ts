@@ -150,7 +150,11 @@ describe('generated workouts', () => {
     const scoreWorkout = { ...unmarked, id: 'score-path-plan' }
     sessions.create({ id: 'ses-click', mode: 'puncheokie' })
     sessions.create({ id: 'ses-score', mode: 'puncheokie' })
-    repo.saveGeneratedWorkout(threeRoundFundamentals, plannedStream(threeRoundFundamentals), 'ses-click')
+    repo.saveGeneratedWorkout(
+      threeRoundFundamentals,
+      plannedStream(threeRoundFundamentals),
+      'ses-click',
+    )
     repo.saveGeneratedWorkout(scoreWorkout, plannedStream(scoreWorkout), 'ses-score')
 
     expect(threeRoundFundamentals.coachPath).toBe('click-script')
@@ -162,11 +166,22 @@ describe('generated workouts', () => {
 
   it('reads a plan saved before the coach path existed as unmarked', () => {
     sessions.create({ id: 'ses-old', mode: 'puncheokie' })
-    repo.saveGeneratedWorkout(threeRoundFundamentals, plannedStream(threeRoundFundamentals), 'ses-old')
-    const stored = db.query<{ blocks_json: string }>('SELECT blocks_json FROM generated_workouts')[0]
-    const { coachPath: saved, ...legacy } = JSON.parse(stored?.blocks_json ?? '{}') as Record<string, unknown>
+    repo.saveGeneratedWorkout(
+      threeRoundFundamentals,
+      plannedStream(threeRoundFundamentals),
+      'ses-old',
+    )
+    const stored = db.query<{ blocks_json: string }>(
+      'SELECT blocks_json FROM generated_workouts',
+    )[0]
+    const { coachPath: saved, ...legacy } = JSON.parse(stored?.blocks_json ?? '{}') as Record<
+      string,
+      unknown
+    >
     expect(saved).toBe('click-script')
-    db.prepareSync('UPDATE generated_workouts SET blocks_json = ?').executeSync([JSON.stringify(legacy)])
+    db.prepareSync('UPDATE generated_workouts SET blocks_json = ?').executeSync([
+      JSON.stringify(legacy),
+    ])
 
     const found = repo.getWorkoutBySession('ses-old')?.workout
     expect(found && 'coachPath' in found).toBe(false)
@@ -238,7 +253,11 @@ describe('generated workouts', () => {
 
   it('replaces the realized stream after adaptation and refuses to blank it', () => {
     sessions.create({ id: 'ses-1', mode: 'puncheokie' })
-    repo.saveGeneratedWorkout(threeRoundFundamentals, plannedStream(threeRoundFundamentals), 'ses-1')
+    repo.saveGeneratedWorkout(
+      threeRoundFundamentals,
+      plannedStream(threeRoundFundamentals),
+      'ses-1',
+    )
 
     const shortened: RealizedTokenStream = [{ blockId: 'blk-1', tokens: [] }]
     repo.updateRealizedTokens('ses-1', shortened)
@@ -263,7 +282,10 @@ describe('generated workouts', () => {
 
     const second = sessions.create({ id: 'ses-2', mode: 'puncheokie' })
     const shortened: RealizedTokenStream = [
-      { blockId: 'blk-1', tokens: threeRoundFundamentals.schedule[0]!.blocks[0]!.tokens.slice(0, 1) },
+      {
+        blockId: 'blk-1',
+        tokens: threeRoundFundamentals.schedule[0]!.blocks[0]!.tokens.slice(0, 1),
+      },
     ]
     expect(() =>
       repo.saveGeneratedWorkout(threeRoundFundamentals, shortened, second.id),
@@ -283,15 +305,20 @@ describe('generated workouts', () => {
       ])[0]!.n,
     ).toBe(1)
     expect(
-      db.query<{ n: number }>('SELECT COUNT(*) as n FROM workout_runs WHERE generated_workout_id = ?', [
-        threeRoundFundamentals.id,
-      ])[0]!.n,
+      db.query<{ n: number }>(
+        'SELECT COUNT(*) as n FROM workout_runs WHERE generated_workout_id = ?',
+        [threeRoundFundamentals.id],
+      )[0]!.n,
     ).toBe(2)
   })
 
   it('raises a typed error rather than returning null when blocks_json is corrupt', () => {
     sessions.create({ id: 'ses-1', mode: 'puncheokie' })
-    repo.saveGeneratedWorkout(threeRoundFundamentals, plannedStream(threeRoundFundamentals), 'ses-1')
+    repo.saveGeneratedWorkout(
+      threeRoundFundamentals,
+      plannedStream(threeRoundFundamentals),
+      'ses-1',
+    )
     db.execSync(`UPDATE generated_workouts SET blocks_json = '{"nope": 1}'`)
 
     try {
@@ -309,7 +336,11 @@ describe('generated workouts', () => {
 describe('adaptations', () => {
   beforeEach(() => {
     sessions.create({ id: 'ses-1', mode: 'puncheokie' })
-    repo.saveGeneratedWorkout(threeRoundFundamentals, plannedStream(threeRoundFundamentals), 'ses-1')
+    repo.saveGeneratedWorkout(
+      threeRoundFundamentals,
+      plannedStream(threeRoundFundamentals),
+      'ses-1',
+    )
   })
 
   it('stores decided_at_monotonic_ms exactly as given — never a wall clock', () => {
@@ -373,7 +404,11 @@ describe('adaptations', () => {
 describe('cue results', () => {
   beforeEach(() => {
     sessions.create({ id: 'ses-1', mode: 'puncheokie' })
-    repo.saveGeneratedWorkout(threeRoundFundamentals, plannedStream(threeRoundFundamentals), 'ses-1')
+    repo.saveGeneratedWorkout(
+      threeRoundFundamentals,
+      plannedStream(threeRoundFundamentals),
+      'ses-1',
+    )
   })
 
   it('writes a batch and reads it back with velocity fields untouched', () => {

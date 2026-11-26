@@ -241,8 +241,12 @@ describe('PlaybackObserver', () => {
   })
 
   it('falls back to polling only when a player has no addListener', () => {
-    const h = rig();
-    const p = { currentTime: 0, playing: false, volume: 1 } as { currentTime: number; playing: boolean; volume: number }
+    const h = rig()
+    const p = { currentTime: 0, playing: false, volume: 1 } as {
+      currentTime: number
+      playing: boolean
+      volume: number
+    }
     h.observer.watch(p, meta('j'))
     expect(h.timers.length).toBeGreaterThanOrEqual(1) // the poll is scheduled
     h.advance(25)

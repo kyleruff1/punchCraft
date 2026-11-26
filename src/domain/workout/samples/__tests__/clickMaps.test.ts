@@ -5,7 +5,13 @@
  * measures/rep must sum EXACTLY to the round's budget at its BPM. A map
  * edit that breaks a denominator fails here, not on a drive.
  */
-import { CLICK_MAPS, breathBeats, clickMapsSelfCheck, clickSpecs, measuresPerRep } from '../clickMaps'
+import {
+  CLICK_MAPS,
+  breathBeats,
+  clickMapsSelfCheck,
+  clickSpecs,
+  measuresPerRep,
+} from '../clickMaps'
 import { allClickMaps } from '../allClickMaps'
 import { QUICK_WORKOUT_ORDER } from '../quickWorkouts'
 

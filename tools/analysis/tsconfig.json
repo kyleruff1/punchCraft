@@ -1,0 +1,15 @@
+{
+  "//": "Type-checks the verifier and guard scripts. They are plain .mjs and the root tsconfig only includes .ts, so until 2026-11-25 nothing looked at them — and every QA verdict rests on them. Deliberately not strict: this catches wrong names, wrong arities and wrong shapes in 5,700 lines of untyped JavaScript without demanding annotations for all of it. Run with `npm run typecheck:tools`.",
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "strict": false,
+    "noImplicitAny": false,
+    "noUncheckedIndexedAccess": false,
+    "types": ["node"]
+  },
+  "include": ["./*.mjs", "../guards/*.mjs", "../dev/*.mjs"],
+  "exclude": []
+}

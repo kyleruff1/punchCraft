@@ -114,7 +114,10 @@ export const useWorkoutStore = create<WorkoutStoreState>((set) => ({
   },
 
   startNewBuild: () => {
-    set((prev) => ({ ...derive({ ...prev.recipe, seed: freshSeed() }), selectedSampleKey: undefined }))
+    set((prev) => ({
+      ...derive({ ...prev.recipe, seed: freshSeed() }),
+      selectedSampleKey: undefined,
+    }))
   },
 
   setAdvancedOpen: (open) => {

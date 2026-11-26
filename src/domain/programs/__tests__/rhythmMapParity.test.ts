@@ -24,6 +24,7 @@ import { defaultRecipe } from '../../workout/WorkoutRecipe'
 import { threeRoundFundamentals } from '../../workout/samples/threeRoundFundamentals'
 import { getSampleWorkout } from '../../workout/samples'
 import { createFakeClock } from '@testing/fakeClock'
+import { asWorkElapsedMs } from '@domain/time/clockDomains'
 
 const PHRASE_MS = 1200
 const WORD_MS = 400
@@ -52,8 +53,7 @@ function driveRound(
   // subtraction puts a recording on the work clock. It used to be skipped,
   // which only worked while the fake clock happened to start at zero.
   const roundStartedAtMs = clock.now()
-  const onWorkClock = (atMs: number | undefined): number =>
-    (atMs ?? clock.now()) - roundStartedAtMs
+  const onWorkClock = (atMs: number | undefined): number => (atMs ?? clock.now()) - roundStartedAtMs
 
   const output: VoiceOutputPort = {
     playAsset: (asset, atMs) => {
@@ -96,7 +96,7 @@ function driveRound(
     at += 50
     clock.advance(50)
     engine.tick(at)
-    if (mode === 'map') announcer.onTick(at, clock.now())
+    if (mode === 'map') announcer.onTick(asWorkElapsedMs(at), clock.now())
   }
 
   return { round, recorded, map }
@@ -115,7 +115,11 @@ function describeParity(name: string, workout: Parameters<typeof expandTimeline>
       const thinned: Recorded[] = []
       let lastKept: { detail: string; end: number } | null = null
       for (const r of phraseRecords) {
-        if (lastKept && lastKept.detail === r.detail && r.at < lastKept.end + REANNOUNCE_MIN_CLEAR_MS)
+        if (
+          lastKept &&
+          lastKept.detail === r.detail &&
+          r.at < lastKept.end + REANNOUNCE_MIN_CLEAR_MS
+        )
           continue
         lastKept = { detail: r.detail, end: r.at + PHRASE_MS }
         thinned.push(r)
@@ -156,7 +160,11 @@ function describeParity(name: string, workout: Parameters<typeof expandTimeline>
       // sit inside [previewAt, scheduledStart] of the owning cue, and every
       // per-word cue in the map must have produced a live call.
       const perWordCues = map.events.filter(
-        (e) => e.kind === 'call' && e.payload !== null && 'mode' in e.payload && e.payload.mode === 'per-word',
+        (e) =>
+          e.kind === 'call' &&
+          e.payload !== null &&
+          'mode' in e.payload &&
+          e.payload.mode === 'per-word',
       )
       const livePerWord = recorded.filter((r) => r.kind === 'per-word')
       // The compiled map applies repeat-thinning to per-word calls (crowded

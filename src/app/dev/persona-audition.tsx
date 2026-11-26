@@ -22,7 +22,7 @@
  */
 import React, { useCallback, useMemo, useRef, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
-import { Stack , useFocusEffect } from 'expo-router'
+import { Stack, useFocusEffect } from 'expo-router'
 import { releaseAudioPlayer } from '@audio/nativeAudioTeardown'
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio'
 
@@ -151,10 +151,7 @@ export default function PersonaAuditionScreen(): React.JSX.Element {
     void setAudioModeAsync({ playsInSilentMode: true, interruptionMode: 'mixWithOthers' })
   }, [])
 
-  const sample = useMemo(
-    () => selectionFor(PHRASES[0] ?? '', VARIANTS[0] ?? ''),
-    [selectionFor],
-  )
+  const sample = useMemo(() => selectionFor(PHRASES[0] ?? '', VARIANTS[0] ?? ''), [selectionFor])
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.container}>

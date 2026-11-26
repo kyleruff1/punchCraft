@@ -75,7 +75,9 @@ export function PickerRow<T>({
           {caption ? <Text style={styles.caption}>{caption}</Text> : null}
         </View>
         <View style={styles.headerValueGroup}>
-          <Text style={styles.value} testID={`${testID ?? `picker-${id}`}-value`}>{preview}</Text>
+          <Text style={styles.value} testID={`${testID ?? `picker-${id}`}-value`}>
+            {preview}
+          </Text>
           <Text style={[styles.chevron, isOpen && styles.chevronOpen]}>{isOpen ? '▴' : '▾'}</Text>
         </View>
       </Pressable>

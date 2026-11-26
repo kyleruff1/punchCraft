@@ -66,7 +66,10 @@ describe('QA mode switch', () => {
   it('persists the choice, so the unattended suite survives a cold start', () => {
     const writes: Array<{ key: string; value: unknown }> = []
     useQaStore.getState().load({
-      read: <T,>(_key: string, fallback: T): T => fallback,
+      readChecked: <T,>(_key: string, normalize: (row: Record<string, unknown>) => T) => ({
+        value: normalize({}),
+        corrected: false,
+      }),
       write: (key: string, value: unknown) => {
         writes.push({ key, value })
       },

@@ -17,12 +17,7 @@
  * imports (spec §15.1).
  */
 
-import type {
-  BlockStance,
-  PunchNumber,
-  Stance,
-  WorkoutToken,
-} from '../workout/WorkoutTokens'
+import type { BlockStance, PunchNumber, Stance, WorkoutToken } from '../workout/WorkoutTokens'
 
 export interface ExpectedPunch {
   /** Index into the block's token array, so a result maps back to its cue. */

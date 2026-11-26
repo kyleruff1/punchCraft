@@ -24,8 +24,11 @@ const ASSET_EXTS = /\.(wav|mp3|ogg|png|jpg|jpeg|svg|ttf|otf)$/i
 register(new URL('./wav-stub-loader.mjs', import.meta.url), pathToFileURL('./'))
 
 // ---- CJS: intercept require() calls --------------------------------------
-const originalLoad = Module._load
-Module._load = function (request, parent, isMain) {
+// `_load` is Node's private CommonJS loader hook: real, stable for years, and
+// absent from the published types — hence the cast.
+const cjs = /** @type {any} */ (Module)
+const originalLoad = cjs._load
+cjs._load = function (request, parent, isMain) {
   if (typeof request === 'string' && ASSET_EXTS.test(request)) {
     return 0
   }

@@ -72,9 +72,12 @@ describe('the D1 gate (spec §13.5, §14.6)', () => {
       ['full', true, true, true],
     ]
     for (const [mode, active, optIn, allowed] of table) {
-      expect([mode, active, optIn, voiceAllowed(policy({ mode, overlayOptIn: optIn }), active)]).toEqual(
-        [mode, active, optIn, allowed],
-      )
+      expect([
+        mode,
+        active,
+        optIn,
+        voiceAllowed(policy({ mode, overlayOptIn: optIn }), active),
+      ]).toEqual([mode, active, optIn, allowed])
     }
   })
 
@@ -209,7 +212,9 @@ describe('the announcement switches', () => {
     expect(shouldSpeak(policy({ finalTenSecondWarning: false }), 'final-countdown', false)).toBe(
       false,
     )
-    expect(shouldSpeak(policy({ finalTenSecondWarning: true }), 'final-countdown', false)).toBe(true)
+    expect(shouldSpeak(policy({ finalTenSecondWarning: true }), 'final-countdown', false)).toBe(
+      true,
+    )
   })
 })
 

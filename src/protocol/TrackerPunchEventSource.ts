@@ -76,9 +76,7 @@ export interface TrackerSlotBinding {
  * fake is what lets the whole class be exercised on Windows with no
  * Bluetooth hardware and no BLE library loaded.
  */
-export type StartPunchStreamFn = (
-  options: PunchStreamOptions,
-) => Promise<PunchStreamController>
+export type StartPunchStreamFn = (options: PunchStreamOptions) => Promise<PunchStreamController>
 
 export interface TrackerPunchEventSourceOptions {
   facade: BleManagerFacade
@@ -333,11 +331,7 @@ export class TrackerPunchEventSource implements PunchEventSource {
     }
   }
 
-  private deliver(
-    runtime: SlotRuntime,
-    generation: number,
-    event: TrackerPunchEvent,
-  ): void {
+  private deliver(runtime: SlotRuntime, generation: number, event: TrackerPunchEvent): void {
     if (!this.started || generation !== runtime.generation) return
 
     // Hand is a property of the connection slot, not of the bytes (H11).

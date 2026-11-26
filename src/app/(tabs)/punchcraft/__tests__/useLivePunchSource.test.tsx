@@ -249,9 +249,7 @@ describe('degraded warning (spec §19.4, doc §19)', () => {
     setSlots(slot(LEFT_DEVICE, 'ready'), slot(RIGHT_DEVICE, 'ready'))
     render()
     setSlots(slot(LEFT_DEVICE, 'recovering'), slot(RIGHT_DEVICE, 'ready'))
-    expect(getLive().degraded).toBe(
-      'Left glove reconnecting — those punches are not being counted',
-    )
+    expect(getLive().degraded).toBe('Left glove reconnecting — those punches are not being counted')
   })
 
   it('clears once the glove comes back', () => {

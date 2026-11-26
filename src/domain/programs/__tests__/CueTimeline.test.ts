@@ -22,7 +22,10 @@ import {
   type CueInstance,
 } from '../CueTimeline'
 import { CADENCE_PROFILES, beatsToMs } from '../../workout/cadence'
-import { legacySwitchByRound as switchByRound, legacyThreeRoundFundamentals as threeRoundFundamentals } from '../../workout/samples/__fixtures__'
+import {
+  legacySwitchByRound as switchByRound,
+  legacyThreeRoundFundamentals as threeRoundFundamentals,
+} from '../../workout/samples/__fixtures__'
 import type { GeneratedWorkout } from '../../workout/GeneratedWorkout'
 import type { ProgramRound, WorkoutBlock, WorkoutToken } from '../../workout/WorkoutTokens'
 
@@ -137,9 +140,7 @@ describe('structure over the real samples', () => {
       .flatMap((r) => r.blocks)
       .filter((b) => countScored.some((c) => c.blockId === b.id))
       .map((b) => b.kind)
-    expect(new Set(kinds)).toEqual(
-      new Set(['volume-burst', 'open-pressure', 'active-recovery']),
-    )
+    expect(new Set(kinds)).toEqual(new Set(['volume-burst', 'open-pressure', 'active-recovery']))
   })
 
   it('leaves nothing deferred in the shipped samples', () => {
@@ -363,9 +364,7 @@ describe('display-only tokens are never scored (D4, doc §21)', () => {
     for (const cue of allCues(expandTimeline(threeRoundFundamentals, 'orthodox', STEADY_BPM))) {
       const scored = cue.expectedPunches.map((p) => p.tokenIndex)
       const shown = cue.displayOnlyTokenIndexes
-      expect([...scored, ...shown].sort((a, b) => a - b)).toEqual(
-        cue.tokens.map((_, i) => i),
-      )
+      expect([...scored, ...shown].sort((a, b) => a - b)).toEqual(cue.tokens.map((_, i) => i))
       expect(scored.filter((i) => shown.includes(i))).toEqual([])
     }
   })

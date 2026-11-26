@@ -24,8 +24,7 @@ function minStrides(): Map<string, number> {
     for (const round of map.rounds) {
       for (const row of round.rows) {
         const slots = row.motif.split('-').length
-        const strideMs =
-          measuresPerRep(slots, row.rate as ClickRate) * 4 * (60_000 / map.bpm)
+        const strideMs = measuresPerRep(slots, row.rate as ClickRate) * 4 * (60_000 / map.bpm)
         const existing = strides.get(row.motif)
         if (existing === undefined || strideMs < existing) {
           strides.set(row.motif, strideMs)

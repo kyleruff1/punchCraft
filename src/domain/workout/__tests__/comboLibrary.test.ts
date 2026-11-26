@@ -74,7 +74,11 @@ describe('motifsFor', () => {
   })
 
   it('drops defense and footwork motifs when their frequency is off', () => {
-    const recipe = { ...defaultRecipe(), defenseFrequency: 'off' as const, footworkFrequency: 'off' as const }
+    const recipe = {
+      ...defaultRecipe(),
+      defenseFrequency: 'off' as const,
+      footworkFrequency: 'off' as const,
+    }
     const pool = motifsFor(recipe)
     expect(pool.every((m) => m.role === 'combo')).toBe(true)
   })

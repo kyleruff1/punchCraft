@@ -82,11 +82,7 @@ export function AffirmationRing(props: AffirmationRingProps): React.JSX.Element 
     return (
       <Animated.View
         pointerEvents="none"
-        style={[
-          styles.ring,
-          styles.static,
-          { width: size, height: size, borderRadius: size / 2 },
-        ]}
+        style={[styles.ring, styles.static, { width: size, height: size, borderRadius: size / 2 }]}
         testID="affirmation-ring-static"
       />
     )

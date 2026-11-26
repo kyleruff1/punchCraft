@@ -22,19 +22,16 @@
 // runtime), so a minimal stub of the imported names is enough to
 // let the useAvatarFrameClock module load.
 jest.mock('react-native-reanimated', () => ({
-  runOnJS: <A extends unknown[]>(fn: (...args: A) => void) => (...args: A) => fn(...args),
-  useSharedValue: <T,>(init: T) => ({ value: init }),
+  runOnJS:
+    <A extends unknown[]>(fn: (...args: A) => void) =>
+    (...args: A) =>
+      fn(...args),
+  useSharedValue: <T>(init: T) => ({ value: init }),
   useFrameCallback: () => ({ setActive: () => {} }),
 }))
 
-import {
-  avatarFrameAt,
-  minHoldMs,
-} from '@domain/workout/punchAvatar'
-import {
-  avatarFrameAtWorklet,
-  minHoldMsWorklet,
-} from '../useAvatarFrameClock'
+import { avatarFrameAt, minHoldMs } from '@domain/workout/punchAvatar'
+import { avatarFrameAtWorklet, minHoldMsWorklet } from '../useAvatarFrameClock'
 
 describe('avatarFrameAtWorklet ↔ domain avatarFrameAt equivalence', () => {
   // Windows the runtime can produce — from tight sprint tokens to

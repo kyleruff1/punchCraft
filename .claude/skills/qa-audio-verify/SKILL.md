@@ -71,6 +71,10 @@ the observers' summary beside every verdict.
 
 ```bash
 # 1. Build the release APK (arm64 only — the tablet's ABI; ~10 min).
+#    Or download the one CI built for the commit: the `release apk` workflow
+#    runs on every push to main and keeps `punchcraft-release-<sha>` for seven
+#    days. Same signing key as a local build, so step 2 works unchanged.
+#    (As of 2026-11-25 that workflow had not yet been seen to pass.)
 cd android && ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a && cd ..
 cp android/app/build/outputs/apk/release/app-release.apk artifacts/punchcraft-release-$(git rev-parse --short HEAD).apk
 

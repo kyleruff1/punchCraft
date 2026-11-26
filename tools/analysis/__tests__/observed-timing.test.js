@@ -8,7 +8,7 @@
  * countdown ends 150 ms before the bell.
  */
 
-import { analyze, fitWorkAxis, OBSERVER_ONSET_SKEW_MS, renderReport, roundWindows, SKEW_CROSS_CHECK_MIN_SAMPLES } from '../observed-timing.mjs'
+import { analyze, fitWorkAxis, OBSERVER_ONSET_SKEW_MS, renderReport, roundWindows } from '../observed-timing.mjs'
 
 const PID = '( 8286)'
 // The REAL ConsoleSink shape (src/diagnostics/logger.ts), copied from a

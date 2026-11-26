@@ -249,7 +249,7 @@ describe('appendPunchEvent', () => {
   })
 
   describe('storedId — which row represents the punch', () => {
-    it('is the punch\'s own id when the row is inserted', () => {
+    it("is the punch's own id when the row is inserted", () => {
       expect(repo.appendPunchEvent(punch()).storedId).toBe('evt-1')
     })
 

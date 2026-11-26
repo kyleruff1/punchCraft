@@ -41,7 +41,10 @@ function round(over: Partial<ProgramRound> = {}): ProgramRound {
 /** Three scored rounds: 9 minutes of active work, 540 seconds. */
 const SCHEDULE: ProgramRound[] = [round({ id: 'r1' }), round({ id: 'r2' }), round({ id: 'r3' })]
 
-function engine(mode: PacingMode = 'adaptive', over: Partial<{ totalGoal: number; schedule: ProgramRound[]; maxRequiredPace: number }> = {}) {
+function engine(
+  mode: PacingMode = 'adaptive',
+  over: Partial<{ totalGoal: number; schedule: ProgramRound[]; maxRequiredPace: number }> = {},
+) {
   return new PacingEngine({
     totalGoal: over.totalGoal ?? 540,
     schedule: over.schedule ?? SCHEDULE,
@@ -56,7 +59,11 @@ const boundary = (
   activeElapsedSeconds: number,
   roundIndex = 0,
 ): AdaptationDecision =>
-  e.onBoundary('round', { roundIndex, atWorkElapsedMs: activeElapsedSeconds * 1000, activeElapsedSeconds })
+  e.onBoundary('round', {
+    roundIndex,
+    atWorkElapsedMs: activeElapsedSeconds * 1000,
+    activeElapsedSeconds,
+  })
 
 // ---------------------------------------------------------------------------
 
@@ -75,10 +82,7 @@ describe('the doc §22 formulas', () => {
   it('counts only rounds that carry a goal (M31-03)', () => {
     // A warm-up occupies session time but no punch goal (doc §9), so it
     // must not dilute the required pace.
-    const withWarmup = [
-      round({ id: 'w', kind: 'warm-up', countsTowardGoal: false }),
-      ...SCHEDULE,
-    ]
+    const withWarmup = [round({ id: 'w', kind: 'warm-up', countsTowardGoal: false }), ...SCHEDULE]
     const e = engine('adaptive', { schedule: withWarmup })
     expect(e.snapshot(0).remainingActiveSeconds).toBe(540)
   })

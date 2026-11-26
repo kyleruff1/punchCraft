@@ -14,8 +14,7 @@ import { threeRoundFundamentals } from '../../workout/samples'
 const STEADY_BPM = CADENCE_PROFILES.steady.nominalBpm
 
 // `1-2` — two punches, offsets 0 and 0.75 beats.
-const CUE: CueInstance = expandTimeline(threeRoundFundamentals, 'orthodox', STEADY_BPM)[0]!
-  .cues[0]!
+const CUE: CueInstance = expandTimeline(threeRoundFundamentals, 'orthodox', STEADY_BPM)[0]!.cues[0]!
 
 describe('beatOrdinalAtMs', () => {
   // scheduledStart 1000, strikes at +0 and +500.

@@ -43,9 +43,7 @@ describe('round trip', () => {
     h.repo.write(SETTINGS_KEYS.voicePolicy, { mode: 'a', loud: false })
     h.repo.write(SETTINGS_KEYS.voicePolicy, { mode: 'b', loud: false })
 
-    const count = h.db.raw
-      .prepare('SELECT COUNT(*) AS n FROM app_settings')
-      .get() as { n: number }
+    const count = h.db.raw.prepare('SELECT COUNT(*) AS n FROM app_settings').get() as { n: number }
     expect(count.n).toBe(1)
     expect(h.repo.read(SETTINGS_KEYS.voicePolicy, DEFAULTS).mode).toBe('b')
   })
@@ -127,5 +125,68 @@ describe('the wall clock is display only (spec §3.2, §18.3)', () => {
       .prepare('SELECT updated_at FROM app_settings WHERE key = ?')
       .get(SETTINGS_KEYS.voicePolicy) as { updated_at: string }
     expect(row.updated_at).toBe('2026-01-02T03:04:05Z')
+  })
+})
+
+describe('readChecked — the read that cannot skip validation', () => {
+  const normalize = (stored: Record<string, unknown>): Prefs => ({
+    mode: stored.mode === 'full' ? 'full' : DEFAULTS.mode,
+    loud: stored.loud === true,
+  })
+  const storeRaw = (h: ReturnType<typeof harness>, json: string): void => {
+    h.db.raw
+      .prepare('INSERT OR REPLACE INTO app_settings (key, value_json, updated_at) VALUES (?, ?, ?)')
+      .run(SETTINGS_KEYS.voicePolicy, json, '2026-11-25T00:00:00.000Z')
+  }
+
+  it('hands the normalizer an empty object when nothing was written', () => {
+    const h = harness()
+    const seen: Array<Record<string, unknown>> = []
+    const result = h.repo.readChecked(SETTINGS_KEYS.voicePolicy, (stored) => {
+      seen.push(stored)
+      return normalize(stored)
+    })
+    expect(seen).toEqual([{}])
+    expect(result).toEqual({ value: DEFAULTS, corrected: false })
+  })
+
+  it('returns a valid stored value as it is, and does not call it corrected', () => {
+    const h = harness()
+    h.repo.write(SETTINGS_KEYS.voicePolicy, { mode: 'full', loud: true })
+    expect(h.repo.readChecked(SETTINGS_KEYS.voicePolicy, normalize)).toEqual({
+      value: { mode: 'full', loud: true },
+      corrected: false,
+    })
+  })
+
+  it('returns what the normalizer makes of a bad value, and says it was corrected', () => {
+    const h = harness()
+    storeRaw(h, JSON.stringify({ mode: 'shouty', loud: 'false' }))
+    expect(h.repo.readChecked(SETTINGS_KEYS.voicePolicy, normalize)).toEqual({
+      value: { mode: 'standard', loud: false },
+      corrected: true,
+    })
+  })
+
+  it('never passes the stored value through unseen — a truthy string is not a boolean', () => {
+    const h = harness()
+    storeRaw(h, JSON.stringify({ mode: 'full', loud: 'false' }))
+    // The unchecked read believes it. This is the whole reason for the other one.
+    expect(h.repo.read<Prefs>(SETTINGS_KEYS.voicePolicy, DEFAULTS).loud).toBe('false')
+    expect(h.repo.readChecked(SETTINGS_KEYS.voicePolicy, normalize).value.loud).toBe(false)
+  })
+
+  it.each([
+    ['malformed json', '{not json'],
+    ['a bare string', '"loud"'],
+    ['null', 'null'],
+    ['an array', '[1,2,3]'],
+  ])('treats %s as nothing stored', (_label, json) => {
+    const h = harness()
+    storeRaw(h, json)
+    expect(h.repo.readChecked(SETTINGS_KEYS.voicePolicy, normalize)).toEqual({
+      value: DEFAULTS,
+      corrected: false,
+    })
   })
 })

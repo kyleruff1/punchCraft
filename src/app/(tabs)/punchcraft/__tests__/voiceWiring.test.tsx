@@ -12,11 +12,7 @@ import React, { useImperativeHandle } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { View } from 'react-native'
 
-import {
-  useWorkoutRunner,
-  TICK_INTERVAL_MS,
-  type WorkoutRunner,
-} from '../_useWorkoutRunner'
+import { useWorkoutRunner, TICK_INTERVAL_MS, type WorkoutRunner } from '../_useWorkoutRunner'
 import { DEFAULT_COUNTDOWN_MS } from '@domain/session/WorkoutSessionClock'
 import { createFakeClock, type FakeClock } from '@testing/fakeClock'
 import { defaultRecipe } from '@domain/workout/WorkoutRecipe'
@@ -158,7 +154,9 @@ interface Harness {
 
 function mount(
   policyOver: Partial<VoiceCoachPolicy> = {},
-  detector: StaticPlaybackDetector | UnavailablePlaybackDetector = new StaticPlaybackDetector(false),
+  detector: StaticPlaybackDetector | UnavailablePlaybackDetector = new StaticPlaybackDetector(
+    false,
+  ),
 ): Harness {
   const clock = createFakeClock()
   const port = new RecordingPort()
@@ -701,7 +699,11 @@ describe("the click script obeys the athlete's voice mode", () => {
     id: 'four-jabs-score-fixture',
     schedule: [fourJabs(1, false), fourJabs(2, true)],
   }
-  const CLICK: GeneratedWorkout = { ...SCORE, id: 'four-jabs-click-fixture', coachPath: 'click-script' }
+  const CLICK: GeneratedWorkout = {
+    ...SCORE,
+    id: 'four-jabs-click-fixture',
+    coachPath: 'click-script',
+  }
 
   const bells = (h: Harness): number => h.port.assets.filter((a) => a === 'bell').length
 

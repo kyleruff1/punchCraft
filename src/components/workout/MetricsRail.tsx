@@ -175,11 +175,7 @@ function MetricsRailInner(props: MetricsRailProps): React.JSX.Element {
     // Scrolls: four optional tiles plus five defaults overflow a landscape
     // rail on a 1200px-tall tablet, and a clipped metric is worse than a
     // scrollable one.
-    <ScrollView
-      style={styles.root}
-      contentContainerStyle={styles.content}
-      testID="metrics-rail"
-    >
+    <ScrollView style={styles.root} contentContainerStyle={styles.content} testID="metrics-rail">
       <Metric
         testID="metric-punches"
         label="Punches"
@@ -279,7 +275,13 @@ const styles = StyleSheet.create({
   metricValueLarge: { fontSize: 36, fontFamily: fonts.display },
   metricValueAccent: { color: colors.accent },
   metricCaption: { fontSize: 12, fontFamily: fonts.body, color: colors.textMuted },
-  tiles: { gap: 14, marginTop: 4, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 12 },
+  tiles: {
+    gap: 14,
+    marginTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: 12,
+  },
 })
 
 /**

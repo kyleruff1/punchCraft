@@ -53,6 +53,7 @@ import type { CapabilityTier } from '../workout/capabilityTier'
 import { tierScoresTechnique } from '../workout/capabilityTier'
 import type { CueInstance, ExpectedPunch } from './CueTimeline'
 import type { PunchType, TrackerPunchEvent } from '../punch/PunchEvent'
+import type { WorkElapsedMs } from '../time/clockDomains'
 
 export type MatchOutcome = 'matched' | 'hand-mismatch' | 'type-mismatch'
 
@@ -72,7 +73,8 @@ export interface PlacedPunch {
   event: TrackerPunchEvent
   /**
    * Work-elapsed ms within the round at which the punch landed, from
-   * `WorkoutSessionClock.workElapsedAt(event.receivedMonotonicTimeMs)`.
+   * `WorkoutSessionClock.workElapsedAtPunch(event)`. Typed as round time so
+   * the event's own uptime stamp cannot be put here by mistake.
    *
    * `null` when the punch cannot be placed. That is every **recovered**
    * event: it was delivered after a reconnection, so its receive time says
@@ -80,7 +82,7 @@ export interface PlacedPunch {
    * epoch time that nothing maps onto the work clock. An unplaceable punch
    * is set aside as an extra rather than guessed into a slot (H12, doc §6).
    */
-  workElapsedMs: number | null
+  workElapsedMs: WorkElapsedMs | null
 }
 
 export interface CueExtra {

@@ -1,0 +1,11 @@
+# Commits that changed layout and nothing else. `git blame` skips them when
+# told to:
+#
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# GitHub's blame view reads this file on its own.
+
+# chore: normalize line endings to LF and add .gitattributes
+b799b10fc9517e1f57a9eb30f85a25043f2ae0d4
+# style: format the source tree with Prettier, once
+229142e2cd468e186f8c9fff99541185865b4916

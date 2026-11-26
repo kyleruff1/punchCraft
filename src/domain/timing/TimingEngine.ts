@@ -75,8 +75,7 @@ export const TRANSPORT_TICKS_PER_PULSE = 960 as const
 export const AUTHORING_STEPS_PER_PULSE = 12 as const
 
 /** Transport ticks per one author-facing step. `960 / 12 = 80`. */
-export const TICKS_PER_AUTHORING_STEP =
-  TRANSPORT_TICKS_PER_PULSE / AUTHORING_STEPS_PER_PULSE
+export const TICKS_PER_AUTHORING_STEP = TRANSPORT_TICKS_PER_PULSE / AUTHORING_STEPS_PER_PULSE
 
 /** Number of call positions per master beat. */
 export type BeatDivision = 1 | 2 | 3 | 4
@@ -239,10 +238,7 @@ export function stepOffsetMs(step: number, tempo: CoachTempo): number {
  * carries the policy tag.
  */
 export type VoicePolicy =
-  | 'per-punch'
-  | 'per-rep'
-  | 'announce-then-work'
-  | 'announce-with-affirmations'
+  'per-punch' | 'per-rep' | 'announce-then-work' | 'announce-with-affirmations'
 
 /** One punch placed on the grid. Steps may be skipped for syncopation. */
 export interface RhythmicPunch {
@@ -314,11 +310,7 @@ export interface ScheduledPunch {
   acceptUntilMs: number
 }
 
-import {
-  ACCEPT_FROM_MS,
-  acceptUntilMsFor,
-  EXPECTED_STRIKE_DELAY_MS,
-} from './acceptance'
+import { ACCEPT_FROM_MS, acceptUntilMsFor, EXPECTED_STRIKE_DELAY_MS } from './acceptance'
 
 /**
  * Expand a combination into absolute per-punch schedules starting at
@@ -326,10 +318,7 @@ import {
  * clock). Repeats are laid back to back, each pass one grid duration
  * later.
  */
-export function scheduleCombination(
-  combo: RhythmicCombination,
-  atMs: number,
-): ScheduledPunch[] {
+export function scheduleCombination(combo: RhythmicCombination, atMs: number): ScheduledPunch[] {
   const passMs = combinationDurationMs(combo)
   const acceptSpanMs = acceptUntilMsFor(combo.tempo.division)
   const out: ScheduledPunch[] = []

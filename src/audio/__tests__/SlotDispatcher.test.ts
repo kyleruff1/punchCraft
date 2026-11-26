@@ -22,10 +22,7 @@
  */
 
 import { SlotDispatcher } from '../SlotDispatcher'
-import type {
-  CompiledCoachSlot,
-  CompiledCoachVariant,
-} from '@/domain/programs/workoutScore'
+import type { CompiledCoachSlot, CompiledCoachVariant } from '@/domain/programs/workoutScore'
 
 function variant(
   vocab: 'numeric' | 'technique',
@@ -267,10 +264,7 @@ describe('SlotDispatcher — vocabulary at dispatch time', () => {
     d.advance(150) // fires s1 as numeric
     currentVocab = 'technique'
     d.advance(250) // fires s2 as technique
-    expect(spy.calls.map((c) => c.assetId)).toEqual([
-      'asset:numeric:one',
-      'asset:technique:cross',
-    ])
+    expect(spy.calls.map((c) => c.assetId)).toEqual(['asset:numeric:one', 'asset:technique:cross'])
   })
 
   it('falls back to the OTHER variant when the picked vocab has none', () => {

@@ -125,7 +125,9 @@ export default function QaRunLauncher(): React.JSX.Element {
     }
     // The recipe is the single source of truth for the vocabulary — and the
     // only thing that reaches the round-1 opener.
-    workoutStore.setRecipe({ voiceVocabulary: request.vocab === 'techniques' ? 'names' : 'numbers' })
+    workoutStore.setRecipe({
+      voiceVocabulary: request.vocab === 'techniques' ? 'names' : 'numbers',
+    })
 
     // Downgrade the privileged actions when the flag is off.
     const autostart = request.autostart && qaEnabled

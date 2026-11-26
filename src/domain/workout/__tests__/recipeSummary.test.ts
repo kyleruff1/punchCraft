@@ -11,7 +11,10 @@ import { defaultRecipe, type WorkoutRecipe } from '../WorkoutRecipe'
 import { buildRoundSchedule } from '../roundSchedule'
 import { GOAL_TIERS } from '../punchGoals'
 
-const recipe = (over: Partial<WorkoutRecipe> = {}): WorkoutRecipe => ({ ...defaultRecipe(), ...over })
+const recipe = (over: Partial<WorkoutRecipe> = {}): WorkoutRecipe => ({
+  ...defaultRecipe(),
+  ...over,
+})
 const summarize = (over: Partial<WorkoutRecipe> = {}) => {
   const r = recipe(over)
   return summarizeRecipe(r, buildRoundSchedule(r.durationMinutes))
@@ -54,7 +57,11 @@ describe('summarizeRecipe — doc §8.2 line classes', () => {
   })
 
   it('states the cadence band, adaptation mode and voice mode', () => {
-    const { lines } = summarize({ cadenceProfile: 'pressure', adaptationMode: 'adaptive', voiceMode: 'full' })
+    const { lines } = summarize({
+      cadenceProfile: 'pressure',
+      adaptationMode: 'adaptive',
+      voiceMode: 'full',
+    })
     const line = lines.find((l) => l.includes('cadence'))
     expect(line).toContain('110-130 BPM')
     expect(line).toContain('Adaptive pace')

@@ -38,7 +38,7 @@ describe('recovery corpus / silence-track coverage', () => {
     }
   })
 
-  it("every silence track is a positive integer millisecond value", () => {
+  it('every silence track is a positive integer millisecond value', () => {
     for (const [ms, module] of Object.entries(SILENCE_TRACKS)) {
       const value = Number(ms)
       expect(Number.isInteger(value)).toBe(true)
@@ -47,17 +47,14 @@ describe('recovery corpus / silence-track coverage', () => {
     }
   })
 
-  it("never accepts a script whose estimated duration already exceeds the cap", () => {
+  it('never accepts a script whose estimated duration already exceeds the cap', () => {
     // The build-time timing rule (measured > 45s → EXCLUDE) will do
     // the final enforcement, but the corpus's own estimates should
     // already be under it; a corpus that shipped an over-cap script
     // means the estimator is wrong or the cap changed.
     const cap = corpus.restWindow.maximumScriptDurationSec * 1000
     for (const script of corpus.scripts) {
-      const estimate = script.segments.reduce(
-        (sum, seg) => sum + seg.pauseAfterMs,
-        0,
-      )
+      const estimate = script.segments.reduce((sum, seg) => sum + seg.pauseAfterMs, 0)
       // Just the pauses; the speech adds ~2s per segment. If the pauses
       // alone breach the cap the corpus itself is malformed.
       expect(estimate).toBeLessThan(cap)

@@ -188,9 +188,13 @@ export class MetronomePlayer {
       this.available = false
       this.playlist = null
       this.loaded = null
-      logger.warn('workout.metronome', 'playlist creation failed — click disabled for this session', {
-        error: safe(String(error)),
-      })
+      logger.warn(
+        'workout.metronome',
+        'playlist creation failed — click disabled for this session',
+        {
+          error: safe(String(error)),
+        },
+      )
     }
   }
 

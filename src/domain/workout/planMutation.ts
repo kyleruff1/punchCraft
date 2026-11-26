@@ -109,9 +109,7 @@ export function applyMutation(
       : { ...round, blocks, targetPunches }
   })
 
-  const roundPunchTargets = schedule
-    .filter((r) => r.countsTowardGoal)
-    .map((r) => r.targetPunches)
+  const roundPunchTargets = schedule.filter((r) => r.countsTowardGoal).map((r) => r.targetPunches)
 
   return { ...workout, schedule, roundPunchTargets }
 }

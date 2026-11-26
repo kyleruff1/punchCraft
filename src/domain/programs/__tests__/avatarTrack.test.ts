@@ -13,7 +13,12 @@ function seqCue(id: string, startMs: number, offsets: number[]): CueInstance {
     blockId: 'b1',
     repeatIndex: 0,
     scoring: 'sequence',
-    tokens: offsets.map(() => ({ kind: 'punch' as const, number: 1 as const, body: false, beatOffset: 0 })),
+    tokens: offsets.map(() => ({
+      kind: 'punch' as const,
+      number: 1 as const,
+      body: false,
+      beatOffset: 0,
+    })),
     tokenOffsetsMs: offsets,
     expectedPunches: offsets.map((_, tokenIndex) => ({ tokenIndex, hand: 'left' as const })),
     displayOnlyTokenIndexes: [],

@@ -108,7 +108,6 @@ export function planIntro(
   if (segments.length === 0) return { segments: [], totalMs: 0 }
 
   const totalMs =
-    segments.reduce((sum, s) => sum + s.gapBeforeMs + s.durationMs, 0) +
-    INTRO_TAIL_PAD_MS
+    segments.reduce((sum, s) => sum + s.gapBeforeMs + s.durationMs, 0) + INTRO_TAIL_PAD_MS
   return { segments, totalMs }
 }

@@ -87,10 +87,11 @@ export const useQaStore = create<QaState>((set) => ({
 
   load(repo) {
     repository = repo
-    const stored = repo.read<QaSettings>(SETTINGS_KEYS.qa, defaultQaSettings())
     // Anything but literal `true` is off — a corrupted row must fail closed,
     // because "on" grants autostart to an externally reachable URL.
-    const enabled = stored.enabled === true
+    const { enabled } = repo.readChecked<QaSettings>(SETTINGS_KEYS.qa, (stored) => ({
+      enabled: stored.enabled === true,
+    })).value
     setTimingObserverEnabled(enabled)
     set({ enabled, loaded: true })
   },

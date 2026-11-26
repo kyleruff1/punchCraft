@@ -19,7 +19,11 @@
  *     cadence falls back to steady (2).
  */
 import type { CueInstance } from '../CueTimeline'
-import { compileCueFromInstance, NULL_COACH_ASSET_RESOLVER, programCueFromInstance } from '../programCueBridge'
+import {
+  compileCueFromInstance,
+  NULL_COACH_ASSET_RESOLVER,
+  programCueFromInstance,
+} from '../programCueBridge'
 import type { WorkoutToken } from '../../workout/WorkoutTokens'
 
 // ---------------------------------------------------------------------------
@@ -172,8 +176,7 @@ describe('programCueFromInstance — the CueInstance → ProgramCue bridge', () 
     ]
     for (const [cadence, expected] of cases) {
       const c = cue({ tokens: [punch(1)] })
-      const withCadence: CueInstance =
-        cadence === undefined ? c : { ...c, cadence }
+      const withCadence: CueInstance = cadence === undefined ? c : { ...c, cadence }
       const program = programCueFromInstance(withCadence, {
         roundId: 'r1',
         coachAssets: NULL_COACH_ASSET_RESOLVER,

@@ -23,13 +23,7 @@
  * paired vocab layouts) — those tests will live alongside this file.
  */
 import { expandTimeline } from '../CueTimeline'
-import {
-  compileRoundSpine,
-  beatsFor,
-  pulseCursorAt,
-  pulsesFor,
-  RAIL_K_MS,
-} from '../RhythmSpine'
+import { compileRoundSpine, beatsFor, pulseCursorAt, pulsesFor, RAIL_K_MS } from '../RhythmSpine'
 import { legacyPacePusher as pacePusher } from '../../workout/samples/__fixtures__'
 import { listLegacySampleWorkouts as listSampleWorkouts } from '../../workout/samples/__fixtures__'
 import { findPhraseTiming } from '../phraseTimingManifest'
@@ -145,12 +139,20 @@ describe('pulses for count-scored windows (A2 / issue #257)', () => {
 
   it('sequence cues produce no pulses (rings drive from beats)', () => {
     const cue: CueInstance = {
-      id: 'seq', blockId: 'b', repeatIndex: 0, scoring: 'sequence',
+      id: 'seq',
+      blockId: 'b',
+      repeatIndex: 0,
+      scoring: 'sequence',
       tokens: [{ kind: 'punch', number: 1, body: false, beatOffset: 0 }],
-      tokenOffsetsMs: [0], expectedPunches: [{ tokenIndex: 0, hand: 'left' }],
-      displayOnlyTokenIndexes: [], previewAt: 0, announceAt: 0,
-      scheduledStartMs: 0, scheduledEndMs: 500,
-      windowStartMs: 0, windowEndMs: 1000,
+      tokenOffsetsMs: [0],
+      expectedPunches: [{ tokenIndex: 0, hand: 'left' }],
+      displayOnlyTokenIndexes: [],
+      previewAt: 0,
+      announceAt: 0,
+      scheduledStartMs: 0,
+      scheduledEndMs: 500,
+      windowStartMs: 0,
+      windowEndMs: 1000,
     }
     expect(pulsesFor(cue)).toEqual([])
   })
@@ -160,7 +162,10 @@ describe('pulses for count-scored windows (A2 / issue #257)', () => {
     // Stride = 4000 / 2 = 2000 ms; motif offsets [0, 200, 400, 600].
     // So pulses land at 0, 200, 400, 600, 2000, 2200, 2400, 2600.
     const cue: CueInstance = {
-      id: 'burst', blockId: 'b', repeatIndex: 0, scoring: 'count',
+      id: 'burst',
+      blockId: 'b',
+      repeatIndex: 0,
+      scoring: 'count',
       countScored: { targetPunches: 8, countdownMs: 3000 },
       tokens: [
         { kind: 'punch', number: 1, body: false, beatOffset: 0 },
@@ -168,11 +173,15 @@ describe('pulses for count-scored windows (A2 / issue #257)', () => {
         { kind: 'punch', number: 1, body: false, beatOffset: 0.8 },
         { kind: 'punch', number: 2, body: false, beatOffset: 1.2 },
       ],
-      tokenOffsetsMs: [0, 200, 400, 600], expectedPunches: [],
+      tokenOffsetsMs: [0, 200, 400, 600],
+      expectedPunches: [],
       displayOnlyTokenIndexes: [0, 1, 2, 3],
-      previewAt: 0, announceAt: 0,
-      scheduledStartMs: 0, scheduledEndMs: 4000,
-      windowStartMs: 0, windowEndMs: 4000,
+      previewAt: 0,
+      announceAt: 0,
+      scheduledStartMs: 0,
+      scheduledEndMs: 4000,
+      windowStartMs: 0,
+      windowEndMs: 4000,
     }
     const spine = {
       roundIndex: 0,
@@ -217,7 +226,9 @@ describe('phrase-timing manifest coverage (A16)', () => {
           if (!cue.cadence) continue
           const combo = cue.tokens
             .map((t) =>
-              t.kind === 'punch' ? `${t.number}${t.body ? 'b' : ''}` : (t as { command?: string }).command ?? '',
+              t.kind === 'punch'
+                ? `${t.number}${t.body ? 'b' : ''}`
+                : ((t as { command?: string }).command ?? ''),
             )
             .join('-')
           const key = `${combo}.${cue.cadence}`
@@ -311,7 +322,10 @@ describe('beatsFor — the single source of truth', () => {
     // 2a 2b 3a 3b 4a 4b. avatarFrameMs is the per-frame ms; there are
     // always exactly 2 frames per punch token, in order.
     const combo: CueInstance = {
-      id: 'k', blockId: 'k', repeatIndex: 0, scoring: 'sequence',
+      id: 'k',
+      blockId: 'k',
+      repeatIndex: 0,
+      scoring: 'sequence',
       tokens: [
         { kind: 'punch', number: 1, body: false, beatOffset: 0 },
         { kind: 'punch', number: 2, body: false, beatOffset: 0.4 },
@@ -326,9 +340,12 @@ describe('beatsFor — the single source of truth', () => {
         { tokenIndex: 3, hand: 'right' },
       ],
       displayOnlyTokenIndexes: [],
-      previewAt: 0, announceAt: 0,
-      scheduledStartMs: 0, scheduledEndMs: 800,
-      windowStartMs: 0, windowEndMs: 1600,
+      previewAt: 0,
+      announceAt: 0,
+      scheduledStartMs: 0,
+      scheduledEndMs: 800,
+      windowStartMs: 0,
+      windowEndMs: 1600,
     }
     const beats = beatsFor(combo)
     expect(beats).toHaveLength(4)
@@ -345,8 +362,10 @@ describe('beatsFor — the single source of truth', () => {
       tokenOffsetsMs: [0, 500],
       expectedPunches: [{ tokenIndex: 1, hand: 'left' }],
       displayOnlyTokenIndexes: [0],
-      scheduledStartMs: 0, scheduledEndMs: 1000,
-      windowStartMs: 0, windowEndMs: 1500,
+      scheduledStartMs: 0,
+      scheduledEndMs: 1000,
+      windowStartMs: 0,
+      windowEndMs: 1500,
     }
     const beats = beatsFor(mixed)
     expect(beats[0]?.avatarFrameMs).toBe(0)
@@ -400,7 +419,7 @@ describe('compileRoundSpine — compiled field (M39-V2 Phase 4-vi)', () => {
     }
   })
 
-  it('produces a compiled timeline whose strikes count matches the cue\'s punch tokens', () => {
+  it("produces a compiled timeline whose strikes count matches the cue's punch tokens", () => {
     const rounds = expandTimeline(pacePusher, 'orthodox', 120)
     const spine = compileRoundSpine(rounds[0]!)
     for (const cue of rounds[0]!.cues) {

@@ -214,11 +214,7 @@ const MINIMAL_CATEGORIES: ReadonlySet<SpokenCategory> = new Set<SpokenCategory>(
  *
  * Does not consult the D1 gate — call `voiceAllowed` first.
  */
-export function shouldSpeak(
-  p: VoiceCoachPolicy,
-  c: SpokenCategory,
-  inCombo: boolean,
-): boolean {
+export function shouldSpeak(p: VoiceCoachPolicy, c: SpokenCategory, inCombo: boolean): boolean {
   if (p.mode === 'off') return false
 
   // Doc §18: never interrupt a combination for something that can wait.
@@ -226,8 +222,7 @@ export function shouldSpeak(
   // already places these lines in audited silence between cues, but
   // this belt-and-braces gate keeps a mistimed one out of the middle
   // of a combination.
-  if (inCombo && (c === 'metric' || c === 'coaching-reminder' || c === 'gap-filler'))
-    return false
+  if (inCombo && (c === 'metric' || c === 'coaching-reminder' || c === 'gap-filler')) return false
 
   if (c === 'metric' && p.metricAnnouncements === 'off') return false
   if (c === 'final-countdown' && !p.finalTenSecondWarning) return false

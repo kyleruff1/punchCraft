@@ -20,7 +20,12 @@ import { hashTimelineContent, sameTimelineIdentity } from '../timelineHash'
 
 describe('hashTimelineContent — deterministic content fingerprint', () => {
   it('is deterministic — same input, same output', () => {
-    const content = { strikes: [{ id: 'a', tick: 0 }, { id: 'b', tick: 240 }] }
+    const content = {
+      strikes: [
+        { id: 'a', tick: 0 },
+        { id: 'b', tick: 240 },
+      ],
+    }
     const h1 = hashTimelineContent(content)
     const h2 = hashTimelineContent(content)
     expect(h1).toBe(h2)
@@ -38,8 +43,18 @@ describe('hashTimelineContent — deterministic content fingerprint', () => {
   })
 
   it('detects a tick change (single-field divergence)', () => {
-    const a = { strikes: [{ id: 'a', tick: 0 }, { id: 'b', tick: 240 }] }
-    const b = { strikes: [{ id: 'a', tick: 0 }, { id: 'b', tick: 241 }] }
+    const a = {
+      strikes: [
+        { id: 'a', tick: 0 },
+        { id: 'b', tick: 240 },
+      ],
+    }
+    const b = {
+      strikes: [
+        { id: 'a', tick: 0 },
+        { id: 'b', tick: 241 },
+      ],
+    }
     expect(hashTimelineContent(a)).not.toBe(hashTimelineContent(b))
   })
 

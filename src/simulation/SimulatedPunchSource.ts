@@ -18,7 +18,13 @@
 import type { PunchEventSource, PunchEventSourceCapability } from '@domain/punch/PunchEventSource'
 import type { TrackerPunchEvent } from '@domain/punch/PunchEvent'
 import type { CancelScheduled, MonotonicClock } from '@domain/time/MonotonicClock'
-import { SCRIPT_NOMINAL_BPM, SIM_SCRIPTS, scriptDurationMs, type ScriptStep, type SimScriptId } from './scripts'
+import {
+  SCRIPT_NOMINAL_BPM,
+  SIM_SCRIPTS,
+  scriptDurationMs,
+  type ScriptStep,
+  type SimScriptId,
+} from './scripts'
 
 export const SIM_DECODER_ID = 'simulated'
 export const SIM_DECODER_VERSION = 'sim-1'
@@ -216,10 +222,8 @@ export class SimulatedPunchSource implements PunchEventSource {
     // produces the same delivered sequence regardless of timing. A tap skips
     // the drop draw entirely rather than drawing and ignoring the result, so
     // taps cannot shift the stream a scripted run depends on.
-    const dropped =
-      droppable && this.opts.dropRate > 0 && this.random() < this.opts.dropRate
-    const jitter =
-      this.opts.jitterMs > 0 ? (this.random() * 2 - 1) * this.opts.jitterMs : 0
+    const dropped = droppable && this.opts.dropRate > 0 && this.random() < this.opts.dropRate
+    const jitter = this.opts.jitterMs > 0 ? (this.random() * 2 - 1) * this.opts.jitterMs : 0
     if (dropped) return
 
     const delay = Math.max(0, baseOffsetMs + this.opts.latencyMs + jitter)

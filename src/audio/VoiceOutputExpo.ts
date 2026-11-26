@@ -56,6 +56,7 @@ import { releaseAudioPlayer } from './nativeAudioTeardown'
 import { PlaybackObserver, type ObservedKind, type ObservedRecord } from './PlaybackObserver'
 import { isTimingObserverEnabled } from '@diagnostics/qaFlags'
 import { MetronomeTransport } from './MetronomeTransport'
+import { asMonotonicMs } from '@domain/time/clockDomains'
 
 const TONE_ASSETS: Record<ToneKind, VoiceAssetId> = {
   ready: 'tone-ready',
@@ -527,7 +528,7 @@ export class VoiceOutputExpo implements VoiceOutputPort {
    * gets touched via the `metronome` port below.
    */
   private readonly metronomeTransport: MetronomeTransport = new MetronomeTransport({
-    now: () => this.clock(),
+    now: () => asMonotonicMs(this.clock()),
     schedule: () => () => {},
   })
 
@@ -570,7 +571,13 @@ export class VoiceOutputExpo implements VoiceOutputPort {
 
   metronome = {
     start: (
-      loop: { baseBpm: number; module: number; division: 1 | 2 | 3 | 4; swing: number; durationMs: number },
+      loop: {
+        baseBpm: number
+        module: number
+        division: 1 | 2 | 3 | 4
+        swing: number
+        durationMs: number
+      },
       volume: number,
       baseBpm?: number,
     ): void => {
@@ -667,8 +674,7 @@ export class VoiceOutputExpo implements VoiceOutputPort {
                 // Duplicate or out-of-order callback — nothing to measure.
                 if (gapMs <= 0) return
                 const expectedAdvanceSec = gapMs / 1000
-                const observedAdvanceSec =
-                  report.wrappedPositionSec - this.metronomeLastWrappedSec
+                const observedAdvanceSec = report.wrappedPositionSec - this.metronomeLastWrappedSec
                 // Guard against counting a wrap on ordinary jitter: only
                 // consider one when the position actually went BACKWARDS,
                 // or when more than a full loop of wall time has passed
@@ -677,9 +683,7 @@ export class VoiceOutputExpo implements VoiceOutputPort {
                 // to 1 and over-count — the failure mode that sank v1/v2.
                 const wraps =
                   observedAdvanceSec < 0 || expectedAdvanceSec > report.loopDurationSec
-                    ? Math.round(
-                        (expectedAdvanceSec - observedAdvanceSec) / report.loopDurationSec,
-                      )
+                    ? Math.round((expectedAdvanceSec - observedAdvanceSec) / report.loopDurationSec)
                     : 0
                 if (wraps > 0) {
                   this.metronomeLoopCount += wraps
@@ -758,9 +762,7 @@ export class VoiceOutputExpo implements VoiceOutputPort {
     this.setAudioMode = opts.setAudioMode ?? setAudioModeAsync
     const latency = opts.calibratedAudioOutputLatencyMs
     if (latency !== undefined && (!Number.isFinite(latency) || latency < 0)) {
-      throw new Error(
-        `VoiceOutputExpo: calibratedAudioOutputLatencyMs must be ≥ 0, got ${latency}`,
-      )
+      throw new Error(`VoiceOutputExpo: calibratedAudioOutputLatencyMs must be ≥ 0, got ${latency}`)
     }
     this.calibratedLatencyMs = latency ?? DEFAULT_CALIBRATED_AUDIO_OUTPUT_LATENCY_MS
   }
@@ -1158,7 +1160,12 @@ export class VoiceOutputExpo implements VoiceOutputPort {
    * ceremony, but they never mute other calls (they're not chime-ins;
    * they're standalone asides).
    */
-  playInstruction(clip: { text: string; module: number; durationMs: number; traceId?: string }): void {
+  playInstruction(clip: {
+    text: string
+    module: number
+    durationMs: number
+    traceId?: string
+  }): void {
     if (this.failed) return
     this.requestFocus()
     try {
@@ -1207,7 +1214,12 @@ export class VoiceOutputExpo implements VoiceOutputPort {
    * can separate "coach's aside" from "coach's block-start command."
    * Same duck posture, same bus advance.
    */
-  playComboAnnounce(clip: { text: string; module: number; durationMs: number; traceId?: string }): void {
+  playComboAnnounce(clip: {
+    text: string
+    module: number
+    durationMs: number
+    traceId?: string
+  }): void {
     if (this.failed) return
     this.requestFocus()
     try {
@@ -1369,43 +1381,46 @@ export class VoiceOutputExpo implements VoiceOutputPort {
         // shllck path never exposed this because its seek is followed
         // immediately by play(). Generation-guarded so a re-dispatched
         // player is never touched; PRE_ARM_PAD clears the clip first.
-        this.schedule(() => {
-          if (this.clickScriptGen.get(module) !== gen) return
-          if (oneShot) {
-            // A lead-in never repeats: free the native player + media
-            // session the moment the clip is done instead of parking it.
-            // Gen-guarded above, so a busy-lane retry that re-dispatched
-            // this module only releases on the LAST dispatch's timer.
-            this.clickScriptPlayers.delete(module)
-            this.clickScriptArmed.delete(module)
-            this.clickScriptGen.delete(module)
-            if (this.clickScriptPlayer === target) this.clickScriptPlayer = null
-            this.observer?.forget(target, 'released')
-            releaseAudioPlayer(target)
-            return
-          }
-          try {
-            target.pause()
-          } catch {
-            // Already stopped at EOS — nothing to pause.
-          }
-          void Promise.resolve(target.seekTo(0))
-            .catch(() => undefined)
-            .then(() => {
-              if (this.clickScriptGen.get(module) === gen) this.clickScriptArmed.add(module)
-            })
-          // The pad has to fit what the timer DOES. The re-arm branch only
-          // pauses and seeks, so 200 ms of clearance is plenty and landing
-          // early is harmless. The one-shot branch DESTROYS the player, and
-          // this timer is armed from the play() call rather than from audible
-          // onset — a one-shot lead-in is always a fresh `downloadFirst`
-          // player, which holds no media item at play() and only sounds once
-          // Metro has delivered the whole file (lead-ins are the largest
-          // clips in the bank, up to 1.4 MB). Releasing on the 200 ms pad
-          // therefore truncated the tail of the whisper. This was invisible
-          // before the #356 fix only because `remove()` neither stopped nor
-          // freed anything, so the clip always played out — while leaking.
-        }, clip.durationMs + (oneShot ? ONE_SHOT_RELEASE_PAD_MS : CLICK_SCRIPT_PREARM_PAD_MS))
+        this.schedule(
+          () => {
+            if (this.clickScriptGen.get(module) !== gen) return
+            if (oneShot) {
+              // A lead-in never repeats: free the native player + media
+              // session the moment the clip is done instead of parking it.
+              // Gen-guarded above, so a busy-lane retry that re-dispatched
+              // this module only releases on the LAST dispatch's timer.
+              this.clickScriptPlayers.delete(module)
+              this.clickScriptArmed.delete(module)
+              this.clickScriptGen.delete(module)
+              if (this.clickScriptPlayer === target) this.clickScriptPlayer = null
+              this.observer?.forget(target, 'released')
+              releaseAudioPlayer(target)
+              return
+            }
+            try {
+              target.pause()
+            } catch {
+              // Already stopped at EOS — nothing to pause.
+            }
+            void Promise.resolve(target.seekTo(0))
+              .catch(() => undefined)
+              .then(() => {
+                if (this.clickScriptGen.get(module) === gen) this.clickScriptArmed.add(module)
+              })
+            // The pad has to fit what the timer DOES. The re-arm branch only
+            // pauses and seeks, so 200 ms of clearance is plenty and landing
+            // early is harmless. The one-shot branch DESTROYS the player, and
+            // this timer is armed from the play() call rather than from audible
+            // onset — a one-shot lead-in is always a fresh `downloadFirst`
+            // player, which holds no media item at play() and only sounds once
+            // Metro has delivered the whole file (lead-ins are the largest
+            // clips in the bank, up to 1.4 MB). Releasing on the 200 ms pad
+            // therefore truncated the tail of the whisper. This was invisible
+            // before the #356 fix only because `remove()` neither stopped nor
+            // freed anything, so the clip always played out — while leaking.
+          },
+          clip.durationMs + (oneShot ? ONE_SHOT_RELEASE_PAD_MS : CLICK_SCRIPT_PREARM_PAD_MS),
+        )
       }
       if (!reused || armed) {
         speak(reused ? 'armed' : 'fresh')
@@ -1506,7 +1521,10 @@ export class VoiceOutputExpo implements VoiceOutputPort {
       return
     }
 
-    this.queueGroup({ atMs, ids: [id], priority, form: 'standalone', tightness: 1, handle: undefined }, delay)
+    this.queueGroup(
+      { atMs, ids: [id], priority, form: 'standalone', tightness: 1, handle: undefined },
+      delay,
+    )
   }
 
   /**
@@ -1534,7 +1552,10 @@ export class VoiceOutputExpo implements VoiceOutputPort {
       return
     }
 
-    this.queueGroup({ atMs: atMs as number, ids: [...ids], priority, form, tightness, handle: undefined }, delay)
+    this.queueGroup(
+      { atMs: atMs as number, ids: [...ids], priority, form, tightness, handle: undefined },
+      delay,
+    )
   }
 
   /**
@@ -1975,8 +1996,7 @@ export class VoiceOutputExpo implements VoiceOutputPort {
       // signed off by ear.
       if (!BELL_ASSETS.has(id)) {
         this.markBusy(
-          this.assetDurationMs(id, form)
-            ?? CALLOUT_CLIPS[id as CalloutClipId]?.durationMs,
+          this.assetDurationMs(id, form) ?? CALLOUT_CLIPS[id as CalloutClipId]?.durationMs,
         )
       }
       if (isChimeInAsset(id)) {
@@ -1991,8 +2011,7 @@ export class VoiceOutputExpo implements VoiceOutputPort {
         // start. The compiled `CALLOUT_CLIPS` manifest carries the true
         // measured length; consult it before the cache and the fallback.
         const key = this.keyFor(id, form)
-        const measured = this.durations.get(key)
-          ?? CALLOUT_CLIPS[id as CalloutClipId]?.durationMs
+        const measured = this.durations.get(key) ?? CALLOUT_CLIPS[id as CalloutClipId]?.durationMs
         // CASCADE TRACER (2026-09-05, uppercut-clinic r4 "35s left, totally
         // silent"): record how much of a PREVIOUS duck window was still
         // unspent when this arm landed. Chained arms with remainingMs > 0

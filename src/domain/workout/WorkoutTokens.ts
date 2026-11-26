@@ -38,7 +38,13 @@ export type FootworkCommand = 'pivot' | 'step-off' | 'circle' | 'cut-off-ring' |
 export type CoachCommand = 'double-up' | 'put-it-on-em' | 'touch-and-go' | 'breathe' | 'hands-up'
 
 export type WorkoutToken =
-  | { kind: 'punch'; number: PunchNumber; body: boolean; beatOffset: number; velocityZone?: 1 | 2 | 3 | 4 }
+  | {
+      kind: 'punch'
+      number: PunchNumber
+      body: boolean
+      beatOffset: number
+      velocityZone?: 1 | 2 | 3 | 4
+    }
   | { kind: 'defense'; command: DefenseCommand; beatOffset: number }
   | { kind: 'footwork'; command: FootworkCommand; beatOffset: number }
   | { kind: 'coach'; command: CoachCommand; beatOffset: number }
@@ -221,7 +227,7 @@ const FOOTWORK_WORDS: ReadonlyArray<readonly [string, FootworkCommand]> = [
 
 const COACH_WORDS: ReadonlyArray<readonly [string, CoachCommand]> = [
   ['double up', 'double-up'],
-  ["put it on em", 'put-it-on-em'],
+  ['put it on em', 'put-it-on-em'],
   ['touch and go', 'touch-and-go'],
   ['breathe', 'breathe'],
   ['hands up', 'hands-up'],
@@ -268,7 +274,12 @@ export function parseCombo(notation: string): WorkoutToken[] {
     const segment = rawSegment.trim()
 
     if (segment.length === 0) {
-      throw new ComboParseError('unknown-segment', rawSegment, index, `empty segment at position ${index}`)
+      throw new ComboParseError(
+        'unknown-segment',
+        rawSegment,
+        index,
+        `empty segment at position ${index}`,
+      )
     }
 
     // Rest: an empty slot that holds the bar's width (GH #305). Spelled
@@ -345,28 +356,32 @@ export function parseCombo(notation: string): WorkoutToken[] {
  * lowercase `b` (D10).
  */
 export function formatCombo(tokens: readonly WorkoutToken[]): string {
-  return tokens
-    // Rests are FILTERED, not serialized to '' — joining an empty string
-    // would emit `1-2--` and break the round-trip law, every combo-announce
-    // lookup, and the 194-clip library's keys. A padded `1-2` must still
-    // spell exactly `"1-2"` (GH #305 decision 7).
-    .filter((token): token is Exclude<WorkoutToken, { kind: 'rest' }> => token.kind !== 'rest')
-    .map((token) => {
-      switch (token.kind) {
-        case 'punch':
-          return `${token.number}${token.body ? 'b' : ''}`
-        case 'defense':
-          return WORD_BY_DEFENSE.get(token.command) ?? token.command
-        case 'footwork':
-          return WORD_BY_FOOTWORK.get(token.command) ?? token.command
-        case 'coach':
-          return WORD_BY_COACH.get(token.command) ?? token.command
-      }
-    })
-    .join('-')
+  return (
+    tokens
+      // Rests are FILTERED, not serialized to '' — joining an empty string
+      // would emit `1-2--` and break the round-trip law, every combo-announce
+      // lookup, and the 194-clip library's keys. A padded `1-2` must still
+      // spell exactly `"1-2"` (GH #305 decision 7).
+      .filter((token): token is Exclude<WorkoutToken, { kind: 'rest' }> => token.kind !== 'rest')
+      .map((token) => {
+        switch (token.kind) {
+          case 'punch':
+            return `${token.number}${token.body ? 'b' : ''}`
+          case 'defense':
+            return WORD_BY_DEFENSE.get(token.command) ?? token.command
+          case 'footwork':
+            return WORD_BY_FOOTWORK.get(token.command) ?? token.command
+          case 'coach':
+            return WORD_BY_COACH.get(token.command) ?? token.command
+        }
+      })
+      .join('-')
+  )
 }
 
 /** Punch tokens only — the sole scored token kind (D4). */
-export function punchTokens(tokens: readonly WorkoutToken[]): Array<Extract<WorkoutToken, { kind: 'punch' }>> {
+export function punchTokens(
+  tokens: readonly WorkoutToken[],
+): Array<Extract<WorkoutToken, { kind: 'punch' }>> {
   return tokens.filter((t): t is Extract<WorkoutToken, { kind: 'punch' }> => t.kind === 'punch')
 }

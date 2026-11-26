@@ -65,11 +65,7 @@ export type CoachContentKind =
  * - `shared-block` — one coach event spans a whole block of strikes (sustained instructions)
  * - `independent` — fires on its own schedule; no strike-time relationship (encouragements)
  */
-export type CoachTimingRelation =
-  | 'precall'
-  | 'synchronized'
-  | 'shared-block'
-  | 'independent'
+export type CoachTimingRelation = 'precall' | 'synchronized' | 'shared-block' | 'independent'
 
 /**
  * HOW OFTEN the coach event fires across a cue's repetitions.
@@ -81,11 +77,7 @@ export type CoachTimingRelation =
  * - `authored-events` — coast check-ins etc.; not tied to rep boundaries at all
  */
 export type CoachRepeatFrequency =
-  | 'once-per-cue'
-  | 'once-per-rep'
-  | 'first-rep-only'
-  | 'selected-reps'
-  | 'authored-events'
+  'once-per-cue' | 'once-per-rep' | 'first-rep-only' | 'selected-reps' | 'authored-events'
 
 export interface VoicePolicy {
   contentKind: CoachContentKind
@@ -110,11 +102,7 @@ export interface VoicePolicy {
  * reinforcement + shared-block sustained instruction all at once —
  * the Kyle-mixed-cue case).
  */
-export type CoachStrikeRelation =
-  | 'precall'
-  | 'synchronized'
-  | 'shared-block'
-  | 'checkin'
+export type CoachStrikeRelation = 'precall' | 'synchronized' | 'shared-block' | 'checkin'
 
 export interface CoachEventLink {
   coachEventId: string

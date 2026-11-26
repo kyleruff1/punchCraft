@@ -239,9 +239,7 @@ describe('the quick catalogue (2026-09-07) — two rounds × 4:00, one 1:00 rest
 
   it('only Southpaw Mirror switches stance, and only at the round boundary', () => {
     for (const s of quick) {
-      const stances = s.workout.schedule.map(
-        (r) => new Set(r.blocks.map((b) => b.stance)),
-      )
+      const stances = s.workout.schedule.map((r) => new Set(r.blocks.map((b) => b.stance)))
       for (const set of stances) expect(set.size).toBe(1)
       const perRound = stances.map((set) => [...set][0])
       if (s.key === 'quick-southpaw-mirror') {
@@ -282,9 +280,7 @@ describe('three-round-fundamentals — click-track edition (MVP v2, GH #305)', (
 
   it('walks all three rates in round 1 — 1x, 1.5x and 2x under one BPM', () => {
     const steps = round1.blocks.map((b) => b.tokens[1]!.beatOffset - b.tokens[0]!.beatOffset)
-    expect(new Set(steps.map((v) => Math.round(1000 / v) / 1000))).toEqual(
-      new Set([1, 1.5, 2]),
-    )
+    expect(new Set(steps.map((v) => Math.round(1000 / v) / 1000))).toEqual(new Set([1, 1.5, 2]))
   })
 })
 
@@ -343,30 +339,27 @@ describe('switch-by-round changes stance only at round boundaries (doc §11)', (
 })
 
 describe('token streams are stable fixtures', () => {
-  it.each(ALL.map((s) => [s.key] as [SampleWorkoutKey]))(
-    '%s token stream snapshot',
-    (key) => {
-      // Downstream suites depend on these exact streams; the snapshot makes
-      // an accidental edit to a sample visible here rather than as a failure
-      // in M32-09.
-      const workout = getSampleWorkout(key).workout
-      const stream = workout.schedule.map((round) => ({
-        theme: round.theme,
-        target: round.targetPunches,
-        blocks: round.blocks.map((b) => ({
-          id: b.id,
-          kind: b.kind,
-          stance: b.stance,
-          repeat: b.repeat ?? null,
-          targetPunches: b.targetPunches ?? null,
-          tokens: b.tokens.map((t) => {
-            if (t.kind === 'punch') return `${t.number}${t.body ? 'b' : ''}@${t.beatOffset}`
-            if (t.kind === 'rest') return `rest@${t.beatOffset}`
-            return `${t.command}@${t.beatOffset}`
-          }),
-        })),
-      }))
-      expect(stream).toMatchSnapshot()
-    },
-  )
+  it.each(ALL.map((s) => [s.key] as [SampleWorkoutKey]))('%s token stream snapshot', (key) => {
+    // Downstream suites depend on these exact streams; the snapshot makes
+    // an accidental edit to a sample visible here rather than as a failure
+    // in M32-09.
+    const workout = getSampleWorkout(key).workout
+    const stream = workout.schedule.map((round) => ({
+      theme: round.theme,
+      target: round.targetPunches,
+      blocks: round.blocks.map((b) => ({
+        id: b.id,
+        kind: b.kind,
+        stance: b.stance,
+        repeat: b.repeat ?? null,
+        targetPunches: b.targetPunches ?? null,
+        tokens: b.tokens.map((t) => {
+          if (t.kind === 'punch') return `${t.number}${t.body ? 'b' : ''}@${t.beatOffset}`
+          if (t.kind === 'rest') return `rest@${t.beatOffset}`
+          return `${t.command}@${t.beatOffset}`
+        }),
+      })),
+    }))
+    expect(stream).toMatchSnapshot()
+  })
 })

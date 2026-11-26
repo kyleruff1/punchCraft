@@ -11,11 +11,7 @@
  * Type-only imports from '@ble/bleTypes' are permitted per §15.1.
  */
 
-import type {
-  AdvertisementSnapshot,
-  GattSnapshot,
-  RawBleFrame,
-} from '@ble/bleTypes'
+import type { AdvertisementSnapshot, GattSnapshot, RawBleFrame } from '@ble/bleTypes'
 import type { TrackerPunchEvent } from '@domain/punch/PunchEvent'
 
 export interface ProtocolInspection {

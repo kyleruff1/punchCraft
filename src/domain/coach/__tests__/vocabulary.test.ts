@@ -51,7 +51,9 @@ describe('a combination becomes clip ids', () => {
   it('refuses a punch number outside 1–6', () => {
     // A stored plan could carry one. Speaking a wrong digit confidently is
     // worse than failing loudly.
-    const bad = [{ kind: 'punch', number: 7, body: false, beatOffset: 0 }] as unknown as WorkoutToken[]
+    const bad = [
+      { kind: 'punch', number: 7, body: false, beatOffset: 0 },
+    ] as unknown as WorkoutToken[]
     expect(() => comboPhraseAssets(bad)).toThrow(/outside 1–6/)
   })
 
@@ -136,7 +138,9 @@ describe('the spoken velocity readout (spec §4.3)', () => {
     // measurement nobody has validated.
     // Matched as whole words: a bare letter like "g" is a substring of
     // "average" and would assert nothing.
-    const words = velocityPhrase('average', 6.8).toLowerCase().split(/[^a-z/]+/)
+    const words = velocityPhrase('average', 6.8)
+      .toLowerCase()
+      .split(/[^a-z/]+/)
     for (const unit of ['mph', 'm/s', 'kph', 'newton', 'joule', 'g', 'gs']) {
       expect([unit, words.includes(unit)]).toEqual([unit, false])
     }

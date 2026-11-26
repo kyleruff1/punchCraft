@@ -11,7 +11,10 @@ import { canGenerate, validateRecipe, type RecipeConflict } from '../recipeValid
 import { defaultRecipe, type WorkoutRecipe } from '../WorkoutRecipe'
 import { GOAL_TIERS } from '../punchGoals'
 
-const recipe = (over: Partial<WorkoutRecipe> = {}): WorkoutRecipe => ({ ...defaultRecipe(), ...over })
+const recipe = (over: Partial<WorkoutRecipe> = {}): WorkoutRecipe => ({
+  ...defaultRecipe(),
+  ...over,
+})
 const codes = (r: WorkoutRecipe): string[] => validateRecipe(r).map((c) => c.code)
 
 describe('defaultRecipe', () => {
@@ -116,16 +119,32 @@ describe('(b) jab disabled — the doc §12 worked example', () => {
 
 describe('(c) frequency set with an empty command list', () => {
   it.each([
-    ['defense', { defenseFrequency: 'light', enabledDefense: [] }, 'enabledDefense-empty-with-frequency'],
-    ['footwork', { footworkFrequency: 'heavy', enabledFootwork: [] }, 'enabledFootwork-empty-with-frequency'],
-  ] as Array<[string, Partial<WorkoutRecipe>, string]>)('is an error for %s', (_label, over, code) => {
-    const conflicts = validateRecipe(recipe(over))
-    expect(conflicts.find((c) => c.code === code)?.severity).toBe('error')
-  })
+    [
+      'defense',
+      { defenseFrequency: 'light', enabledDefense: [] },
+      'enabledDefense-empty-with-frequency',
+    ],
+    [
+      'footwork',
+      { footworkFrequency: 'heavy', enabledFootwork: [] },
+      'enabledFootwork-empty-with-frequency',
+    ],
+  ] as Array<[string, Partial<WorkoutRecipe>, string]>)(
+    'is an error for %s',
+    (_label, over, code) => {
+      const conflicts = validateRecipe(recipe(over))
+      expect(conflicts.find((c) => c.code === code)?.severity).toBe('error')
+    },
+  )
 
   it('does not fire when the frequency is off', () => {
     const conflicts = validateRecipe(
-      recipe({ defenseFrequency: 'off', enabledDefense: [], footworkFrequency: 'off', enabledFootwork: [] }),
+      recipe({
+        defenseFrequency: 'off',
+        enabledDefense: [],
+        footworkFrequency: 'off',
+        enabledFootwork: [],
+      }),
     )
     expect(conflicts.filter((c) => c.code.includes('empty-with-frequency'))).toEqual([])
   })
@@ -134,7 +153,11 @@ describe('(c) frequency set with an empty command list', () => {
 describe('(d) goal above the Extreme tier', () => {
   it('is a warning, not a block', () => {
     const conflicts = validateRecipe(
-      recipe({ durationMinutes: 20, totalPunchGoal: GOAL_TIERS.extreme[20] + 500, maximumComboPunches: 5 }),
+      recipe({
+        durationMinutes: 20,
+        totalPunchGoal: GOAL_TIERS.extreme[20] + 500,
+        maximumComboPunches: 5,
+      }),
     )
     const conflict = conflicts.find((c) => c.code === 'goal-above-extreme-tier')
     expect(conflict?.severity).toBe('warning')
@@ -142,7 +165,9 @@ describe('(d) goal above the Extreme tier', () => {
   })
 
   it('does not fire at exactly the Extreme value', () => {
-    const conflicts = validateRecipe(recipe({ durationMinutes: 20, totalPunchGoal: GOAL_TIERS.extreme[20] }))
+    const conflicts = validateRecipe(
+      recipe({ durationMinutes: 20, totalPunchGoal: GOAL_TIERS.extreme[20] }),
+    )
     expect(conflicts.some((c) => c.code === 'goal-above-extreme-tier')).toBe(false)
   })
 })
@@ -160,9 +185,9 @@ describe('(e) goal unreachable at the chosen combo length', () => {
   })
 
   it('does not fire for a comfortable pairing', () => {
-    expect(codes(recipe({ durationMinutes: 20, totalPunchGoal: 1000, maximumComboPunches: 5 }))).not.toContain(
-      'goal-unreachable-at-combo-length',
-    )
+    expect(
+      codes(recipe({ durationMinutes: 20, totalPunchGoal: 1000, maximumComboPunches: 5 })),
+    ).not.toContain('goal-unreachable-at-combo-length')
   })
 })
 

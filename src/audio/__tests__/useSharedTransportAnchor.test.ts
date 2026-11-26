@@ -25,14 +25,11 @@
 // under test never touches Reanimated — only the `useSharedTransportAnchor`
 // React hook does — so a minimal stub is enough for these tests.
 jest.mock('react-native-reanimated', () => ({
-  useSharedValue: <T,>(init: T) => ({ value: init }),
+  useSharedValue: <T>(init: T) => ({ value: init }),
 }))
 
 import { MetronomeTransport } from '../MetronomeTransport'
-import {
-  bindSharedTransportAnchor,
-  type AnchorSlot,
-} from '../useSharedTransportAnchor'
+import { bindSharedTransportAnchor, type AnchorSlot } from '../useSharedTransportAnchor'
 import {
   SHARED_ANCHOR_STOPPED,
   type SharedTransportAnchor,

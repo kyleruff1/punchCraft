@@ -27,7 +27,9 @@ interface Harness {
   times: () => number[]
 }
 
-function harness(options: Partial<ConstructorParameters<typeof SimulatedPunchSource>[0]> = {}): Harness {
+function harness(
+  options: Partial<ConstructorParameters<typeof SimulatedPunchSource>[0]> = {},
+): Harness {
   const clock = createFakeClock()
   const events: TrackerPunchEvent[] = []
   const source = new SimulatedPunchSource({

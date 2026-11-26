@@ -25,7 +25,11 @@
  * Pure TypeScript — no React, Expo, SQLite or BLE imports (spec §15.1).
  */
 
-import { sequenceScoreLabel, tierScoresTechnique, type CapabilityTier } from '../workout/capabilityTier'
+import {
+  sequenceScoreLabel,
+  tierScoresTechnique,
+  type CapabilityTier,
+} from '../workout/capabilityTier'
 import { CALCULATION_VERSION } from '../workout/versions'
 import type { CueMatchResult } from './CueMatcher'
 import type { TrackerPunchEvent } from '../punch/PunchEvent'

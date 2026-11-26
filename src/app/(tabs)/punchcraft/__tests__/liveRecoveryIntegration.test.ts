@@ -37,10 +37,7 @@ const corpus = JSON.parse(
   readFileSync(join(cwd, 'tools', 'voice', 'recovery.json'), 'utf8'),
 ) as Corpus
 
-const introSrc = readFileSync(
-  join(cwd, 'src', 'audio', 'voiceAssets', 'introManifest.ts'),
-  'utf8',
-)
+const introSrc = readFileSync(join(cwd, 'src', 'audio', 'voiceAssets', 'introManifest.ts'), 'utf8')
 const openerDurations: number[] = []
 for (const m of introSrc.matchAll(/'warn-opener-\d+':[^{]*\{[^}]*durationMs:\s*(\d+)/g)) {
   openerDurations.push(Number(m[1]))

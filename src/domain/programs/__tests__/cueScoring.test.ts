@@ -19,10 +19,10 @@ import { legacyThreeRoundFundamentals as threeRoundFundamentals } from '../../wo
 import { CALCULATION_VERSION } from '../../workout/versions'
 import type { CapabilityTier } from '../../workout/capabilityTier'
 import type { TrackerPunchEvent } from '../../punch/PunchEvent'
+import { asWorkElapsedMs } from '../../time/clockDomains'
 
 const STEADY_BPM = CADENCE_PROFILES.steady.nominalBpm
-const CUE: CueInstance = expandTimeline(threeRoundFundamentals, 'orthodox', STEADY_BPM)[0]!
-  .cues[1]!
+const CUE: CueInstance = expandTimeline(threeRoundFundamentals, 'orthodox', STEADY_BPM)[0]!.cues[1]!
 
 /**
  * How long the app had been running when the bell rang. Fixtures stamp each
@@ -35,7 +35,7 @@ const UPTIME_AT_BELL_MS = 3_600_000
 
 const placed = (event: TrackerPunchEvent): PlacedPunch => ({
   event,
-  workElapsedMs: event.receivedMonotonicTimeMs - UPTIME_AT_BELL_MS,
+  workElapsedMs: asWorkElapsedMs(event.receivedMonotonicTimeMs - UPTIME_AT_BELL_MS),
 })
 
 let nextId = 0
@@ -63,7 +63,8 @@ function onToken(n: number, over: Partial<TrackerPunchEvent> = {}): TrackerPunch
   const expected = CUE.expectedPunches[n]!
   return event({
     hand: expected.hand,
-    receivedMonotonicTimeMs: UPTIME_AT_BELL_MS + CUE.scheduledStartMs + (CUE.tokenOffsetsMs[expected.tokenIndex] ?? 0),
+    receivedMonotonicTimeMs:
+      UPTIME_AT_BELL_MS + CUE.scheduledStartMs + (CUE.tokenOffsetsMs[expected.tokenIndex] ?? 0),
     ...over,
   })
 }
@@ -117,7 +118,10 @@ describe('completion and correct hand', () => {
     // but since D18 a wrong hand no longer fills the expectation, so nothing
     // completed. Hand accuracy is measured among the punches that answered an
     // expectation, so one wrong glove and nothing else is 0%.
-    const wrong = event({ hand: 'right', receivedMonotonicTimeMs: UPTIME_AT_BELL_MS + CUE.scheduledStartMs })
+    const wrong = event({
+      hand: 'right',
+      receivedMonotonicTimeMs: UPTIME_AT_BELL_MS + CUE.scheduledStartMs,
+    })
     const result = score([wrong])
     expect(result.completionPct).toBe(0)
     expect(result.correctHandPct).toBe(0)
@@ -126,7 +130,10 @@ describe('completion and correct hand', () => {
   it('scores hand accuracy against attempts, not against what was called', () => {
     // A set half-thrown, correctly: 100% of what was attempted used the right
     // glove, while completion honestly reports that half the set went unthrown.
-    const right = event({ hand: 'left', receivedMonotonicTimeMs: UPTIME_AT_BELL_MS + CUE.scheduledStartMs })
+    const right = event({
+      hand: 'left',
+      receivedMonotonicTimeMs: UPTIME_AT_BELL_MS + CUE.scheduledStartMs,
+    })
     const result = score([right])
     expect(result.completionPct).toBe(50)
     expect(result.correctHandPct).toBe(100)
@@ -270,7 +277,13 @@ describe('scoreRound', () => {
 
   it('sums extras across cues', () => {
     const base = score([onToken(0)])
-    const round = scoreRound([{ ...base, extraCount: 2 }, { ...base, extraCount: 3 }], 'hand-only')
+    const round = scoreRound(
+      [
+        { ...base, extraCount: 2 },
+        { ...base, extraCount: 3 },
+      ],
+      'hand-only',
+    )
     expect(round.extraCount).toBe(5)
   })
 

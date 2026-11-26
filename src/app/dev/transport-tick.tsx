@@ -79,11 +79,7 @@ function FrameTickReadout({
     return { text, defaultValue: text }
   })
   return (
-    <AnimatedTextInput
-      editable={false}
-      animatedProps={animatedProps}
-      style={styles.tickReadout}
-    />
+    <AnimatedTextInput editable={false} animatedProps={animatedProps} style={styles.tickReadout} />
   )
 }
 
@@ -102,9 +98,7 @@ export default function TransportTickDev(): React.JSX.Element {
   // Snapshot for the JS-thread readouts (state name, generation,
   // ticks/sec). Subscribes to the same events the publisher hook
   // subscribes to — two subscribers, both notified.
-  const [snapshot, setSnapshot] = useState<MetronomeTransportSnapshot>(() =>
-    transport.snapshot(),
-  )
+  const [snapshot, setSnapshot] = useState<MetronomeTransportSnapshot>(() => transport.snapshot())
   useEffect(() => {
     const unsubscribe = transport.subscribe(setSnapshot)
     return unsubscribe
@@ -129,9 +123,7 @@ export default function TransportTickDev(): React.JSX.Element {
         <View style={styles.card}>
           <Text style={styles.label}>Frame-callback tick</Text>
           <FrameTickReadout anchor={anchor} />
-          <Text style={styles.hint}>
-            Should count up at 960 ticks/s at 60 BPM (~1.04 ms/tick).
-          </Text>
+          <Text style={styles.hint}>Should count up at 960 ticks/s at 60 BPM (~1.04 ms/tick).</Text>
         </View>
 
         <View style={styles.card}>

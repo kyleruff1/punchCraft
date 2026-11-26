@@ -71,9 +71,7 @@ export interface BlockSpec {
 function withOffsets(tokens: WorkoutToken[], offsets?: readonly number[]): WorkoutToken[] {
   if (!offsets) return tokens
   if (offsets.length !== tokens.length) {
-    throw new Error(
-      `offsets length ${offsets.length} does not match token count ${tokens.length}`,
-    )
+    throw new Error(`offsets length ${offsets.length} does not match token count ${tokens.length}`)
   }
   return tokens.map((token, i) => ({ ...token, beatOffset: offsets[i] as number }))
 }
@@ -234,9 +232,7 @@ export function padBlocksToRound(
             .filter((t): t is Extract<WorkoutToken, { kind: 'punch' }> => t.kind === 'punch')
             .map((t) => `${t.number}${t.body ? 'b' : ''}`)
             .join('-'),
-          offsets: last.tokens
-            .filter((t) => t.kind === 'punch')
-            .map((t) => t.beatOffset ?? 0),
+          offsets: last.tokens.filter((t) => t.kind === 'punch').map((t) => t.beatOffset ?? 0),
           gapBeats: last.gapBeats,
           ...(last.cadence !== undefined ? { cadence: last.cadence } : {}),
           ...(last.spokenPhrase !== undefined ? { spokenPhrase: last.spokenPhrase } : {}),
