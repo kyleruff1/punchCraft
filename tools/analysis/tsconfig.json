@@ -10,6 +10,6 @@
     "noUncheckedIndexedAccess": false,
     "types": ["node"]
   },
-  "include": ["./*.mjs", "../guards/*.mjs"],
+  "include": ["./*.mjs", "../guards/*.mjs", "../dev/*.mjs"],
   "exclude": []
 }

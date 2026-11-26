@@ -100,7 +100,7 @@ export default [
   },
   {
     // The verifiers' own tests: ES modules, transformed and run by jest.
-    files: ['tools/analysis/__tests__/**/*.js'],
+    files: ['tools/analysis/__tests__/**/*.js', 'tools/dev/__tests__/**/*.js'],
     languageOptions: {
       globals: {
         require: 'readonly',
