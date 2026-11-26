@@ -80,8 +80,23 @@ export const PUNCH_REJECTION_REASONS = [
 
 export type PunchRejectionReason = (typeof PUNCH_REJECTION_REASONS)[number]
 
-/** Session modes (§17.1). */
-export const SESSION_MODES = ['velocity-test', 'punchcraft', 'workouts'] as const
+/**
+ * Session modes (§17.1) — the values the `sessions.mode` CHECK below was
+ * created with, and so the only values an installed database accepts.
+ *
+ * `'puncheokie'` is a STORED identifier, not a product name. The product was
+ * renamed "punchCraft workouts" on 2026-11-25 and the rename briefly changed
+ * this list and the CHECK to `'workouts'`. That would have left two schemas
+ * in the world under one migration id: a fresh install accepting
+ * `'workouts'`, and every existing install — whose table was created with
+ * the line below and is never re-created — rejecting it with a CHECK
+ * failure, while typecheck and every test said it was fine. Nothing writes
+ * this mode today (a workout session is saved as `'punchcraft'`, see
+ * `persistWorkoutSession`), which is the only reason it would have gone
+ * unnoticed. To rename the stored value, add a migration that rebuilds the
+ * table; never edit this one.
+ */
+export const SESSION_MODES = ['velocity-test', 'punchcraft', 'puncheokie'] as const
 export type SessionMode = (typeof SESSION_MODES)[number]
 
 /** Session status values — the §18.1 state machine, persisted verbatim. */
@@ -105,7 +120,7 @@ export const MIGRATION_003: Migration = {
     db.execSync(`
       CREATE TABLE IF NOT EXISTS sessions (
         id TEXT PRIMARY KEY,
-        mode TEXT NOT NULL CHECK(mode IN ('velocity-test','punchcraft','workouts')),
+        mode TEXT NOT NULL CHECK(mode IN ('velocity-test','punchcraft','puncheokie')),
         status TEXT NOT NULL CHECK(status IN (
           'configuring','ready','countdown','work','paused','rest','finishing','completed','cancelled'
         )),

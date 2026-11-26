@@ -81,7 +81,7 @@ describe('sessions table', () => {
   it('defaults every quality counter and active_duration_ms to zero', () => {
     db.execSync(
       `INSERT INTO sessions (id, mode, status, created_at)
-       VALUES ('s1', 'workouts', 'configuring', '2026-08-23T00:00:00.000Z')`,
+       VALUES ('s1', 'puncheokie', 'configuring', '2026-08-23T00:00:00.000Z')`,
     )
     const row = db.query<Record<string, number>>('SELECT * FROM sessions WHERE id = ?', ['s1'])[0]!
     expect(row.active_duration_ms).toBe(0)
@@ -99,7 +99,7 @@ describe('sessions table', () => {
     ).toThrow(/CHECK constraint failed/i)
     expect(() =>
       db.execSync(
-        `INSERT INTO sessions (id, mode, status, created_at) VALUES ('bad', 'workouts', 'sprinting', 'x')`,
+        `INSERT INTO sessions (id, mode, status, created_at) VALUES ('bad', 'puncheokie', 'sprinting', 'x')`,
       ),
     ).toThrow(/CHECK constraint failed/i)
   })
@@ -263,7 +263,7 @@ describe('cascade contract', () => {
         (id, capture_id, monotonic_time_ms, wall_time_iso, direction, service_uuid,
          characteristic_uuid, value_base64, value_hex, connection_generation)
         VALUES ('frame1','cap1',1,'t','notification','svc','chr','AA==','00',1);
-      INSERT INTO sessions (id, mode, status, created_at) VALUES ('s1','workouts','completed','t');
+      INSERT INTO sessions (id, mode, status, created_at) VALUES ('s1','puncheokie','completed','t');
       INSERT INTO rounds (id, session_id, round_number) VALUES ('r1','s1',1);
       INSERT INTO punch_events
         (id, source_frame_id, capture_id, hand, received_monotonic_time_ms, received_wall_time_iso,

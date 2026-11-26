@@ -119,7 +119,7 @@ export function persistWorkoutSession(
     const generatedWorkoutId = workout.id
     const session = sessions.create({
       // punchCraft owns building and running workouts; the older
-      // 'workouts' mode in #194's text predates that move.
+      // 'puncheokie' mode in #194's text predates that move.
       mode: 'punchcraft',
       status: cancelled ? 'cancelled' : 'completed',
       startedMonotonicMs,

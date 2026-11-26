@@ -65,7 +65,7 @@ function seedWorkout(db: MemoryDb, opts: { sessionId?: string | null } = {}): vo
 function seedSession(db: MemoryDb, id = 's1'): void {
   db.execSync(
     `INSERT INTO sessions (id, mode, status, created_at)
-     VALUES ('${id}', 'workouts', 'configuring', '2026-08-23T00:00:00.000Z')`,
+     VALUES ('${id}', 'puncheokie', 'configuring', '2026-08-23T00:00:00.000Z')`,
   )
 }
 
