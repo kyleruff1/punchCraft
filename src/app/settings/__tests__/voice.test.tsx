@@ -26,13 +26,26 @@ import VoiceSettingsScreen, { OVERLAY_TOGGLE_LABEL } from '../voice'
 import { __resetVoiceSettingsForTests, useVoiceSettingsStore } from '@state/useVoiceSettingsStore'
 import { PLAYBACK_DETECTION_UNAVAILABLE_NOTICE } from '@audio/ThirdPartyPlaybackDetector'
 
+const mounted: ReactTestRenderer[] = []
+
 function render(): ReactTestRenderer {
   let tree!: ReactTestRenderer
   act(() => {
     tree = create(<VoiceSettingsScreen />)
   })
+  mounted.push(tree)
   return tree
 }
+
+// Unmount what each test rendered. A screen left mounted stays subscribed to
+// the settings store, so the reset before the NEXT test re-rendered every
+// earlier test's screen outside `act` — 156 React warnings a run, growing
+// with each test added.
+afterEach(() => {
+  act(() => {
+    for (const tree of mounted.splice(0)) tree.unmount()
+  })
+})
 
 /** Host nodes only — `findAllByProps` defaults to deep and doubles counts. */
 const node = (tree: ReactTestRenderer, testID: string) =>
