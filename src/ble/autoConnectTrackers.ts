@@ -273,7 +273,14 @@ async function runAutoConnect(options: AutoConnectOptions): Promise<AutoConnectR
       logger.info('autoconnect.connected', 'auto-connected tracker', {
         hand: safe(tracker.hand),
         color: safe(tracker.color),
-        deviceId: deviceSensitive(deviceId),
+        // The address that was connected to — not the scan's sighting, which
+        // is undefined whenever the glove was connected unseen. In the
+        // captures on disk that is every one of 83 successes (N-8), so this
+        // line had never once named its device.
+        deviceId: deviceSensitive(deviceId ?? tracker.address),
+        // Whether the scan saw it advertising. A bonded glove usually does
+        // not: it advertises directed at its partner (see above).
+        sighted: safe(sighted),
       })
       results.push({ hand: tracker.hand, address: tracker.address, status: 'connected' })
     } catch (err) {
