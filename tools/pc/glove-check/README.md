@@ -37,6 +37,13 @@ Open the printed `http://127.0.0.1:8787/` address in **Chrome or Edge**
 - **Glove: read from the glove** — the glove's System ID carried its address,
   so the PC version can tell left from right by itself. **Going by the
   button** means it could not, and hand stays a choice on the PC.
+- **Status byte** — the glove's own status (`ca281073`), read before anything
+  is written and again after the start-up. The official app gates "ready" on
+  bit 4 of it: set, and it requires an OS bond; clear, and it writes command 16
+  (H14). The page only reads and reports — **it never sends command 16**. Set
+  against whether the link held, this is the first evidence of what the bit
+  means. Anything the glove pushes on that channel, and any string on its
+  error channel (`ca281078`), shows on the timeline.
 - **Latency** — arrival time minus the tracker's own timestamp, for punches
   that arrived live. Punches the glove had buffered are marked and left out.
 
@@ -56,12 +63,15 @@ Everything it writes is something the tablet app already writes
 (CLAUDE.md rule 4), from the same code:
 
 1. connects;
-2. **reads** System ID — if that shows the glove is the *other* hand, it hangs
+2. **reads** the status byte;
+3. **reads** System ID — if that shows the glove is the *other* hand, it hangs
    up there, before anything is written;
-3. runs `FightCampV1Adapter.buildInitializationPlan` through
+4. runs `FightCampV1Adapter.buildInitializationPlan` through
    `startPunchStream`: clock sync, three subscriptions, a device-info read,
    mode-normal, the hand byte, command 17;
-4. every 20 s, the keepalive's mode-normal byte and a battery read.
+5. **reads** the status byte again, then battery and the Device Information
+   strings;
+6. every 20 s, the keepalive's mode-normal byte and a battery read.
 
 Gloves are brought up one at a time: in the September spike a connect that
 landed inside the other glove's security procedure failed.

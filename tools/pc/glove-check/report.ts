@@ -5,6 +5,7 @@
 import { UNBONDED_DROP_WINDOW_MS, type BondVerdict } from '@ble/bondDiagnosis'
 
 import { UNBONDED_WINDOW_TEXT, type GloveState, type Hand, type PunchRow } from './gloveCheck'
+import { statusSentence } from './statusByte'
 
 const HOLD_SECONDS = UNBONDED_DROP_WINDOW_MS.max / 1000
 
@@ -95,6 +96,20 @@ function gloveSection(source: ReportSource, hand: Hand): string[] {
     }`,
   )
   lines.push(`  tracker info blob: ${g.trackerInfoHex ?? 'not read'}`)
+  lines.push(`  status byte before start-up: ${statusSentence(g.statusBeforeHex)}`)
+  lines.push(`  status byte after start-up: ${statusSentence(g.statusAfterHex)}`)
+  lines.push(
+    `  status pushed by the glove: ${
+      g.statusNotifications.length === 0
+        ? 'never'
+        : g.statusNotifications.map((s) => `0x${s.hex}`).join(' ')
+    }`,
+  )
+  lines.push(
+    `  error strings from the glove: ${
+      g.errorStrings.length === 0 ? 'none' : g.errorStrings.map((s) => `"${s}"`).join(' ')
+    }`,
+  )
   const info = Object.entries(g.deviceInformation)
   lines.push(
     `  device information: ${info.length === 0 ? 'none read' : info.map(([k, v]) => `${k}=${v}`).join(', ')}`,

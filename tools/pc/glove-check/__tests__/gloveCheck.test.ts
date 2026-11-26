@@ -167,6 +167,86 @@ describe('telling the gloves apart', () => {
   })
 })
 
+describe('the status byte (H14)', () => {
+  it('is read before anything is written, and again after the start-up', async () => {
+    const h = setup()
+    h.f.setRead(LEFT.deviceId, CHAR.NOTIFY_STATUS, '10')
+    await h.connect('left')
+    const g = h.check.glove('left')
+    expect(g.statusBeforeHex).toBe('10')
+    expect(g.statusAfterHex).toBe('10')
+
+    const statusReads = h.f.ops.flatMap((op, i) => (op === `read:${CHAR.NOTIFY_STATUS}` ? [i] : []))
+    const writes = h.f.ops.flatMap((op, i) => (op.startsWith('write:') ? [i] : []))
+    expect(statusReads).toHaveLength(2)
+    expect(statusReads[0]).toBeLessThan(writes[0]!)
+    expect(statusReads[1]).toBeGreaterThan(writes[writes.length - 1]!)
+  })
+
+  it('says what the official app would do, and never does it', async () => {
+    const h = setup()
+    h.f.setRead(LEFT.deviceId, CHAR.NOTIFY_STATUS, '00')
+    await h.connect('left')
+    const lines = h.check.glove('left').timeline.map((e) => e.text)
+    expect(lines).toContain(
+      'status byte before start-up: 0x00: bit 4 clear — the official app would send command 16 here; this page never does',
+    )
+    // Command 16 is 0x10 on the mode channel. Nothing sent it.
+    expect(h.writesTo(LEFT.deviceId)).not.toContainEqual([CHAR.COMMAND1, '10'])
+    await advance(HEARTBEAT_INTERVAL_MS * 3)
+    expect(
+      h.writesTo(LEFT.deviceId).filter(([uuid, hex]) => uuid === CHAR.COMMAND1 && hex === '10'),
+    ).toEqual([])
+  })
+
+  it('carries on when the status byte cannot be read', async () => {
+    const h = setup()
+    await h.connect('left')
+    const g = h.check.glove('left')
+    expect(g.statusBeforeHex).toBeNull()
+    expect(g.phase).toBe('streaming')
+    expect(g.timeline.map((e) => e.text)).toContain(
+      'status byte before start-up: not readable (not readable)',
+    )
+  })
+
+  it('shows a status the glove pushes on its own, and its error strings', async () => {
+    const h = setup()
+    await h.connect('left')
+    const at = new Date().toISOString()
+    h.f.emitFrame(LEFT.deviceId, '10', at, CHAR.NOTIFY_STATUS)
+    // "ASSERT 42" on the channel the app calls COMMAND_ACK and discards.
+    h.f.emitFrame(LEFT.deviceId, '415353455254203432', at, CHAR.COMMAND_ACK)
+    const g = h.check.glove('left')
+    expect(g.statusNotifications.map((s) => s.hex)).toEqual(['10'])
+    expect(g.errorStrings).toEqual(['ASSERT 42'])
+    expect(g.punchCount).toBe(0)
+    // Both are in the raw capture too, like every other frame.
+    expect(h.check.capturedFrames().frames).toHaveLength(2)
+
+    const report = buildReport(h.check, {
+      wallTimeIso: 'T',
+      userAgent: 'jest',
+      bluetoothAvailable: true,
+    })
+    expect(report).toContain('status pushed by the glove: 0x10')
+    expect(report).toContain('error strings from the glove: "ASSERT 42"')
+    expect(report).toContain('status byte before start-up: not read')
+  })
+
+  it('reads it afresh on every link', async () => {
+    const h = setup()
+    h.f.setRead(LEFT.deviceId, CHAR.NOTIFY_STATUS, '00')
+    await h.connect('left')
+    await advance(60_000)
+    h.f.setRead(LEFT.deviceId, CHAR.NOTIFY_STATUS, '10')
+    h.f.drop(LEFT.deviceId)
+    await advance(RECONNECT_DELAY_MS)
+    expect(h.check.glove('left').statusBeforeHex).toBe('10')
+    expect(h.check.glove('left').statusAfterHex).toBe('10')
+  })
+})
+
 describe('what comes back', () => {
   it('decodes a punch through the real decoder and times it', async () => {
     const h = setup()

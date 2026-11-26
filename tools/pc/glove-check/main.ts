@@ -10,6 +10,7 @@ import { FightCampV1Adapter } from '@protocol/fightcamp-v1/FightCampV1Adapter'
 
 import { GloveCheck, type GlovePhase, type Hand } from './gloveCheck'
 import { buildReport, latencySummary, verdictSentence } from './report'
+import { statusSentence } from './statusByte'
 
 const HANDS: readonly Hand[] = ['left', 'right']
 const ROWS_SHOWN = 12
@@ -98,6 +99,19 @@ function draw(check: GloveCheck, panels: Record<Hand, HTMLElement>): void {
       : `${g.subscribedChars.length} subscriptions; ` +
         (g.initErrors.length === 0 ? 'no errors' : g.initErrors.join('; '))
     field(panel, 'battery').textContent = g.batteryPct === null ? '—' : `${g.batteryPct}%`
+    const statusHex = g.statusAfterHex ?? g.statusBeforeHex
+    const pushed = g.statusNotifications.length
+    const errors = g.errorStrings.length
+    field(panel, 'statusByte').textContent = !g.deviceId
+      ? '—'
+      : statusSentence(statusHex) +
+        (g.statusAfterHex !== null &&
+        g.statusBeforeHex !== null &&
+        g.statusAfterHex !== g.statusBeforeHex
+          ? ` (was 0x${g.statusBeforeHex} before start-up)`
+          : '') +
+        (pushed > 0 ? ` · pushed ${pushed}×` : '') +
+        (errors > 0 ? ` · ${errors} error string${errors === 1 ? '' : 's'} — see the timeline` : '')
     field(panel, 'heartbeat').textContent =
       `${g.heartbeatsSent} sent` + (g.heartbeatsFailed > 0 ? `, ${g.heartbeatsFailed} failed` : '')
     field(panel, 'punches').textContent =

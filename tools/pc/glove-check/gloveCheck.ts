@@ -14,10 +14,15 @@
  * What it does to a glove, in order (CLAUDE.md rule 4 — every write here is
  * one the tablet app already sends):
  *   1. connect
- *   2. READ System ID, to check the glove against the button that was
+ *   2. READ the status byte — the vendor gates "ready" on its bit 4 (H14)
+ *   3. READ System ID, to check the glove against the button that was
  *      clicked — before the init plan writes a hand to it
- *   3. the adapter's init plan, through `startPunchStream`
- *   4. every 20 s, the keepalive's mode-normal byte and a battery READ
+ *   4. the adapter's init plan, through `startPunchStream`
+ *   5. READ the status byte again, where the vendor reads it
+ *   6. every 20 s, the keepalive's mode-normal byte and a battery READ
+ *
+ * It also listens to two channels the app subscribes to and discards — the
+ * glove's status pushes and its error strings (`ca281078`) — and shows them.
  *
  * Lessons carried over from the September PC spike (`tools/spikes/pc-ble`):
  * gloves are brought up one at a time (a connect that lands inside the other
@@ -57,6 +62,7 @@ import {
   identifyGlove,
   textFromHex,
 } from './gloveIdentity'
+import { statusSentence } from './statusByte'
 
 export type Hand = 'left' | 'right'
 
@@ -113,6 +119,14 @@ export interface GloveState {
   subscribedChars: string[]
   initErrors: string[]
   trackerInfoHex: string | null
+  /** The status byte read on this link before anything was written (H14). */
+  statusBeforeHex: string | null
+  /** The same read again once the init plan had run. */
+  statusAfterHex: string | null
+  /** Status values the glove pushed on its own, newest last. */
+  statusNotifications: Array<{ atMs: number; hex: string }>
+  /** Strings from the glove's error channel (`ca281078`), newest last. */
+  errorStrings: string[]
   batteryPct: number | null
   punches: PunchRow[]
   punchCount: number
@@ -147,6 +161,8 @@ export const CONNECT_TIMEOUT_MS = 25_000
 export const MAX_RECONNECTS = 6
 /** Punch rows kept per glove for the list; the count is never capped. */
 export const MAX_PUNCH_ROWS = 500
+/** Status notifications and error strings kept per glove for display. */
+export const MAX_SIDE_CHANNEL_ROWS = 50
 /** Raw frames kept for download. Past this the oldest go, and it says so. */
 export const MAX_CAPTURED_FRAMES = 50_000
 
@@ -200,6 +216,10 @@ function freshGlove(hand: Hand): Glove {
     subscribedChars: [],
     initErrors: [],
     trackerInfoHex: null,
+    statusBeforeHex: null,
+    statusAfterHex: null,
+    statusNotifications: [],
+    errorStrings: [],
     batteryPct: null,
     punches: [],
     punchCount: 0,
@@ -332,6 +352,10 @@ export class GloveCheck {
       g.identified = null
       g.systemIdHex = null
       g.deviceInformation = {}
+      g.statusBeforeHex = null
+      g.statusAfterHex = null
+      g.statusNotifications = []
+      g.errorStrings = []
       g.bond = initialBondDiagnosis()
     }
     g.deviceId = picked.deviceId
@@ -382,6 +406,11 @@ export class GloveCheck {
       this.note(g, `connected in ${seconds(this.now() - startedAt)}`)
       if (!alive()) return
 
+      // Before anything is written: what the glove says about itself.
+      g.statusBeforeHex = await this.readStatus(g, deviceId, 'before start-up')
+      g.statusAfterHex = null
+      if (!alive()) return
+
       if (!g.identityTried) {
         g.phase = 'identifying'
         this.changed()
@@ -418,6 +447,8 @@ export class GloveCheck {
       g.controller = controller
       g.phase = 'streaming'
       this.changed()
+      // The vendor reads the status byte here, after its own start-up.
+      g.statusAfterHex = await this.readStatus(g, deviceId, 'after start-up')
       await this.readBattery(g, deviceId)
       await this.readDeviceInformation(g, deviceId)
     } catch (err) {
@@ -615,6 +646,21 @@ export class GloveCheck {
     this.changed()
   }
 
+  /** READ the status byte and say what the vendor would do with it (H14). */
+  private async readStatus(g: Glove, deviceId: string, when: string): Promise<string | null> {
+    const read = await this.facade.readCharacteristic(
+      deviceId,
+      FIGHTCAMP_SERVICE_UUID,
+      CHAR.NOTIFY_STATUS,
+    )
+    if (!read.success || !read.valueHex) {
+      this.note(g, `status byte ${when}: not readable (${read.errorMessage ?? 'no value'})`)
+      return null
+    }
+    this.note(g, `status byte ${when}: ${statusSentence(read.valueHex)}`)
+    return read.valueHex
+  }
+
   private async readBattery(g: Glove, deviceId: string): Promise<void> {
     const read = await this.facade.readCharacteristic(
       deviceId,
@@ -645,7 +691,21 @@ export class GloveCheck {
       this.droppedFrames += 1
     }
     for (const g of Object.values(this.gloves)) {
-      if (g.deviceId === frame.deviceId) g.frames += 1
+      if (g.deviceId !== frame.deviceId) continue
+      g.frames += 1
+      // Two channels the decoder has no use for, and the app discards: the
+      // glove's own status pushes, and its error strings.
+      const characteristic = frame.characteristicUuid.toLowerCase()
+      if (characteristic === CHAR.NOTIFY_STATUS) {
+        g.statusNotifications.push({ atMs: frame.monotonicTimeMs, hex: frame.valueHex })
+        if (g.statusNotifications.length > MAX_SIDE_CHANNEL_ROWS) g.statusNotifications.shift()
+        this.note(g, `status pushed by the glove: ${statusSentence(frame.valueHex)}`)
+      } else if (characteristic === CHAR.COMMAND_ACK) {
+        const text = textFromHex(frame.valueHex)
+        g.errorStrings.push(text)
+        if (g.errorStrings.length > MAX_SIDE_CHANNEL_ROWS) g.errorStrings.shift()
+        this.note(g, `error string from the glove: "${text}"`)
+      }
     }
   }
 

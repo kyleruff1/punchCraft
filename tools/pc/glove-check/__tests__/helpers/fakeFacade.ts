@@ -33,6 +33,8 @@ export function fakeFacade(now: () => number) {
   const monitors = new Map<string, Set<(f: RawBleFrame) => void>>()
   const reads = new Map<string, string>()
   const writes: FakeWrite[] = []
+  /** Every read and write in the order it was asked for: `read:<uuid>`. */
+  const ops: string[] = []
   const connectFailures: Error[] = []
   const hangingConnects = new Map<string, (err: Error) => void>()
   let hangNextConnect = false
@@ -134,10 +136,12 @@ export function fakeFacade(now: () => number) {
       if (!connected.has(deviceId)) return { ...notConnected, bytesWritten: 0 }
       const hex = payload.hex ?? (payload.base64 === 'AQ==' ? '01' : `b64:${payload.base64}`)
       writes.push({ deviceId, characteristicUuid, hex })
+      ops.push(`write:${characteristicUuid}`)
       return { success: true, bytesWritten: hex.length / 2, durationMs: 1 }
     },
     readCharacteristic: async (deviceId, _service, characteristicUuid): Promise<ReadResult> => {
       const valueHex = reads.get(`${deviceId}|${characteristicUuid}`)
+      ops.push(`read:${characteristicUuid}`)
       if (!connected.has(deviceId)) return notConnected
       if (valueHex === undefined) return { ...notConnected, errorMessage: 'not readable' }
       return { success: true, durationMs: 1, valueHex, valueBase64: hexToBase64(valueHex) }
@@ -148,6 +152,7 @@ export function fakeFacade(now: () => number) {
   return {
     facade,
     writes,
+    ops,
     pickRequests,
     willPick: (device: PickedDevice | Error) => picks.push(device),
     setRead: (deviceId: string, characteristicUuid: string, valueHex: string) =>
@@ -159,7 +164,12 @@ export function fakeFacade(now: () => number) {
     drop: dropLink,
     isConnected: (deviceId: string) => connected.has(deviceId),
     /** Deliver a data-stream frame the way the transport does: sink first. */
-    emitFrame: (deviceId: string, valueHex: string, wallTimeIso: string) => {
+    emitFrame: (
+      deviceId: string,
+      valueHex: string,
+      wallTimeIso: string,
+      characteristicUuid: string = CHAR.DATA_STREAM,
+    ) => {
       const frame: RawBleFrame = {
         id: `f-${seq++}`,
         captureId: 'test',
@@ -169,13 +179,13 @@ export function fakeFacade(now: () => number) {
         wallTimeIso,
         direction: 'indication',
         serviceUuid: FIGHTCAMP_SERVICE_UUID,
-        characteristicUuid: CHAR.DATA_STREAM,
+        characteristicUuid,
         valueBase64: hexToBase64(valueHex),
         valueHex,
         connectionGeneration: generation.get(deviceId) ?? 0,
       }
       sink?.capture(frame)
-      for (const cb of [...(monitors.get(`${deviceId}|${CHAR.DATA_STREAM}`) ?? [])]) cb(frame)
+      for (const cb of [...(monitors.get(`${deviceId}|${characteristicUuid}`) ?? [])]) cb(frame)
     },
   }
 }
