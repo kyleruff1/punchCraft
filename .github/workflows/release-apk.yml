@@ -1,0 +1,90 @@
+name: release apk
+
+# Builds the release APK for every commit on main and keeps it as a
+# downloadable artifact — the "known-good APK" spec §11.2 asks to be
+# preserved, without someone having to remember to build it.
+#
+# The spec does not say where builds happen; "Android builds are done
+# locally" was only ever a comment in ci.yml. Local builds still work exactly
+# as before (`docs/dev-setup.md`).
+#
+# NOT YET SEEN GREEN. Written 2026-11-25 and impossible to run before it is
+# on GitHub. Expect the first run or two to need a fix: the likeliest causes
+# are a missing SDK component, runner disk space (the app bundles ~900 MB of
+# audio), or build time.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Only the newest commit's APK is worth finishing.
+concurrency:
+  group: release-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build release apk
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # The versions app.config.ts pins through expo-build-properties. The
+      # runner image ships an SDK; these lines make the build independent of
+      # which components that image happens to carry this month.
+      - name: Install the pinned SDK components
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "ndk;27.2.12479018"
+
+      # `android/` is not tracked: continuous native generation rebuilds it
+      # from app.config.ts. This also writes android/app/debug.keystore from
+      # Expo's template — byte-for-byte the keystore every local prebuild
+      # gets (checked: same SHA-256), which is what release builds are signed
+      # with. So an APK from here has the same signature as one built on the
+      # workstation and installs over it with `adb install -r`, data intact.
+      - name: Generate the native project
+        run: npx expo prebuild --platform android --no-install
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # arm64 only: the tablet's ABI, and a third of the build time.
+      - name: Build
+        working-directory: android
+        run: ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon
+
+      - name: Name the APK after its commit
+        id: apk
+        run: |
+          sha="$(git rev-parse --short HEAD)"
+          mkdir -p artifacts
+          cp android/app/build/outputs/apk/release/app-release.apk "artifacts/punchcraft-release-${sha}.apk"
+          ls -la artifacts
+          echo "name=punchcraft-release-${sha}" >> "$GITHUB_OUTPUT"
+
+      # About 1 GB each, so they are not kept for long. An APK is already
+      # compressed; compressing it again only costs time.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.apk.outputs.name }}
+          path: artifacts/*.apk
+          retention-days: 7
+          compression-level: 0
+          if-no-files-found: error
