@@ -27,6 +27,10 @@ describe('isInterruptedPlay', () => {
     expect(
       isInterruptedPlay({ name: 'NotAllowedError', message: 'play() failed because the user…' }),
     ).toBe(false)
+    // The wording alone is not enough: it has to be an abort.
+    expect(
+      isInterruptedPlay({ name: 'NotSupportedError', message: 'The play() request was refused.' }),
+    ).toBe(false)
     // An abort that is not a play() — a cancelled fetch, say.
     expect(isInterruptedPlay({ name: 'AbortError', message: 'The user aborted a request.' })).toBe(
       false,
