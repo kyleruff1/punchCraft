@@ -36,6 +36,7 @@ import type {
   RealizedTokenStream,
   WorkoutRepository,
 } from './repositories/WorkoutRepository'
+import { storedPlanId } from './repositories/WorkoutRepository'
 import type { GeneratedWorkout } from '@domain/workout/GeneratedWorkout'
 import type { TrackerPunchEvent } from '@domain/punch/PunchEvent'
 
@@ -114,7 +115,9 @@ export function persistWorkoutSession(args: PersistWorkoutSessionArgs): Persiste
     // foreign key, so the workout cannot be written before its session
     // exists. `sessions.generated_workout_id` has no FK (migration 003
     // predates the workouts table), so it can be set here in one pass.
-    const generatedWorkoutId = workout.id
+    // The plan's stored id, not the workout's own: every row that points at
+    // the plan must use the key the plan row is written under.
+    const generatedWorkoutId = storedPlanId(workout)
     const session = sessions.create({
       // punchCraft owns building and running workouts; the older
       // 'puncheokie' mode in #194's text predates that move.
