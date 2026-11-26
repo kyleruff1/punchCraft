@@ -37,6 +37,7 @@ import {
 import type { CueEvent, CueEventType, CueStatus, CueTimestamps } from '@domain/programs/CueState'
 import type { CueInstance } from '@domain/programs/CueTimeline'
 import type { WorkoutToken } from '@domain/workout/WorkoutTokens'
+import { asMonotonicMs, asWorkElapsedMs } from '@domain/time/clockDomains'
 
 /* ------------------------------------------------------------ fake port */
 
@@ -1511,7 +1512,10 @@ describe('block-level instruction dispatch (WS4 / A23)', () => {
     const h = harness()
     h.announcer.setRound(round, map)
     // Tick past the instruction time — same work-elapsed frame the runner uses.
-    h.announcer.onTick(instructionEvent.atMs + 10, instructionEvent.atMs + 10)
+    h.announcer.onTick(
+      asWorkElapsedMs(instructionEvent.atMs + 10),
+      asMonotonicMs(instructionEvent.atMs + 10),
+    )
     const insCall = h.port.calls.find((k) => k.kind === 'instruction')
     expect(insCall).toEqual({
       kind: 'instruction',
@@ -1528,7 +1532,10 @@ describe('block-level instruction dispatch (WS4 / A23)', () => {
     const h = harness()
     h.port.audibleUntilValue = instructionEvent.atMs + 2_000
     h.announcer.setRound(round, map)
-    h.announcer.onTick(instructionEvent.atMs + 10, instructionEvent.atMs + 10)
+    h.announcer.onTick(
+      asWorkElapsedMs(instructionEvent.atMs + 10),
+      asMonotonicMs(instructionEvent.atMs + 10),
+    )
     expect(h.port.calls.find((k) => k.kind === 'instruction')).toBeUndefined()
   })
 
@@ -1536,7 +1543,10 @@ describe('block-level instruction dispatch (WS4 / A23)', () => {
     const h = harness()
     h.announcer.setThirdPartyPlayback(true)
     h.announcer.setRound(round, map)
-    h.announcer.onTick(instructionEvent.atMs + 10, instructionEvent.atMs + 10)
+    h.announcer.onTick(
+      asWorkElapsedMs(instructionEvent.atMs + 10),
+      asMonotonicMs(instructionEvent.atMs + 10),
+    )
     expect(h.port.calls).toEqual([])
   })
 
@@ -1554,7 +1564,10 @@ describe('block-level instruction dispatch (WS4 / A23)', () => {
     })
     announcer.setRound(round, map)
     expect(() =>
-      announcer.onTick(instructionEvent.atMs + 10, instructionEvent.atMs + 10),
+      announcer.onTick(
+        asWorkElapsedMs(instructionEvent.atMs + 10),
+        asMonotonicMs(instructionEvent.atMs + 10),
+      ),
     ).not.toThrow()
     expect(port.calls.find((k) => k.kind === 'instruction')).toBeUndefined()
   })

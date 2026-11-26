@@ -66,6 +66,7 @@ import type { CueInstance } from './CueTimeline'
 import type { CapabilityTier } from '../workout/capabilityTier'
 import type { ExtraPunchPolicy } from '../workout/WorkoutRecipe'
 import type { TrackerPunchEvent } from '../punch/PunchEvent'
+import type { WorkElapsedMs } from '../time/clockDomains'
 import { typeConcordance, type Concordance, type DeviceTypeProfile } from '../punch/typeConcordance'
 
 export interface LiveMatch {
@@ -235,7 +236,7 @@ export class LiveCueMatcher {
    *   Required rather than derived here: this module has no session clock,
    *   and a default would quietly reinstate the mixed-clock subtraction.
    */
-  onPunchEvent(event: TrackerPunchEvent, workElapsedMs: number): void {
+  onPunchEvent(event: TrackerPunchEvent, workElapsedMs: WorkElapsedMs): void {
     const open = this.open
     if (!open) {
       // Nothing is being called: a punch between combinations. Still real,

@@ -10,6 +10,7 @@
  * Not a jest mock: the sim, the cue engine and the workout clock all take a
  * `MonotonicClock`, so one shared fake keeps their suites consistent.
  */
+import { asMonotonicMs } from '@domain/time/clockDomains'
 import type { CancelScheduled, MonotonicClock } from '@domain/time/MonotonicClock'
 
 interface Scheduled {
@@ -69,7 +70,7 @@ export function createFakeClock(startMs = DEFAULT_FAKE_CLOCK_ORIGIN_MS): FakeClo
   }
 
   return {
-    now: () => current,
+    now: () => asMonotonicMs(current),
 
     schedule(delayMs: number, callback: () => void): CancelScheduled {
       const id = nextId++

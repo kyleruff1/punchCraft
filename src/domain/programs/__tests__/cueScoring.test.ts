@@ -19,6 +19,7 @@ import { legacyThreeRoundFundamentals as threeRoundFundamentals } from '../../wo
 import { CALCULATION_VERSION } from '../../workout/versions'
 import type { CapabilityTier } from '../../workout/capabilityTier'
 import type { TrackerPunchEvent } from '../../punch/PunchEvent'
+import { asWorkElapsedMs } from '../../time/clockDomains'
 
 const STEADY_BPM = CADENCE_PROFILES.steady.nominalBpm
 const CUE: CueInstance = expandTimeline(threeRoundFundamentals, 'orthodox', STEADY_BPM)[0]!.cues[1]!
@@ -34,7 +35,7 @@ const UPTIME_AT_BELL_MS = 3_600_000
 
 const placed = (event: TrackerPunchEvent): PlacedPunch => ({
   event,
-  workElapsedMs: event.receivedMonotonicTimeMs - UPTIME_AT_BELL_MS,
+  workElapsedMs: asWorkElapsedMs(event.receivedMonotonicTimeMs - UPTIME_AT_BELL_MS),
 })
 
 let nextId = 0

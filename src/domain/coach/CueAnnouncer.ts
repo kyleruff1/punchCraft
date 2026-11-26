@@ -70,6 +70,7 @@ import type {
   SetCalloutPayload,
 } from '../programs/RhythmMap'
 import type { Stance } from '../workout/WorkoutTokens'
+import type { MonotonicMs, WorkElapsedMs } from '../time/clockDomains'
 
 /**
  * Lead times and burst-re-call constants live with the Rhythm Map (M2) —
@@ -388,7 +389,7 @@ export class CueAnnouncer {
    * advances the cue engine — audio and screen read one clock, so they
    * cannot drift (the wall-timer failure the monitor measured at ~2.3x).
    */
-  onTick(workElapsedMs: number, nowMs: number): void {
+  onTick(workElapsedMs: WorkElapsedMs, nowMs: MonotonicMs): void {
     const map = this.roundMap
     if (!map) return
     const clockOffsetMs = nowMs - workElapsedMs

@@ -24,6 +24,7 @@ import { defaultRecipe } from '../../workout/WorkoutRecipe'
 import { threeRoundFundamentals } from '../../workout/samples/threeRoundFundamentals'
 import { getSampleWorkout } from '../../workout/samples'
 import { createFakeClock } from '@testing/fakeClock'
+import { asWorkElapsedMs } from '@domain/time/clockDomains'
 
 const PHRASE_MS = 1200
 const WORD_MS = 400
@@ -95,7 +96,7 @@ function driveRound(
     at += 50
     clock.advance(50)
     engine.tick(at)
-    if (mode === 'map') announcer.onTick(at, clock.now())
+    if (mode === 'map') announcer.onTick(asWorkElapsedMs(at), clock.now())
   }
 
   return { round, recorded, map }

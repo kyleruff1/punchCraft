@@ -56,6 +56,7 @@ import { releaseAudioPlayer } from './nativeAudioTeardown'
 import { PlaybackObserver, type ObservedKind, type ObservedRecord } from './PlaybackObserver'
 import { isTimingObserverEnabled } from '@diagnostics/qaFlags'
 import { MetronomeTransport } from './MetronomeTransport'
+import { asMonotonicMs } from '@domain/time/clockDomains'
 
 const TONE_ASSETS: Record<ToneKind, VoiceAssetId> = {
   ready: 'tone-ready',
@@ -527,7 +528,7 @@ export class VoiceOutputExpo implements VoiceOutputPort {
    * gets touched via the `metronome` port below.
    */
   private readonly metronomeTransport: MetronomeTransport = new MetronomeTransport({
-    now: () => this.clock(),
+    now: () => asMonotonicMs(this.clock()),
     schedule: () => () => {},
   })
 

@@ -52,6 +52,7 @@ import {
 import { compileRoundRhythmMap } from '@domain/programs/RhythmMap'
 import { compileRoundSpine, pulseCursorAt, type SpineSchedule } from '@domain/programs/RhythmSpine'
 import { resolveCapabilityTier, sequenceScoreLabel } from '@domain/workout/capabilityTier'
+import { asWorkElapsedMs, type WorkElapsedMs } from '@domain/time/clockDomains'
 import { systemMonotonicClock, type MonotonicClock } from '@domain/time/MonotonicClock'
 import { WorkoutSessionClock, type SessionTransition } from '@domain/session/WorkoutSessionClock'
 import { RoundResultFreeze } from '@domain/session/restPhases'
@@ -448,7 +449,7 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
   const spinesRef = useRef(spines)
   spinesRef.current = spines
   /** Latest work-elapsed sample, mutated on every tick; read by the ring cursor. */
-  const workElapsedMsRef = useRef(0)
+  const workElapsedMsRef = useRef<WorkElapsedMs>(asWorkElapsedMs(0))
 
   /**
    * The compiled rhythm maps, one per round (M2): every call, refire and
@@ -1288,7 +1289,7 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
       // meet, and the session clock — the only thing that knows both — does
       // the conversion. Nothing downstream subtracts one from the other.
       const landedAtWorkMs =
-        sessionRef.current?.workElapsedAt(event.receivedMonotonicTimeMs) ?? workElapsedMsRef.current
+        sessionRef.current?.workElapsedAtPunch(event) ?? workElapsedMsRef.current
       matcherRef.current?.onPunchEvent(event, landedAtWorkMs)
 
       syncFromEngine()

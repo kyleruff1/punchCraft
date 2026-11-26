@@ -16,6 +16,7 @@ import { CADENCE_PROFILES } from '../../workout/cadence'
 import { legacyThreeRoundFundamentals as threeRoundFundamentals } from '../../workout/samples/__fixtures__'
 import type { CapabilityTier } from '../../workout/capabilityTier'
 import type { PunchType, TrackerPunchEvent } from '../../punch/PunchEvent'
+import { asWorkElapsedMs } from '../../time/clockDomains'
 
 const STEADY_BPM = CADENCE_PROFILES.steady.nominalBpm
 const TIMELINE = expandTimeline(threeRoundFundamentals, 'orthodox', STEADY_BPM)
@@ -54,7 +55,7 @@ function punch(over: PunchOverrides = {}): PlacedPunch {
   nextId += 1
   const { atMs = CUE.scheduledStartMs, ...eventOver } = over
   return {
-    workElapsedMs: atMs,
+    workElapsedMs: atMs === null ? null : asWorkElapsedMs(atMs),
     event: {
       id: `e${nextId}`,
       sourceFrameId: `f${nextId}`,
