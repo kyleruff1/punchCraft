@@ -171,6 +171,23 @@ export class TrackerPunchEventSource implements PunchEventSource {
   }
 
   /**
+   * Whether this source has brought `deviceId` all the way up: its stream
+   * is armed, the init plan has finished, and nothing in it failed.
+   *
+   * A second consumer of the same glove asks this before deciding whether
+   * to initialise it again. Deliberately strict — still starting, an init
+   * error, or a device this source does not own all answer false, because
+   * the caller's fallback is to run the full plan itself, which is always
+   * safe, while skipping it on a glove that is not really up leaves a
+   * stream that never speaks.
+   */
+  hasInitialized(deviceId: string): boolean {
+    const runtime = this.runtimes.find((r) => r.deviceId === deviceId)
+    if (!runtime || !runtime.armed || !runtime.controller) return false
+    return runtime.controller.getState().initErrors.length === 0
+  }
+
+  /**
    * Idempotent, like the simulator's. One `startPunchStream` per assigned
    * slot; left and right are separate GATT connections and share nothing.
    */

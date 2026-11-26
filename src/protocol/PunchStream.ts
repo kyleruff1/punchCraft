@@ -47,6 +47,23 @@ export interface PunchStreamOptions {
    * derived data and belong to whoever is doing the decoding, hence this hook.
    */
   onEventPersist?: (event: TrackerPunchEvent) => void
+  /**
+   * Whether to run the plan's WRITES. Default true.
+   *
+   * False is for a second consumer of a glove that something else has
+   * already initialised — in practice Velocity Lab Live, attaching to a
+   * glove the app-wide keepalive brought up at connect. The plan's
+   * subscribes and reads still run (the transport shares one native monitor
+   * between subscribers, so a second subscription is free); its writes do
+   * not. Those are the clock sync, mode, hand assignment and command 17: a
+   * second clock sync re-bases the tracker's timestamps under the stream
+   * that is already decoding them, and none of the four tells the glove
+   * anything it has not been told.
+   *
+   * Only pass false when the glove is KNOWN to be initialised. A glove that
+   * never got its clock sync stays connected and silent.
+   */
+  initialize?: boolean
 }
 
 export interface PunchStreamController {
@@ -63,6 +80,7 @@ export async function startPunchStream(
   opts: PunchStreamOptions,
 ): Promise<PunchStreamController> {
   const { facade, deviceId, adapter, hand, onEvent, onDecodeMeta, onEventPersist } = opts
+  const initialize = opts.initialize ?? true
 
   const handles: SubscriptionHandle[] = []
   const subscribedChars: string[] = []
@@ -141,6 +159,17 @@ export async function startPunchStream(
       errorMessage: safe(message),
     })
     return buildController()
+  }
+
+  if (!initialize) {
+    const skipped = plan.filter((op) => op.kind === 'write')
+    plan = plan.filter((op) => op.kind !== 'write')
+    logger.info('punchstream.init.skipped', 'attaching to an initialised glove; init writes not sent', {
+      deviceId: deviceSensitive(deviceId),
+      adapterId: safe(adapter.id),
+      skippedWrites: safe(skipped.length),
+      labels: safe(skipped.map((op) => op.label ?? op.characteristicUuid).join(',')),
+    })
   }
 
   for (const op of plan) {

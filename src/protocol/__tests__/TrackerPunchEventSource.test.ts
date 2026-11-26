@@ -86,7 +86,7 @@ function fightcampEvent(hand: 'left' | 'right', patch: Partial<TrackerPunchEvent
   }
 }
 
-function createHarness(opts: { manual?: boolean } = {}): Harness {
+function createHarness(opts: { manual?: boolean; initErrors?: string[] } = {}): Harness {
   const streams: FakeStream[] = []
   const watchers = new Map<string, Set<(status: ConnectionStatus) => void>>()
   let writes = 0
@@ -97,7 +97,7 @@ function createHarness(opts: { manual?: boolean } = {}): Harness {
       getState: () => ({
         subscribedCount: 1,
         subscribedChars: [],
-        initErrors: [],
+        initErrors: opts.initErrors ?? [],
         deviceInfo: {},
       }),
     }
@@ -486,5 +486,77 @@ describe('no GATT writes of its own (CLAUDE.md §4, spec §12.1)', () => {
     // Initialization writes belong to adapter.buildInitializationPlan, which
     // PunchStream executes. This class adds none.
     expect(h.writeCalls()).toBe(0)
+  })
+})
+
+describe('hasInitialized — may a second consumer skip the init plan?', () => {
+  // Velocity Lab Live asks this before starting a stream of its own on a
+  // glove. A wrong "yes" leaves that stream silent, so every doubtful case
+  // has to answer no.
+
+  it('is true once the init plan has finished cleanly', async () => {
+    const h = createHarness()
+    const source = bothSlots(h)
+    source.start()
+    await flush()
+
+    expect(source.hasInitialized(LEFT_DEVICE)).toBe(true)
+    expect(source.hasInitialized(RIGHT_DEVICE)).toBe(true)
+  })
+
+  it('is false while the stream is still starting', async () => {
+    const h = createHarness({ manual: true })
+    const source = bothSlots(h)
+    source.start()
+    await flush()
+    expect(source.hasInitialized(LEFT_DEVICE)).toBe(false)
+
+    for (const stream of h.streams) stream.release()
+    await flush()
+    expect(source.hasInitialized(LEFT_DEVICE)).toBe(true)
+  })
+
+  it('is false when the init plan reported an error', async () => {
+    const h = createHarness({ initErrors: ['write ca281079: GATT 133'] })
+    const source = bothSlots(h)
+    source.start()
+    await flush()
+
+    expect(source.hasInitialized(LEFT_DEVICE)).toBe(false)
+  })
+
+  it('is false for a device this source does not own', async () => {
+    const h = createHarness()
+    const source = bothSlots(h)
+    source.start()
+    await flush()
+
+    expect(source.hasInitialized('AA:BB:CC:DD:EE:FF')).toBe(false)
+  })
+
+  it('goes false when the glove drops, and true again once it is back up', async () => {
+    const h = createHarness()
+    const source = bothSlots(h)
+    source.start()
+    await flush()
+
+    h.setConnection(LEFT_DEVICE, 'recovering')
+    expect(source.hasInitialized(LEFT_DEVICE)).toBe(false)
+    expect(source.hasInitialized(RIGHT_DEVICE)).toBe(true)
+
+    h.setConnection(LEFT_DEVICE, 'ready')
+    await flush()
+    expect(source.hasInitialized(LEFT_DEVICE)).toBe(true)
+  })
+
+  it('is false before start() and after stop()', async () => {
+    const h = createHarness()
+    const source = bothSlots(h)
+    expect(source.hasInitialized(LEFT_DEVICE)).toBe(false)
+
+    source.start()
+    await flush()
+    source.stop()
+    expect(source.hasInitialized(LEFT_DEVICE)).toBe(false)
   })
 })
