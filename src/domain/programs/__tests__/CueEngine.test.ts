@@ -126,8 +126,9 @@ describe('load-time assertions', () => {
     ]
     // Quietly re-clamping here would hide a broken expansion while letting
     // events be accepted during rest (spec §18.2).
-    expect(() => new CueEngine(bad, { leadTimes: DEFAULT_LEAD_TIMES, clock: createFakeClock() }))
-      .toThrow(/outside the round work interval/)
+    expect(
+      () => new CueEngine(bad, { leadTimes: DEFAULT_LEAD_TIMES, clock: createFakeClock() }),
+    ).toThrow(/outside the round work interval/)
   })
 
   it('accepts the real sample timelines', () => {

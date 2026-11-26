@@ -120,13 +120,7 @@ const SILENCE_350 = require('../../../assets/voice/numbers/standalone/silence-35
 /* eslint-enable @typescript-eslint/no-require-imports */
 
 type CaseId =
-  | 'preloaded'
-  | 'armed'
-  | 'armed-kit'
-  | 'armed-oboe'
-  | 'cold'
-  | 'tts-phrase'
-  | 'tts-number'
+  'preloaded' | 'armed' | 'armed-kit' | 'armed-oboe' | 'cold' | 'tts-phrase' | 'tts-number'
 
 interface CaseResult {
   id: CaseId
@@ -259,9 +253,12 @@ async function timeBothClocks(
   const startedEpochMs = Date.now()
   // Attached BEFORE play() so the transition cannot be missed. This is the
   // exact predicate PlaybackObserver.onStatus uses for onset.
-  const subscription = player.addListener('playbackStatusUpdate', (status: { playing?: boolean }) => {
-    if (statusMs === null && status.playing === true) statusMs = performance.now() - startedAt
-  })
+  const subscription = player.addListener(
+    'playbackStatusUpdate',
+    (status: { playing?: boolean }) => {
+      if (statusMs === null && status.playing === true) statusMs = performance.now() - startedAt
+    },
+  )
   player.play()
   let playheadMs: number | null = null
   for (;;) {
@@ -404,45 +401,45 @@ export default function VoiceLatencySpike(): React.JSX.Element {
     setLog((prev) => [...prev, line])
   }, [])
 
-/**
- * Time one Oboe trigger, by the SAME class of measurement as `armed-kit`.
- *
- * There is no playhead to poll here — Web Audio source nodes are fire-and-
- * forget — so an AnalyserNode is tapped instead and polled for the first
- * non-silent frame. That keeps the comparison honest: both this and the
- * expo-audio `armed-kit` figure are JS-polled at one loop turn of resolution,
- * so the DIFFERENCE between them is meaningful even though neither is a true
- * acoustic latency.
- *
- * A fresh source node per trigger is mandatory, not a choice: `.buffer` may be
- * set once and `start()` called once (AudioBufferSourceNode.ts:39-48, :101-107).
- * That is also why this path cannot truncate a still-sounding hit the way the
- * expo-audio pool does.
- */
-async function timeArmedOboe(
-  ctx: OboeAudioContext,
-  buffer: OboeBuffer,
-  analyser: OboeAnalyser,
-  data: Uint8Array,
-  timeoutMs = 3_000,
-): Promise<number | null> {
-  const src = ctx.createBufferSource()
-  src.buffer = buffer
-  src.connect(analyser)
-  const startedAt = performance.now()
-  src.start(0)
-  for (;;) {
-    analyser.getByteTimeDomainData(data)
-    let peak = 0
-    for (let i = 0; i < data.length; i += 1) {
-      peak = Math.max(peak, Math.abs((data[i] ?? 128) - 128))
+  /**
+   * Time one Oboe trigger, by the SAME class of measurement as `armed-kit`.
+   *
+   * There is no playhead to poll here — Web Audio source nodes are fire-and-
+   * forget — so an AnalyserNode is tapped instead and polled for the first
+   * non-silent frame. That keeps the comparison honest: both this and the
+   * expo-audio `armed-kit` figure are JS-polled at one loop turn of resolution,
+   * so the DIFFERENCE between them is meaningful even though neither is a true
+   * acoustic latency.
+   *
+   * A fresh source node per trigger is mandatory, not a choice: `.buffer` may be
+   * set once and `start()` called once (AudioBufferSourceNode.ts:39-48, :101-107).
+   * That is also why this path cannot truncate a still-sounding hit the way the
+   * expo-audio pool does.
+   */
+  async function timeArmedOboe(
+    ctx: OboeAudioContext,
+    buffer: OboeBuffer,
+    analyser: OboeAnalyser,
+    data: Uint8Array,
+    timeoutMs = 3_000,
+  ): Promise<number | null> {
+    const src = ctx.createBufferSource()
+    src.buffer = buffer
+    src.connect(analyser)
+    const startedAt = performance.now()
+    src.start(0)
+    for (;;) {
+      analyser.getByteTimeDomainData(data)
+      let peak = 0
+      for (let i = 0; i < data.length; i += 1) {
+        peak = Math.max(peak, Math.abs((data[i] ?? 128) - 128))
+      }
+      // 128 is silence for byte time-domain data; >2 clears dither/noise.
+      if (peak > 2) return performance.now() - startedAt
+      if (performance.now() - startedAt > timeoutMs) return null
+      await new Promise<void>((resolve) => setTimeout(resolve, 1))
     }
-    // 128 is silence for byte time-domain data; >2 clears dither/noise.
-    if (peak > 2) return performance.now() - startedAt
-    if (performance.now() - startedAt > timeoutMs) return null
-    await new Promise<void>((resolve) => setTimeout(resolve, 1))
   }
-}
 
   /**
    * Read the RENDERED amplitude of each captured punch — silently.
@@ -470,7 +467,8 @@ async function timeArmedOboe(
       // clips the workouts actually play. Two lengths, because the bell (the
       // one asset that is 24 kHz, and the slowest thing measured) may behave
       // differently from a 48 kHz call.
-      const call = findClickScript('call/1-2-.-.', 'numbers') ?? findClickScript('call/1-1-2-.', 'numbers')
+      const call =
+        findClickScript('call/1-2-.-.', 'numbers') ?? findClickScript('call/1-1-2-.', 'numbers')
       const cases: { label: string; module: number }[] = [
         ...(call ? [{ label: `call ${call.id} (48k)`, module: call.module }] : []),
         { label: 'bell (24k)', module: BELL_MODULE },
@@ -509,7 +507,9 @@ async function timeArmedOboe(
           // 2.5× and rejected 3 runs in 200 as too close to call; 200–800 ms
           // gives 3.6× median, 2.5× worst case, and rejected none in 200. Ten
           // seconds of session for a margin that does not depend on luck.
-          await new Promise<void>((resolve) => setTimeout(resolve, 200 + Math.floor(Math.random() * 600)))
+          await new Promise<void>((resolve) =>
+            setTimeout(resolve, 200 + Math.floor(Math.random() * 600)),
+          )
           const { statusMs, playheadMs, startedEpochMs } = await timeBothClocks(player)
           if (statusMs !== null && playheadMs !== null) pairs.push({ statusMs, playheadMs })
           // One line per rep, carrying the WALL epoch of each event. The
@@ -523,7 +523,9 @@ async function timeArmedOboe(
             rep: safe(i),
             startedEpochMs: safe(startedEpochMs),
             statusEpochMs: safe(statusMs === null ? null : Math.round(startedEpochMs + statusMs)),
-            playheadEpochMs: safe(playheadMs === null ? null : Math.round(startedEpochMs + playheadMs)),
+            playheadEpochMs: safe(
+              playheadMs === null ? null : Math.round(startedEpochMs + playheadMs),
+            ),
             statusMs: safe(statusMs === null ? null : Math.round(statusMs * 10) / 10),
             playheadMs: safe(playheadMs === null ? null : Math.round(playheadMs * 10) / 10),
           })
@@ -546,7 +548,9 @@ async function timeArmedOboe(
         const ph = pairs.map((p) => p.playheadMs)
         const skew = pairs.map((p) => p.playheadMs - p.statusMs)
         const r = (v: number): number => Math.round(v * 10) / 10
-        say(`  ${c.label}: n=${pairs.length} status=${r(med(st))} playhead=${r(med(ph))} SKEW=${r(med(skew))} ms`)
+        say(
+          `  ${c.label}: n=${pairs.length} status=${r(med(st))} playhead=${r(med(ph))} SKEW=${r(med(skew))} ms`,
+        )
         logger.info('workout.ruler', 'paired onset calibration', {
           asset: safe(c.label),
           n: safe(pairs.length),
@@ -645,7 +649,8 @@ async function timeArmedOboe(
     }
     const runId = Date.now()
 
-    const call = findClickScript('call/1-2-.-.', 'numbers') ?? findClickScript('call/1-1-2-.', 'numbers')
+    const call =
+      findClickScript('call/1-2-.-.', 'numbers') ?? findClickScript('call/1-1-2-.', 'numbers')
     if (!call) {
       say('playlist ruler: no call clip found — cannot form the 48 kHz arm')
       return
@@ -672,15 +677,65 @@ async function timeArmedOboe(
       rates: string
     }
     const arms: Arm[] = [
-      { key: 'call1', label: 'call 48k x1', clip: call.module, clipMs: CALL_MS, clips: 1, silence: false, rates: 'baseline' },
-      { key: 'callHom', label: 'call 48k x4 no-sil', clip: call.module, clipMs: CALL_MS, clips: CLIPS_IN_MULTI, silence: false, rates: 'HOMOGENEOUS-48' },
-      { key: 'callHet', label: 'call 48k x4 + sil 24k', clip: call.module, clipMs: CALL_MS, clips: CLIPS_IN_MULTI, silence: true, rates: 'HETEROGENEOUS-48/24' },
-      { key: 'bell1', label: 'bell 24k x1', clip: BELL_MODULE, clipMs: BELL_MS, clips: 1, silence: false, rates: 'baseline' },
-      { key: 'bellHom', label: 'bell 24k x4 no-sil', clip: BELL_MODULE, clipMs: BELL_MS, clips: CLIPS_IN_MULTI, silence: false, rates: 'HOMOGENEOUS-24' },
-      { key: 'bellHet', label: 'bell 24k x4 + sil 24k', clip: BELL_MODULE, clipMs: BELL_MS, clips: CLIPS_IN_MULTI, silence: true, rates: 'HOMOGENEOUS-24+sil' },
+      {
+        key: 'call1',
+        label: 'call 48k x1',
+        clip: call.module,
+        clipMs: CALL_MS,
+        clips: 1,
+        silence: false,
+        rates: 'baseline',
+      },
+      {
+        key: 'callHom',
+        label: 'call 48k x4 no-sil',
+        clip: call.module,
+        clipMs: CALL_MS,
+        clips: CLIPS_IN_MULTI,
+        silence: false,
+        rates: 'HOMOGENEOUS-48',
+      },
+      {
+        key: 'callHet',
+        label: 'call 48k x4 + sil 24k',
+        clip: call.module,
+        clipMs: CALL_MS,
+        clips: CLIPS_IN_MULTI,
+        silence: true,
+        rates: 'HETEROGENEOUS-48/24',
+      },
+      {
+        key: 'bell1',
+        label: 'bell 24k x1',
+        clip: BELL_MODULE,
+        clipMs: BELL_MS,
+        clips: 1,
+        silence: false,
+        rates: 'baseline',
+      },
+      {
+        key: 'bellHom',
+        label: 'bell 24k x4 no-sil',
+        clip: BELL_MODULE,
+        clipMs: BELL_MS,
+        clips: CLIPS_IN_MULTI,
+        silence: false,
+        rates: 'HOMOGENEOUS-24',
+      },
+      {
+        key: 'bellHet',
+        label: 'bell 24k x4 + sil 24k',
+        clip: BELL_MODULE,
+        clipMs: BELL_MS,
+        clips: CLIPS_IN_MULTI,
+        silence: true,
+        rates: 'HOMOGENEOUS-24+sil',
+      },
     ]
 
-    const build = (arm: Arm): { sources: number[]; trackIsClip: boolean[]; plannedTrackMs: number[] } => {
+    const build = (
+      arm: Arm,
+    ): { sources: number[]; trackIsClip: boolean[]; plannedTrackMs: number[] } => {
       const sources: number[] = []
       const trackIsClip: boolean[] = []
       const plannedTrackMs: number[] = []
@@ -705,8 +760,18 @@ async function timeArmedOboe(
     }
     const r1 = (v: number | null): number | null => (v === null ? null : Math.round(v * 10) / 10)
 
-    const acc: Record<string, { skew: number[]; residual: number[]; clipDwell: number[]; silDwell: number[]; failed: number }> = {}
-    for (const a of arms) acc[a.key] = { skew: [], residual: [], clipDwell: [], silDwell: [], failed: 0 }
+    const acc: Record<
+      string,
+      {
+        skew: number[]
+        residual: number[]
+        clipDwell: number[]
+        silDwell: number[]
+        failed: number
+      }
+    > = {}
+    for (const a of arms)
+      acc[a.key] = { skew: [], residual: [], clipDwell: [], silDwell: [], failed: 0 }
 
     setRunning(true)
     try {
@@ -720,7 +785,9 @@ async function timeArmedOboe(
         shouldPlayInBackground: false,
       })
 
-      say(`playlist ruler: ${arms.length} arms x ${REPS} reps, interleaved — clip ${call.id} (${CALL_MS} ms)`)
+      say(
+        `playlist ruler: ${arms.length} arms x ${REPS} reps, interleaved — clip ${call.id} (${CALL_MS} ms)`,
+      )
       logger.info('workout.plruler.start', 'playlist ruler starting', {
         runId: safe(runId),
         arms: safe(arms.length),
@@ -774,14 +841,19 @@ async function timeArmedOboe(
             const statusSub = playlist.addListener(
               'playlistStatusUpdate',
               (s: { playing?: boolean; didJustFinish?: boolean }) => {
-                if (statusMs === null && s.playing === true) statusMs = performance.now() - startedAt
-                if (endedMs === null && s.didJustFinish === true) endedMs = performance.now() - startedAt
+                if (statusMs === null && s.playing === true)
+                  statusMs = performance.now() - startedAt
+                if (endedMs === null && s.didJustFinish === true)
+                  endedMs = performance.now() - startedAt
               },
             )
-            const trackSub = playlist.addListener('trackChanged', (d: { previousIndex: number; currentIndex: number }) => {
-              transitioned = true
-              transitions.push({ index: d.currentIndex, atMs: performance.now() - startedAt })
-            })
+            const trackSub = playlist.addListener(
+              'trackChanged',
+              (d: { previousIndex: number; currentIndex: number }) => {
+                transitioned = true
+                transitions.push({ index: d.currentIndex, atMs: performance.now() - startedAt })
+              },
+            )
 
             playlist.play()
 
@@ -809,7 +881,8 @@ async function timeArmedOboe(
             const skewMs = statusMs !== null && playheadMs !== null ? playheadMs - statusMs : null
             // Residual against the STATED total — the secondary estimator, and
             // the one comparable to the field captures' 121/343/790 ms.
-            const residualMs = endedMs !== null && playheadMs !== null ? endedMs - playheadMs - plannedMs : null
+            const residualMs =
+              endedMs !== null && playheadMs !== null ? endedMs - playheadMs - plannedMs : null
             if (skewMs !== null) acc[arm.key]!.skew.push(skewMs)
             if (residualMs !== null) acc[arm.key]!.residual.push(residualMs)
 
@@ -842,7 +915,9 @@ async function timeArmedOboe(
               residualMs: safe(residualMs === null ? null : Math.round(residualMs)),
               // The raw material, so every derived number above can be
               // recomputed offline rather than trusted.
-              transitionsMs: safe(transitions.map((t) => `${t.index}@${Math.round(t.atMs)}`).join('|')),
+              transitionsMs: safe(
+                transitions.map((t) => `${t.index}@${Math.round(t.atMs)}`).join('|'),
+              ),
               dwellsMs: safe(dwells.join('|')),
             })
           } catch (err) {
@@ -906,7 +981,10 @@ async function timeArmedOboe(
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       say(`playlist ruler FAILED: ${message}`)
-      logger.warn('workout.plruler', 'playlist calibration failed', { runId: safe(runId), error: safe(message) })
+      logger.warn('workout.plruler', 'playlist calibration failed', {
+        runId: safe(runId),
+        error: safe(message),
+      })
     } finally {
       setRunning(false)
     }
@@ -961,7 +1039,9 @@ async function timeArmedOboe(
       }
 
       const pinned = peaks.filter((p) => p >= Math.max(...peaks) - 1).length
-      say(`RENDERED peaks: min ${Math.min(...peaks)} max ${Math.max(...peaks)} distinct ${new Set(peaks).size}/${peaks.length}, at-max ${pinned}`)
+      say(
+        `RENDERED peaks: min ${Math.min(...peaks)} max ${Math.max(...peaks)} distinct ${new Set(peaks).size}/${peaks.length}, at-max ${pinned}`,
+      )
       void ctx.close().catch(() => undefined)
     } catch (err) {
       say(`dynamics probe FAILED: ${err instanceof Error ? err.message : String(err)}`)

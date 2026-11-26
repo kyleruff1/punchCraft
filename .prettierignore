@@ -1,0 +1,38 @@
+# Build output and dependencies.
+node_modules/
+android/
+ios/
+dist/
+.expo/
+coverage/
+captures/
+artifacts/
+
+# Generated files. Each is written by a tool under tools/ and says so in its
+# header; formatting it here would only fight the generator on the next run.
+src/audio/voiceAssets/auditionManifest.ts
+src/audio/voiceAssets/calloutManifest.ts
+src/audio/voiceAssets/clickScriptManifest.ts
+src/audio/voiceAssets/coastManifest.ts
+src/audio/voiceAssets/comboAnnounceManifest.ts
+src/audio/voiceAssets/instructionManifest.ts
+src/audio/voiceAssets/introManifest.ts
+src/audio/voiceAssets/metronomeAssets.ts
+src/audio/voiceAssets/recoveryManifest.ts
+src/audio/voiceAssets/sustainedManifest.ts
+src/audio/voiceAssets/techniquesStandaloneManifest.ts
+src/components/workout/punchAvatarManifest.ts
+src/domain/programs/phraseTimingManifest.ts
+tools/analysis/manifests/
+**/__snapshots__/
+
+# Puncheoke — the instrument — is forked to its own product and its code here
+# is not ours to rework. Left exactly as committed so it stays diffable
+# against the fork. The same list is in .gitattributes; keep the two in step.
+docs/puncheoke/
+src/app/(tabs)/puncheokie/
+src/domain/instrument/
+src/instrument/
+tools/punchbridge/
+tools/tablet-voice/
+**/*[Ii]nstrument*

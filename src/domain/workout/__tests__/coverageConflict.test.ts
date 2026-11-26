@@ -70,7 +70,9 @@ describe('against the real generator', () => {
     // Was the flagged case through generator 1.3.0: jab-only at sprint tempo
     // ran the count-bounded repair pass out before the bell. Bounded by
     // progress (1.3.1), it fills.
-    expect(coverageConflict(generated({ enabledPunches: [1], cadenceProfile: 'sprint' }))).toBeNull()
+    expect(
+      coverageConflict(generated({ enabledPunches: [1], cadenceProfile: 'sprint' })),
+    ).toBeNull()
   })
 
   it('flags a workout whose punches form no combination at all', () => {

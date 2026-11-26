@@ -283,7 +283,9 @@ describe('a completed workout lands in the database', () => {
     expect(outcome?.status).toBe('persisted')
 
     const named = p.raw
-      .prepare('SELECT observed_event_id AS id FROM cue_results WHERE observed_event_id IS NOT NULL')
+      .prepare(
+        'SELECT observed_event_id AS id FROM cue_results WHERE observed_event_id IS NOT NULL',
+      )
       .all() as Array<{ id: string }>
     expect(named.length).toBeGreaterThan(0)
 

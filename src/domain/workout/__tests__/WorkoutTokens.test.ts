@@ -22,7 +22,12 @@ describe('parseCombo', () => {
     expect(tokens).toHaveLength(4)
     expect(tokens.map((t) => t.kind)).toEqual(['punch', 'punch', 'punch', 'punch'])
     expect(tokens.map((t) => (t.kind === 'punch' ? t.number : null))).toEqual([1, 2, 3, 2])
-    expect(tokens.map((t) => (t.kind === 'punch' ? t.body : null))).toEqual([false, true, false, false])
+    expect(tokens.map((t) => (t.kind === 'punch' ? t.body : null))).toEqual([
+      false,
+      true,
+      false,
+      false,
+    ])
   })
 
   it('accepts an uppercase B and still records a body shot', () => {
@@ -60,8 +65,19 @@ describe('parseCombo', () => {
 
   it('parses the doc §15 mixed examples', () => {
     expect(parseCombo('1-slip-2').map((t) => t.kind)).toEqual(['punch', 'defense', 'punch'])
-    expect(parseCombo('1-2-roll-3-2').map((t) => t.kind)).toEqual(['punch', 'punch', 'defense', 'punch', 'punch'])
-    expect(parseCombo('1-1-step off-2').map((t) => t.kind)).toEqual(['punch', 'punch', 'footwork', 'punch'])
+    expect(parseCombo('1-2-roll-3-2').map((t) => t.kind)).toEqual([
+      'punch',
+      'punch',
+      'defense',
+      'punch',
+      'punch',
+    ])
+    expect(parseCombo('1-1-step off-2').map((t) => t.kind)).toEqual([
+      'punch',
+      'punch',
+      'footwork',
+      'punch',
+    ])
   })
 
   it('is case-insensitive and tolerates surrounding whitespace on commands', () => {

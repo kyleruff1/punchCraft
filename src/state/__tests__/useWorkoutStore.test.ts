@@ -5,12 +5,7 @@
  * never stale: the screen reads them directly, so a missed recompute would
  * show the athlete a summary describing a recipe they no longer have.
  */
-import {
-  conflictsForField,
-  getRecipe,
-  patchRecipe,
-  useWorkoutStore,
-} from '../useWorkoutStore'
+import { conflictsForField, getRecipe, patchRecipe, useWorkoutStore } from '../useWorkoutStore'
 import { buildRoundSchedule } from '@domain/workout/roundSchedule'
 import { summarizeRecipe } from '@domain/workout/recipeSummary'
 import { validateRecipe } from '@domain/workout/recipeValidation'
@@ -40,7 +35,9 @@ describe('initial state', () => {
 
   it('derives summary from the default recipe', () => {
     const recipe = defaultRecipe()
-    expect(store().summary).toEqual(summarizeRecipe(recipe, buildRoundSchedule(recipe.durationMinutes)))
+    expect(store().summary).toEqual(
+      summarizeRecipe(recipe, buildRoundSchedule(recipe.durationMinutes)),
+    )
   })
 })
 

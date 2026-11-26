@@ -152,7 +152,7 @@ describe('windows are used verbatim (spec §18.2)', () => {
     expect(result.extras.map((e) => e.eventId)).toEqual([before.event.id, after.event.id])
   })
 
-  it('applies no grace of its own — a wider window is the timeline\'s job', () => {
+  it("applies no grace of its own — a wider window is the timeline's job", () => {
     // Rebuilding with a huge grace should change what matches; the matcher
     // itself must contribute nothing.
     const wide = expandTimeline(threeRoundFundamentals, 'orthodox', STEADY_BPM, {
@@ -262,8 +262,7 @@ describe('hand mismatch is not type mismatch (doc §6)', () => {
 })
 
 describe('technique claims are gated by the tier (D12)', () => {
-  const withType = (type: PunchType): PlacedPunch =>
-    onToken(0, { punchType: type })
+  const withType = (type: PunchType): PlacedPunch => onToken(0, { punchType: type })
 
   it.each(['hand-only', 'hand-timestamp'] as const)(
     'never reports type-mismatch at the %s tier',
@@ -300,9 +299,9 @@ describe('technique claims are gated by the tier (D12)', () => {
 
   it('never contradicts a prescription with the vendor power flag', () => {
     // 'power' is a vendor classification, not a technique family.
-    expect(
-      matcher('hand-broad-type').match(CUE, [withType('power')]).assignments[0]?.outcome,
-    ).toBe('matched')
+    expect(matcher('hand-broad-type').match(CUE, [withType('power')]).assignments[0]?.outcome).toBe(
+      'matched',
+    )
   })
 
   it('prefers hand-mismatch over type-mismatch when both are wrong', () => {

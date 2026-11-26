@@ -34,9 +34,11 @@ const mockBuilt: FakePlaylist[] = []
 const mockControl = { throwOnCreate: false }
 
 jest.mock('expo-audio', () => ({
-  createAudioPlaylist: (
-    opts: { sources: unknown[]; loop: string; updateInterval: number },
-  ): FakePlaylist => {
+  createAudioPlaylist: (opts: {
+    sources: unknown[]
+    loop: string
+    updateInterval: number
+  }): FakePlaylist => {
     if (mockControl.throwOnCreate) {
       throw new Error('native init refused')
     }

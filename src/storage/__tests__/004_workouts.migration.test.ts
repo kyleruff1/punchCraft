@@ -178,9 +178,7 @@ describe('schema shape', () => {
   })
 
   it('indexes cue_results by session and by generated workout', () => {
-    const names = db
-      .query<{ name: string }>(`PRAGMA index_list(cue_results)`)
-      .map((i) => i.name)
+    const names = db.query<{ name: string }>(`PRAGMA index_list(cue_results)`).map((i) => i.name)
     expect(names).toContain('idx_cue_results_session')
     expect(names).toContain('idx_cue_results_workout')
   })

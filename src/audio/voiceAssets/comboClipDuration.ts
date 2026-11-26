@@ -41,9 +41,7 @@ import { formatCombo, type WorkoutToken } from '@domain/workout/WorkoutTokens'
  * that only fits in one vocabulary does not fit, because the athlete may
  * be listening to the other.
  */
-export function comboClipDurationMs(
-  tokens: readonly WorkoutToken[],
-): number | undefined {
+export function comboClipDurationMs(tokens: readonly WorkoutToken[]): number | undefined {
   const combination = formatCombo(tokens)
   if (combination.length === 0) return undefined
   const numbers = findComboAnnounce(combination, 'numbers')?.durationMs

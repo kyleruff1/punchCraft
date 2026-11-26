@@ -25,19 +25,19 @@ const ev = (deviceId: string, punchTypeRaw?: number) => ({ deviceId, punchTypeRa
 // ---------------------------------------------------------------------------
 
 describe('the profiles record only discriminating bytes', () => {
-  it('keeps red\'s hook and straight bytes', () => {
+  it("keeps red's hook and straight bytes", () => {
     const red = profileFor(RED)!
     expect(red.discriminatingBytes[2]).toBe('hook')
     expect(red.discriminatingBytes[3]).toBe('straight')
   })
 
-  it('drops red\'s byte 4, which is modal for jabs AND uppercuts', () => {
+  it("drops red's byte 4, which is modal for jabs AND uppercuts", () => {
     // A bonus on an ambiguous byte would congratulate the athlete for
     // throwing either of two different things.
     expect(profileFor(RED)!.discriminatingBytes[4]).toBeUndefined()
   })
 
-  it('keeps only blue\'s uppercut byte', () => {
+  it("keeps only blue's uppercut byte", () => {
     const blue = profileFor(BLUE)!
     expect(blue.discriminatingBytes[3]).toBe('uppercut')
     // Byte 1 is modal for jabs, crosses and hooks alike on this device.
@@ -106,9 +106,7 @@ describe('concordance', () => {
 
 describe('the bonus can only add', () => {
   it('adds for an agreement', () => {
-    expect(formBonus([{ event: ev(RED, 2), expectedType: 'hook' }])).toBe(
-      FORM_BONUS_PER_AGREEMENT,
-    )
+    expect(formBonus([{ event: ev(RED, 2), expectedType: 'hook' }])).toBe(FORM_BONUS_PER_AGREEMENT)
   })
 
   it('adds nothing — and subtracts nothing — for a disagreement', () => {

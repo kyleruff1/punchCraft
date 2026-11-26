@@ -76,9 +76,7 @@ export interface PunchStreamController {
   }
 }
 
-export async function startPunchStream(
-  opts: PunchStreamOptions,
-): Promise<PunchStreamController> {
+export async function startPunchStream(opts: PunchStreamOptions): Promise<PunchStreamController> {
   const { facade, deviceId, adapter, hand, onEvent, onDecodeMeta, onEventPersist } = opts
   const initialize = opts.initialize ?? true
 
@@ -164,12 +162,16 @@ export async function startPunchStream(
   if (!initialize) {
     const skipped = plan.filter((op) => op.kind === 'write')
     plan = plan.filter((op) => op.kind !== 'write')
-    logger.info('punchstream.init.skipped', 'attaching to an initialised glove; init writes not sent', {
-      deviceId: deviceSensitive(deviceId),
-      adapterId: safe(adapter.id),
-      skippedWrites: safe(skipped.length),
-      labels: safe(skipped.map((op) => op.label ?? op.characteristicUuid).join(',')),
-    })
+    logger.info(
+      'punchstream.init.skipped',
+      'attaching to an initialised glove; init writes not sent',
+      {
+        deviceId: deviceSensitive(deviceId),
+        adapterId: safe(adapter.id),
+        skippedWrites: safe(skipped.length),
+        labels: safe(skipped.map((op) => op.label ?? op.characteristicUuid).join(',')),
+      },
+    )
   }
 
   for (const op of plan) {
@@ -185,7 +187,11 @@ export async function startPunchStream(
         if (stopped) {
           // Cleanup race: stop() fired while the CCCD write was in flight.
           // Do NOT push into handles (teardown already ran or is about to).
-          try { handle.unsubscribe() } catch { /* best-effort */ }
+          try {
+            handle.unsubscribe()
+          } catch {
+            /* best-effort */
+          }
           break
         }
         handles.push(handle)
@@ -197,17 +203,25 @@ export async function startPunchStream(
         try {
           const outcome = await handle.setupOutcome
           if (stopped) {
-            try { handle.unsubscribe() } catch { /* best-effort */ }
+            try {
+              handle.unsubscribe()
+            } catch {
+              /* best-effort */
+            }
             break
           }
           if (!outcome.success) {
             const msg = outcome.errorMessage ?? 'unknown subscribe error'
             initErrors.push(`subscribe ${op.characteristicUuid}: ${msg}`)
-            logger.warn('punchstream.subscribe.failed', 'subscribe reported failure via setupOutcome', {
-              deviceId: deviceSensitive(deviceId),
-              characteristicUuid: safe(op.characteristicUuid),
-              errorMessage: safe(msg),
-            })
+            logger.warn(
+              'punchstream.subscribe.failed',
+              'subscribe reported failure via setupOutcome',
+              {
+                deviceId: deviceSensitive(deviceId),
+                characteristicUuid: safe(op.characteristicUuid),
+                errorMessage: safe(msg),
+              },
+            )
           }
         } catch (outcomeErr) {
           const msg = outcomeErr instanceof Error ? outcomeErr.message : String(outcomeErr)

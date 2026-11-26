@@ -19,10 +19,7 @@ import { DEFAULT_COUNTDOWN_MS } from '@domain/session/WorkoutSessionClock'
 import { createFakeClock, type FakeClock } from '@testing/fakeClock'
 import { defaultRecipe } from '@domain/workout/WorkoutRecipe'
 import { resetLive, useLiveStore } from '@state/useWorkoutStore'
-import type {
-  BackdropImpulsePort,
-  BackdropPunchImpulse,
-} from '@domain/effects/BackdropImpulsePort'
+import type { BackdropImpulsePort, BackdropPunchImpulse } from '@domain/effects/BackdropImpulsePort'
 import type { GeneratedWorkout } from '@domain/workout/GeneratedWorkout'
 import type { PunchEventSource } from '@domain/punch/PunchEventSource'
 import type { TrackerPunchEvent } from '@domain/punch/PunchEvent'

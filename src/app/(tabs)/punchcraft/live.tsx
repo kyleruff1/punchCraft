@@ -63,10 +63,7 @@ import { simBpmForWorkout } from '@simulation/simPace'
 import { useLivePunchSource } from './_useLivePunchSource'
 import { useWorkoutRunner, type SessionEndOutcome } from './_useWorkoutRunner'
 import { useSharedTransportAnchor } from '@audio/useSharedTransportAnchor'
-import {
-  SHARED_WORK_CLOCK_STOPPED,
-  type SharedWorkClock,
-} from '@domain/timing/SharedWorkClock'
+import { SHARED_WORK_CLOCK_STOPPED, type SharedWorkClock } from '@domain/timing/SharedWorkClock'
 import { VoiceOutputExpo } from '@audio/VoiceOutputExpo'
 import { isWorkoutActive, shouldHoldAudio } from './_audioHold'
 import { fillOptionsForRecipe } from '@audio/fillOptionsForRecipe'
@@ -78,15 +75,9 @@ import { RECOVERY_SCRIPTS, type RecoveryScript } from '@audio/voiceAssets/recove
 import { findClickScript } from '@audio/voiceAssets/clickScriptManifest'
 import { RoundWarningPlayer } from '@audio/RoundWarningPlayer'
 import { planRecoverySequence } from '@domain/coach/recoveryPlan'
-import {
-  INTRO_COUNTDOWN_SLACK_MS,
-  INTRO_TAIL_PAD_MS,
-  planIntro,
-} from '@audio/introPlan'
+import { INTRO_COUNTDOWN_SLACK_MS, INTRO_TAIL_PAD_MS, planIntro } from '@audio/introPlan'
 import { HapticOutputExpo } from '@audio/HapticOutputExpo'
-import {
-  createPlaybackDetector,
-} from '@audio/ThirdPartyPlaybackDetector'
+import { createPlaybackDetector } from '@audio/ThirdPartyPlaybackDetector'
 import { useVoiceSettingsStore } from '@state/useVoiceSettingsStore'
 import type { SimScriptId } from '@simulation/scripts'
 
@@ -201,7 +192,8 @@ export default function LiveScreen(): React.JSX.Element {
   const effectiveVocabulary = liveVocabulary ?? recipe.voiceVocabulary
   // The click-script bank's spelling of the same choice (the policy names
   // it `names`; the rendered library names it `techniques`).
-  const clickVocabulary = effectiveVocabulary === 'names' ? ('techniques' as const) : ('numbers' as const)
+  const clickVocabulary =
+    effectiveVocabulary === 'names' ? ('techniques' as const) : ('numbers' as const)
   // The vocabulary the round-1 pre-bell opener (intro plan) is built in.
   // It MUST come from the recipe, not the live radio: the intro drives
   // `countdownMs`, which is a dependency of the engine-build effect, so if
@@ -210,7 +202,8 @@ export default function LiveScreen(): React.JSX.Element {
   // already applies from the next round everywhere else; round 1's opener
   // is pre-flip by definition, so the recipe's starting vocabulary is
   // exactly right and stays stable across flips.
-  const startClickVocabulary = recipe.voiceVocabulary === 'names' ? ('techniques' as const) : ('numbers' as const)
+  const startClickVocabulary =
+    recipe.voiceVocabulary === 'names' ? ('techniques' as const) : ('numbers' as const)
 
   // A workout that never speaks per-word clips does not warm them — 20 word
   // players for nothing was a third of the 44-live-session pile-up that
@@ -241,10 +234,7 @@ export default function LiveScreen(): React.JSX.Element {
     output.setVolumes(volumes)
   }, [output, volumes])
 
-  const voice = React.useMemo(
-    () => ({ output, policy, detector }),
-    [output, policy, detector],
-  )
+  const voice = React.useMemo(() => ({ output, policy, detector }), [output, policy, detector])
 
   // Shared transport anchor (M39-V2 Phase W0-b-iii). Publishes on
   // every metronome start/stop/pause/resume; consumers (currently
@@ -337,7 +327,10 @@ export default function LiveScreen(): React.JSX.Element {
   // the memo), so the coach finishes before the first bell and the rhythm
   // map never moves. Voice off, or no rendered segments, falls back to the
   // default 5-second lead-in.
-  const intro = useMemo(() => planIntro(workout, undefined, startClickVocabulary), [workout, startClickVocabulary])
+  const intro = useMemo(
+    () => planIntro(workout, undefined, startClickVocabulary),
+    [workout, startClickVocabulary],
+  )
   // The countdown is a CAP, not the schedule: planned speech plus slack
   // for dev-client load stalls. The intro's completion callback skips the
   // remainder, so the bell follows the coach's actual last word.
@@ -449,14 +442,27 @@ export default function LiveScreen(): React.JSX.Element {
     // joins the warn ceremony — theme, then the opening combo call, then
     // "get ready… three, two, one" onto the bell. The runner's in-round
     // scheduler skips s1 to match.
-    const nextLead = findClickScript(`lead-in/${workout.id}/r${live.roundIndex + 2}s1`, clickVocabulary)
+    const nextLead = findClickScript(
+      `lead-in/${workout.id}/r${live.roundIndex + 2}s1`,
+      clickVocabulary,
+    )
     warnRef.current.prepare(
       live.roundIndex + 2,
       workout.schedule[live.roundIndex + 1]?.theme,
       nextLead ? { module: nextLead.module, durationMs: nextLead.durationMs } : undefined,
     )
     warnRef.current.playIfDue(live.roundRemainingMs, volumes.voice)
-  }, [live.phase, live.roundIndex, live.roundRemainingMs, policy.mode, volumes.voice, workout.id, workout.schedule, clickVocabulary, timingObserver])
+  }, [
+    live.phase,
+    live.roundIndex,
+    live.roundRemainingMs,
+    policy.mode,
+    volumes.voice,
+    workout.id,
+    workout.schedule,
+    clickVocabulary,
+    timingObserver,
+  ])
   React.useEffect(() => () => warnRef.current?.stop(), [])
 
   // Inter-round recovery walkthrough — the cornerman works the corner
@@ -485,27 +491,23 @@ export default function LiveScreen(): React.JSX.Element {
       // script (R13) survived — every rest of every workout played the
       // same walkthrough, with the other twelve scripts unreachable.
       const themeMs =
-        upcoming?.theme === undefined ? 0 : themeClipFor(upcoming.theme)?.durationMs ?? 0
+        upcoming?.theme === undefined ? 0 : (themeClipFor(upcoming.theme)?.durationMs ?? 0)
       // The ACTUAL pre-bell opener clip for this rest's next round (same
       // known-at-plan-time reasoning as the theme above) — the warn
       // playlist now carries it between theme and countdown core.
       // Budgeted at the compile-time vocabulary; a longer techniques lead
       // after a mid-workout flip eats margin, which the 500ms floor absorbs.
       const leadMs =
-        findClickScript(`lead-in/${workout.id}/r${restIndex + 2}s1`, clickVocabulary)?.durationMs ?? 0
+        findClickScript(`lead-in/${workout.id}/r${restIndex + 2}s1`, clickVocabulary)?.durationMs ??
+        0
       // openerMax + 350 breath + theme + 350 breath + lead(+350 when
       // present) + core + 400 slack + 500 margin.
       const warnWorstMs =
         openerMax + 350 + themeMs + 350 + (leadMs > 0 ? leadMs + 350 : 0) + coreMs + 400 + 500
-      const restMs = upcoming ? workout.schedule[restIndex]?.restAfterMs ?? 0 : 0
+      const restMs = upcoming ? (workout.schedule[restIndex]?.restAfterMs ?? 0) : 0
       return Math.max(0, restMs - 1_000 - warnWorstMs)
     }
-    return planRecoverySequence(
-      RECOVERY_SCRIPTS,
-      restCount,
-      workout.recipe.seed,
-      { maxTotalMsFor },
-    )
+    return planRecoverySequence(RECOVERY_SCRIPTS, restCount, workout.recipe.seed, { maxTotalMsFor })
   }, [workout.id, workout.recipe.seed, workout.schedule, clickVocabulary])
 
   // Pre-bell hold indicator (Script Bible v2): HOW a round starts — its
@@ -560,7 +562,9 @@ export default function LiveScreen(): React.JSX.Element {
           hydrationPrompt: false,
           requiresStableBag: false,
           avoidIfDizzy: false,
-          segments: [{ module: clickRest.module, durationMs: clickRest.durationMs, pauseAfterMs: 0 }],
+          segments: [
+            { module: clickRest.module, durationMs: clickRest.durationMs, pauseAfterMs: 0 },
+          ],
           measuredTotalMs: clickRest.durationMs,
           corpusVersion: 'click-scripts',
         }
@@ -870,8 +874,8 @@ export default function LiveScreen(): React.JSX.Element {
               {...(cues.freeWork ? { idleLabel: 'Free work — keep your hands moving' } : {})}
               reducedMotion={reducedMotion}
               avatarAnchor={avatarAnchor}
-        workClock={workClock}
-        {...(cues.walkPlan ? { walkPlan: cues.walkPlan } : {})}
+              workClock={workClock}
+              {...(cues.walkPlan ? { walkPlan: cues.walkPlan } : {})}
             />
           )}
 
@@ -1079,26 +1083,15 @@ export default function LiveScreen(): React.JSX.Element {
             style={styles.vocabOption}
             testID={`vocab-${v}`}
           >
-            <Text
-              style={[
-                styles.vocabDot,
-                effectiveVocabulary === v && styles.vocabDotActive,
-              ]}
-            >
+            <Text style={[styles.vocabDot, effectiveVocabulary === v && styles.vocabDotActive]}>
               {effectiveVocabulary === v ? '◉' : '○'}
             </Text>
-            <Text
-              style={[
-                styles.vocabLabel,
-                effectiveVocabulary === v && styles.vocabLabelActive,
-              ]}
-            >
+            <Text style={[styles.vocabLabel, effectiveVocabulary === v && styles.vocabLabelActive]}>
               {v === 'numbers' ? 'Numbers' : 'Techniques'}
             </Text>
           </Pressable>
         ))}
       </View>
-
     </View>
   )
 }

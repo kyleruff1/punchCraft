@@ -43,12 +43,7 @@ export const WORKOUT_SUMMARY_CALCULATION_VERSION = '1.0.0'
 
 /** The six persisted outcomes (spec §17.1 amendment). */
 export type SummaryCueOutcome =
-  | 'matched'
-  | 'hand-mismatch'
-  | 'type-mismatch'
-  | 'missed'
-  | 'late'
-  | 'during-pause'
+  'matched' | 'hand-mismatch' | 'type-mismatch' | 'missed' | 'late' | 'during-pause'
 
 /** The persisted shape this reads. Structural, so storage stays out of domain. */
 export interface SummaryCueResult {
@@ -203,7 +198,8 @@ export function computeWorkoutSummary(args: ComputeSummaryArgs): WorkoutSummaryD
   const tier = (cueResults[0]?.capabilityTier ?? 'hand-only') as CapabilityTier
 
   const mostProductiveRound = perRound.reduce(
-    (best, current) => (current.actual > (perRound[best]?.actual ?? -1) ? current.roundIndex : best),
+    (best, current) =>
+      current.actual > (perRound[best]?.actual ?? -1) ? current.roundIndex : best,
     0,
   )
   const roundsWithVelocity = perRound.filter((r) => r.avgVelocity !== undefined)
@@ -264,10 +260,7 @@ export function computeWorkoutSummary(args: ComputeSummaryArgs): WorkoutSummaryD
  * alongside their counts without that separation would invite reading a
  * dropout as a performance dip (D13).
  */
-export function connectionCompleteness(
-  connectedMs: number,
-  totalActiveMs: number,
-): number {
+export function connectionCompleteness(connectedMs: number, totalActiveMs: number): number {
   if (totalActiveMs <= 0) return 0
   return round1(Math.min(100, (connectedMs / totalActiveMs) * 100))
 }

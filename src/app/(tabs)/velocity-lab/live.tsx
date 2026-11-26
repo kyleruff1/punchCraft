@@ -252,7 +252,10 @@ export default function LiveDecodeScreen(): React.ReactElement {
 
   const [events, setEvents] = useState<DecodedEventRow[]>([])
   const [meta, setMeta] = useState<MetaEntry[]>([])
-  const [streamState, setStreamState] = useState<StreamState>({ subscribedCount: 0, initErrorCount: 0 })
+  const [streamState, setStreamState] = useState<StreamState>({
+    subscribedCount: 0,
+    initErrorCount: 0,
+  })
 
   const controllersRef = useRef<StreamController[]>([])
   const seqRef = useRef(0)
@@ -260,7 +263,11 @@ export default function LiveDecodeScreen(): React.ReactElement {
   const prevMonotonicRef = useRef<number | null>(null)
 
   const adapter = useMemo(() => {
-    return getProtocolRegistry().list().find((a) => a.id === FIGHTCAMP_V1_ID) ?? null
+    return (
+      getProtocolRegistry()
+        .list()
+        .find((a) => a.id === FIGHTCAMP_V1_ID) ?? null
+    )
   }, [])
 
   const onEvent = useCallback((event: TrackerPunchEvent) => {
@@ -399,9 +406,11 @@ export default function LiveDecodeScreen(): React.ReactElement {
     return (
       <ScrollView style={styles.root} contentContainerStyle={styles.content}>
         <Text style={styles.title}>Live decoded events</Text>
-        <Text style={styles.errorText}>FightCamp v1 adapter not found in the protocol registry.</Text>
+        <Text style={styles.errorText}>
+          FightCamp v1 adapter not found in the protocol registry.
+        </Text>
         <View style={styles.row}>
-          <Link href='/(tabs)/velocity-lab' style={styles.linkBtn}>
+          <Link href="/(tabs)/velocity-lab" style={styles.linkBtn}>
             <Text style={styles.btnText}>Back to Velocity Lab</Text>
           </Link>
         </View>
@@ -413,7 +422,7 @@ export default function LiveDecodeScreen(): React.ReactElement {
     <Pressable
       style={[styles.toggleBtn, viewMode === mode && styles.toggleBtnActive]}
       onPress={() => setViewMode(mode)}
-      accessibilityRole='button'
+      accessibilityRole="button"
       accessibilityLabel={a11y}
     >
       <Text style={[styles.toggleText, viewMode === mode && styles.toggleTextActive]}>{label}</Text>
@@ -430,16 +439,21 @@ export default function LiveDecodeScreen(): React.ReactElement {
 
   if (activeSlots.length === 0) {
     const wanted =
-      viewMode === 'both' ? 'Neither tracker is' :
-      viewMode === 'left' ? 'The left (blue) tracker is not' :
-      'The right (red) tracker is not'
+      viewMode === 'both'
+        ? 'Neither tracker is'
+        : viewMode === 'left'
+          ? 'The left (blue) tracker is not'
+          : 'The right (red) tracker is not'
     return (
       <ScrollView style={styles.root} contentContainerStyle={styles.content}>
         <Text style={styles.title}>Live decoded events</Text>
         {HandToggle}
-        <Text style={styles.subtitle}>{wanted} ready. Tap a tracker to wake it, then use Connect both on the Velocity Lab landing.</Text>
+        <Text style={styles.subtitle}>
+          {wanted} ready. Tap a tracker to wake it, then use Connect both on the Velocity Lab
+          landing.
+        </Text>
         <View style={styles.row}>
-          <Link href='/(tabs)/velocity-lab' style={styles.linkBtn}>
+          <Link href="/(tabs)/velocity-lab" style={styles.linkBtn}>
             <Text style={styles.btnText}>Back to Velocity Lab</Text>
           </Link>
         </View>
@@ -448,7 +462,10 @@ export default function LiveDecodeScreen(): React.ReactElement {
   }
 
   const headerSuffix = activeSlots
-    .map((a) => `${handInitial(a.hand)} ${a.slot.name ?? 'Tracker'} (${truncateDeviceId(a.slot.deviceId)})`)
+    .map(
+      (a) =>
+        `${handInitial(a.hand)} ${a.slot.name ?? 'Tracker'} (${truncateDeviceId(a.slot.deviceId)})`,
+    )
     .join('  +  ')
 
   return (
@@ -459,14 +476,20 @@ export default function LiveDecodeScreen(): React.ReactElement {
         Subscribed to {streamState.subscribedCount} chars · {streamState.initErrorCount} init errors
       </Text>
       <Text style={styles.phase}>
-        adapter {adapter.id}@{adapter.version} · {activeSlots.map((a) => `${a.hand}:${a.slot.state}`).join(' · ')}
+        adapter {adapter.id}@{adapter.version} ·{' '}
+        {activeSlots.map((a) => `${a.hand}:${a.slot.state}`).join(' · ')}
       </Text>
 
       <View style={styles.row}>
         <Pressable style={styles.smallBtnAlt} onPress={onClear}>
           <Text style={styles.smallBtnText}>Clear log</Text>
         </Pressable>
-        <Pressable style={styles.smallBtn} onPress={() => { void onCopyJson() }}>
+        <Pressable
+          style={styles.smallBtn}
+          onPress={() => {
+            void onCopyJson()
+          }}
+        >
           <Text style={styles.smallBtnText}>Copy JSON</Text>
         </Pressable>
       </View>
@@ -474,7 +497,9 @@ export default function LiveDecodeScreen(): React.ReactElement {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Events ({events.length})</Text>
         {events.length === 0 ? (
-          <Text style={styles.hint}>Throw a punch. Events appear here as the adapter decodes them.</Text>
+          <Text style={styles.hint}>
+            Throw a punch. Events appear here as the adapter decodes them.
+          </Text>
         ) : null}
         {events.map((row) => {
           const e = row.event
@@ -491,29 +516,35 @@ export default function LiveDecodeScreen(): React.ReactElement {
           // never the only signal (§19.4).
           const handLabel = e.hand === 'left' ? 'L' : e.hand === 'right' ? 'R' : '?'
           const handStyle =
-            e.hand === 'left' ? styles.handLeft : e.hand === 'right' ? styles.handRight : styles.handText
+            e.hand === 'left'
+              ? styles.handLeft
+              : e.hand === 'right'
+                ? styles.handRight
+                : styles.handText
           const typeLabel = e.punchTypeRaw != null ? `TYPE ${e.punchTypeRaw}` : 'TYPE ?'
           const vRaw = e.velocityRaw ?? 0
           const vCal = e.velocityCalibrated
           const vCalStr = typeof vCal === 'number' ? vCal.toFixed(1) : '—'
           const tStr = typeof e.trackerTimestampMs === 'number' ? `t+${e.trackerTimestampMs}ms` : ''
           return (
-            <View
-              key={row.seq}
-              style={[styles.eventRow, isBoosted && styles.eventRowBoosted]}
-            >
+            <View key={row.seq} style={[styles.eventRow, isBoosted && styles.eventRowBoosted]}>
               <Text style={styles.eventLine} selectable>
-                <Text style={styles.deltaText}>[{row.deltaMs.toString().padStart(4, ' ')}ms since prev]</Text>
+                <Text style={styles.deltaText}>
+                  [{row.deltaMs.toString().padStart(4, ' ')}ms since prev]
+                </Text>
                 {'  '}
                 <Text style={styles.typeText}>{typeLabel}</Text>
                 {'  '}
                 <Text style={handStyle}>{handLabel}</Text>
                 {'  '}
-                <Text style={styles.velocityText}>vRAW({vRaw}) v={vCalStr}</Text>
-                {tStr ? <Text style={styles.trackerTs}>  {tStr}</Text> : null}
+                <Text style={styles.velocityText}>
+                  vRAW({vRaw}) v={vCalStr}
+                </Text>
+                {tStr ? <Text style={styles.trackerTs}> {tStr}</Text> : null}
               </Text>
               <Text style={styles.eventDetail} selectable>
-                frame {e.sourceFrameId} · type-byte {e.punchTypeRaw ?? '—'} · svc ca280069 · unit {e.velocityUnit}
+                frame {e.sourceFrameId} · type-byte {e.punchTypeRaw ?? '—'} · svc ca280069 · unit{' '}
+                {e.velocityUnit}
               </Text>
             </View>
           )
@@ -522,9 +553,7 @@ export default function LiveDecodeScreen(): React.ReactElement {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Metadata ({meta.length})</Text>
-        {meta.length === 0 ? (
-          <Text style={styles.hint}>No decoder notes yet.</Text>
-        ) : null}
+        {meta.length === 0 ? <Text style={styles.hint}>No decoder notes yet.</Text> : null}
         {meta.map((m) => {
           const style =
             m.kind === 'malformed' || m.kind === 'init-error'

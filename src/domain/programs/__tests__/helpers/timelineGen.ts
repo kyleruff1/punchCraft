@@ -36,7 +36,7 @@ import type {
 
 /** Numerical Recipes' LCG constants; `>>> 0` keeps it in 32 unsigned bits. */
 function lcg(seed: number): () => number {
-  let state = (seed >>> 0) || 0x9e3779b9
+  let state = seed >>> 0 || 0x9e3779b9
   return () => {
     state = (Math.imul(state, 1664525) + 1013904223) >>> 0
     return state / 0x1_0000_0000
@@ -203,7 +203,8 @@ export function generateTickSchedule(seed: number, workDurationMs: number): numb
   while (t < workDurationMs && ticks.length < 4_000) {
     ticks.push(t)
     const roll = rnd()
-    if (roll < 0.05) ticks.push(t) // duplicate: must be idempotent
+    if (roll < 0.05)
+      ticks.push(t) // duplicate: must be idempotent
     else if (roll < 0.08) ticks.push(Math.max(0, t - 5_000)) // backwards: ignored
     t += steps[Math.floor(rnd() * steps.length)] as number
   }

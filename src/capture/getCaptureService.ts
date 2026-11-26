@@ -51,10 +51,14 @@ export function startCapture(label?: string): BleCaptureService {
     ble.setCaptureIdProvider(() => service.currentCaptureId() ?? 'ephemeral')
     ble.setFrameSink(service)
   } catch (err) {
-    logger.error('capture.sink.install.failed', 'transport sink not installed — capture would record nothing', {
-      captureId: safe(captureId),
-      error: safe(String(err)),
-    })
+    logger.error(
+      'capture.sink.install.failed',
+      'transport sink not installed — capture would record nothing',
+      {
+        captureId: safe(captureId),
+        error: safe(String(err)),
+      },
+    )
     void stopCapture()
     throw err
   }

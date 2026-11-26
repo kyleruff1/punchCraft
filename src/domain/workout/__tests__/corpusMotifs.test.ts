@@ -103,12 +103,7 @@ describe('build-up ladders', () => {
 
 describe('footwork wrappers', () => {
   it('declares placement and tier for every wrapper', () => {
-    const placements = new Set([
-      'before',
-      'after',
-      'between-spoken-groups',
-      'between-repetitions',
-    ])
+    const placements = new Set(['before', 'after', 'between-spoken-groups', 'between-repetitions'])
     const tiers = new Set(['beginner', 'intermediate', 'advanced'])
     for (const wrapper of OPTIONAL_FOOTWORK_WRAPPERS) {
       expect(placements.has(wrapper.placement)).toBe(true)

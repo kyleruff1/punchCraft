@@ -334,4 +334,3 @@ describe('QA auto-sim', () => {
     expect(stopScript).toHaveBeenCalledTimes(2)
   })
 })
-

@@ -23,10 +23,7 @@ jest.mock('expo-router', () => {
 })
 
 import VoiceSettingsScreen, { OVERLAY_TOGGLE_LABEL } from '../voice'
-import {
-  __resetVoiceSettingsForTests,
-  useVoiceSettingsStore,
-} from '@state/useVoiceSettingsStore'
+import { __resetVoiceSettingsForTests, useVoiceSettingsStore } from '@state/useVoiceSettingsStore'
 import { PLAYBACK_DETECTION_UNAVAILABLE_NOTICE } from '@audio/ThirdPartyPlaybackDetector'
 
 function render(): ReactTestRenderer {

@@ -60,9 +60,7 @@ interface PlayEvent {
   volume: number
 }
 
-function harness(
-  opts: { failMode?: boolean; failPlayers?: boolean } = {},
-): {
+function harness(opts: { failMode?: boolean; failPlayers?: boolean } = {}): {
   output: VoiceOutputExpo
   plays: PlayEvent[]
   created: Array<{ source: number; volume: number }>
@@ -217,8 +215,12 @@ describe('the manifest covers the whole vocabulary', () => {
     const nonFusedCount = VOICE_ASSET_IDS.length - FUSED_BODY_ASSET_IDS.length
     const expectedNumbers = VOICE_ASSET_IDS.length + nonFusedCount
     const expectedNames = nonFusedCount * PHRASE_FORMS.length
-    expect((numbersBlock.match(/assets\/voice\/numbers\//g)?.length ?? 0) + calloutNumbers.length).toBe(expectedNumbers)
-    expect((namesBlock.match(/assets\/voice\/names\//g)?.length ?? 0) + calloutNames.length).toBe(expectedNames)
+    expect(
+      (numbersBlock.match(/assets\/voice\/numbers\//g)?.length ?? 0) + calloutNumbers.length,
+    ).toBe(expectedNumbers)
+    expect((namesBlock.match(/assets\/voice\/names\//g)?.length ?? 0) + calloutNames.length).toBe(
+      expectedNames,
+    )
     expect(namesBlock).not.toContain('assets/voice/numbers/')
   })
 
@@ -233,7 +235,9 @@ describe('the manifest covers the whole vocabulary', () => {
     // standalone only), split across manifest.ts + calloutManifest.ts.
     const nonFusedCount = VOICE_ASSET_IDS.length - FUSED_BODY_ASSET_IDS.length
     const idPaths = [...paths, ...calloutPaths.filter((p) => p.includes('/co-'))]
-    expect(idPaths).toHaveLength(nonFusedCount * 2 * PHRASE_FORMS.length + FUSED_BODY_ASSET_IDS.length)
+    expect(idPaths).toHaveLength(
+      nonFusedCount * 2 * PHRASE_FORMS.length + FUSED_BODY_ASSET_IDS.length,
+    )
     for (const path of [...paths, ...calloutPaths]) {
       expect([path, existsSync(path)]).toEqual([path, true])
     }
@@ -307,11 +311,7 @@ describe('a phrase plays as a sequence, not all at once', () => {
     expect(h.plays.map((p) => p.source)).toEqual([sourceOf('1'), sourceOf('1')])
 
     h.advance(FALLBACK_CLIP_MS)
-    expect(h.plays.map((p) => p.source)).toEqual([
-      sourceOf('1'),
-      sourceOf('1'),
-      sourceOf('2'),
-    ])
+    expect(h.plays.map((p) => p.source)).toEqual([sourceOf('1'), sourceOf('1'), sourceOf('2')])
   })
 
   it('says a repeated word once for each time it was called', async () => {
@@ -594,12 +594,13 @@ describe('playSequence timer safety — A6 (#260) & append-not-clear (2026-08-31
         const i = timers.findIndex((t) => t.id === h)
         if (i >= 0) timers.splice(i, 1)
       },
-      createPlayer: () => ({
-        volume: 1,
-        seekTo: () => {},
-        play: () => {},
-        remove: () => {},
-      } as never),
+      createPlayer: () =>
+        ({
+          volume: 1,
+          seekTo: () => {},
+          play: () => {},
+          remove: () => {},
+        }) as never,
       speaker: { speak: () => {}, stop: () => {} } as never,
       setAudioMode: (async () => undefined) as never,
     })
@@ -655,12 +656,13 @@ describe('playSequence timer safety — A6 (#260) & append-not-clear (2026-08-31
         return id
       },
       cancelScheduled: () => {},
-      createPlayer: () => ({
-        volume: 1,
-        seekTo: () => {},
-        play: () => {},
-        remove: () => {},
-      } as never),
+      createPlayer: () =>
+        ({
+          volume: 1,
+          seekTo: () => {},
+          play: () => {},
+          remove: () => {},
+        }) as never,
       speaker: { speak: () => {}, stop: () => {} } as never,
       setAudioMode: (async () => undefined) as never,
     })
@@ -880,9 +882,7 @@ describe('latency-compensated dispatch (M39-V2 Phase 4-iii)', () => {
 
   it('instance uses the default calibration when the option is omitted', () => {
     const h = harness()
-    expect(h.output.calibratedAudioOutputLatencyMs).toBe(
-      DEFAULT_CALIBRATED_AUDIO_OUTPUT_LATENCY_MS,
-    )
+    expect(h.output.calibratedAudioOutputLatencyMs).toBe(DEFAULT_CALIBRATED_AUDIO_OUTPUT_LATENCY_MS)
     expect(h.output.dispatchAtMsForTickTime(10_000)).toBe(10_000 - 40)
   })
 
@@ -893,9 +893,7 @@ describe('latency-compensated dispatch (M39-V2 Phase 4-iii)', () => {
   })
 
   it('rejects a negative override at construction', () => {
-    expect(() => new VoiceOutputExpo({ calibratedAudioOutputLatencyMs: -5 })).toThrow(
-      /must be ≥ 0/,
-    )
+    expect(() => new VoiceOutputExpo({ calibratedAudioOutputLatencyMs: -5 })).toThrow(/must be ≥ 0/)
   })
 })
 
@@ -1603,8 +1601,18 @@ describe('focus-scoped reuse (#356) — release() frees, the SAME instance re-wa
       clock: () => 1_000,
       schedule: () => 1,
       cancelScheduled: () => {},
-      createPlayer: (() => ({ volume: 1, seekTo: () => {}, play: () => {}, remove: () => {} })) as never,
-      createClickScriptPlayer: (() => ({ volume: 1, seekTo: () => {}, play: () => {}, remove: () => {} })) as never,
+      createPlayer: (() => ({
+        volume: 1,
+        seekTo: () => {},
+        play: () => {},
+        remove: () => {},
+      })) as never,
+      createClickScriptPlayer: (() => ({
+        volume: 1,
+        seekTo: () => {},
+        play: () => {},
+        remove: () => {},
+      })) as never,
       setAudioMode: (async () => {
         attempts += 1
         throw new Error('audio stack down')

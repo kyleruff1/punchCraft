@@ -147,10 +147,7 @@ export function ForgedButton({
         colors={[...stops]}
         start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 1 }}
-        style={[
-          styles.body,
-          { borderTopColor: v.bevelTop, borderBottomColor: v.bevelBottom },
-        ]}
+        style={[styles.body, { borderTopColor: v.bevelTop, borderBottomColor: v.bevelBottom }]}
       >
         {/* Inner highlight — a 1px light line along the top inside edge,
             selling the bevel from the light side. Hidden on press. */}

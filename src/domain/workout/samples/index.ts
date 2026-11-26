@@ -88,8 +88,7 @@ const SAMPLES: Record<SampleWorkoutKey, SampleWorkout> = {
   'uppercut-clinic': {
     key: 'uppercut-clinic',
     name: 'Uppercut Clinic',
-    description:
-      'The five and the six from first touch to full combinations, at teaching cadence.',
+    description: 'The five and the six from first touch to full combinations, at teaching cadence.',
     workout: uppercutClinic,
   },
   'progressive-buildup': {

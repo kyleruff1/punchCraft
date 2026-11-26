@@ -43,7 +43,11 @@ const MODES: Array<{ value: VoiceMode; label: string; hint: string }> = [
 ]
 
 const STYLES: Array<{ value: VoiceStyle; label: string; hint: string }> = [
-  { value: 'call-and-go', label: 'Call and Go', hint: 'The whole combination, called before you throw it' },
+  {
+    value: 'call-and-go',
+    label: 'Call and Go',
+    hint: 'The whole combination, called before you throw it',
+  },
   { value: 'follow-the-call', label: 'Follow the Call', hint: 'Each punch called as it comes up' },
   { value: 'minimal', label: 'Minimal', hint: 'Round events only' },
 ]
@@ -107,7 +111,11 @@ export default function VoiceSettingsScreen(): React.JSX.Element {
   const detectionAvailable = React.useMemo(() => createPlaybackDetector().available, [])
 
   return (
-    <ScrollView style={styles.root} contentContainerStyle={styles.container} testID="voice-settings">
+    <ScrollView
+      style={styles.root}
+      contentContainerStyle={styles.container}
+      testID="voice-settings"
+    >
       <Stack.Screen options={{ title: 'Voice Coach' }} />
 
       <Choice

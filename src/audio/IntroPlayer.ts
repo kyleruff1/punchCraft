@@ -94,10 +94,7 @@ export class IntroPlayer {
    * uses it to ring the bell instead of serving the countdown cap's
    * leftover slack in silence.
    */
-  play(
-    volume: number,
-    opts: { tailMs?: number; onComplete?: () => void } = {},
-  ): void {
+  play(volume: number, opts: { tailMs?: number; onComplete?: () => void } = {}): void {
     if (!this.pl.loaded) return
     if (this.started) {
       if (this.pausedAt !== null) {

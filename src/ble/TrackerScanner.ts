@@ -90,8 +90,6 @@ export class TrackerScanner {
       // Idempotent; swallow.
     }
 
-    return Array.from(byDevice.values()).sort(
-      (a, b) => b.monotonicTimeMs - a.monotonicTimeMs,
-    )
+    return Array.from(byDevice.values()).sort((a, b) => b.monotonicTimeMs - a.monotonicTimeMs)
   }
 }

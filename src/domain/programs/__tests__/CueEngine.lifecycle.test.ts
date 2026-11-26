@@ -44,7 +44,17 @@ import {
 } from './helpers/fakeClock'
 import { generateCase, generateTickSchedule } from './helpers/timelineGen'
 import { CADENCE_PROFILES } from '../../workout/cadence'
-import { legacyBodyWork as bodyWork, legacyEstablishTheJab20 as establishTheJab20, legacyHeavyHands as heavyHands, legacyPacePusher as pacePusher, legacyProgressiveBuildup as progressiveBuildup, legacySpeedCombos as speedCombos, legacySwitchByRound as switchByRound, legacyThreeRoundFundamentals as threeRoundFundamentals, legacyUppercutClinic as uppercutClinic } from '../../workout/samples/__fixtures__'
+import {
+  legacyBodyWork as bodyWork,
+  legacyEstablishTheJab20 as establishTheJab20,
+  legacyHeavyHands as heavyHands,
+  legacyPacePusher as pacePusher,
+  legacyProgressiveBuildup as progressiveBuildup,
+  legacySpeedCombos as speedCombos,
+  legacySwitchByRound as switchByRound,
+  legacyThreeRoundFundamentals as threeRoundFundamentals,
+  legacyUppercutClinic as uppercutClinic,
+} from '../../workout/samples/__fixtures__'
 import type { GeneratedWorkout } from '../../workout/GeneratedWorkout'
 import type { ProgramRound, WorkoutBlock, WorkoutToken } from '../../workout/WorkoutTokens'
 
@@ -123,9 +133,7 @@ function statusTrail(events: readonly CueEvent[], cueId?: string): CueStatus[] {
 }
 
 function typesFor(events: readonly CueEvent[], cueId?: string): Array<CueEvent['type']> {
-  return events
-    .filter((e) => cueId === undefined || e.cue.id === cueId)
-    .map((e) => e.type)
+  return events.filter((e) => cueId === undefined || e.cue.id === cueId).map((e) => e.type)
 }
 
 // ---------------------------------------------------------------------------
@@ -409,8 +417,8 @@ describe('case 11 — paused mid-active suspends and resumed restores prior stat
     expect(run.engine.snapshot().status).toBe<CueStatus>('suspended')
 
     // Still exactly one open span — a second suspend must not stack.
-    const spans = run.events.filter(isLifecycle).find((e) => e.type === 'cue-suspended')!
-      .timestamps.suspensions
+    const spans = run.events.filter(isLifecycle).find((e) => e.type === 'cue-suspended')!.timestamps
+      .suspensions
     expect(spans).toHaveLength(1)
 
     run.engine.notifyTrackerFault(false)
@@ -964,7 +972,10 @@ describe('property — a full sample runs end to end with nothing left in flight
       // mid-flight when the next round loaded.
       const cueIds = new Set(timeline.flatMap((r) => r.cues.map((c) => c.id)))
       const settledIds = new Set(
-        events.filter(isLifecycle).filter((e) => TERMINAL_STATUSES.has(e.status)).map((e) => e.cue.id),
+        events
+          .filter(isLifecycle)
+          .filter((e) => TERMINAL_STATUSES.has(e.status))
+          .map((e) => e.cue.id),
       )
       expect({ bpm, missing: [...cueIds].filter((id) => !settledIds.has(id)) }).toEqual({
         bpm,

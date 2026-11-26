@@ -78,10 +78,18 @@ function validateBlock(
   const path = `schedule[${roundIndex}].blocks[${blockIndex}]`
 
   if (block.startOffsetMs < 0) {
-    errors.push({ code: 'block-negative-start', path: `${path}.startOffsetMs`, message: `startOffsetMs must be >= 0, got ${block.startOffsetMs}` })
+    errors.push({
+      code: 'block-negative-start',
+      path: `${path}.startOffsetMs`,
+      message: `startOffsetMs must be >= 0, got ${block.startOffsetMs}`,
+    })
   }
   if (block.durationMs <= 0) {
-    errors.push({ code: 'block-nonpositive-duration', path: `${path}.durationMs`, message: `durationMs must be > 0, got ${block.durationMs}` })
+    errors.push({
+      code: 'block-nonpositive-duration',
+      path: `${path}.durationMs`,
+      message: `durationMs must be > 0, got ${block.durationMs}`,
+    })
   }
   if (block.startOffsetMs + block.durationMs > round.workDurationMs) {
     errors.push({
@@ -114,7 +122,11 @@ function validateBlock(
     })
   }
   if (block.gapBeats < 0) {
-    errors.push({ code: 'negative-gap', path: `${path}.gapBeats`, message: `gapBeats must be >= 0, got ${block.gapBeats}` })
+    errors.push({
+      code: 'negative-gap',
+      path: `${path}.gapBeats`,
+      message: `gapBeats must be >= 0, got ${block.gapBeats}`,
+    })
   }
 }
 
@@ -131,7 +143,11 @@ export function validateGeneratedWorkout(workout: GeneratedWorkout): WorkoutVali
   const schedule = workout.schedule
 
   if (schedule.length === 0) {
-    errors.push({ code: 'empty-schedule', path: 'schedule', message: 'a workout must contain at least one round' })
+    errors.push({
+      code: 'empty-schedule',
+      path: 'schedule',
+      message: 'a workout must contain at least one round',
+    })
   }
 
   let previousOrder = Number.NEGATIVE_INFINITY
@@ -158,10 +174,18 @@ export function validateGeneratedWorkout(workout: GeneratedWorkout): WorkoutVali
     }
 
     if (round.workDurationMs <= 0) {
-      errors.push({ code: 'round-nonpositive-work', path: `${path}.workDurationMs`, message: `workDurationMs must be > 0, got ${round.workDurationMs}` })
+      errors.push({
+        code: 'round-nonpositive-work',
+        path: `${path}.workDurationMs`,
+        message: `workDurationMs must be > 0, got ${round.workDurationMs}`,
+      })
     }
     if (round.restAfterMs < 0) {
-      errors.push({ code: 'round-negative-rest', path: `${path}.restAfterMs`, message: `restAfterMs must be >= 0, got ${round.restAfterMs}` })
+      errors.push({
+        code: 'round-negative-rest',
+        path: `${path}.restAfterMs`,
+        message: `restAfterMs must be >= 0, got ${round.restAfterMs}`,
+      })
     }
 
     round.blocks.forEach((block, blockIndex) => {

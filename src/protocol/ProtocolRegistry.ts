@@ -81,10 +81,7 @@ export class ProtocolRegistry {
         bestConfidence = confidence
         continue
       }
-      if (
-        confidence === bestConfidence &&
-        compareVersions(adapter.version, best.version) > 0
-      ) {
+      if (confidence === bestConfidence && compareVersions(adapter.version, best.version) > 0) {
         best = adapter
       }
     }

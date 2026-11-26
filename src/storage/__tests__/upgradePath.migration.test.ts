@@ -37,7 +37,10 @@ const columns = (db: MemoryDb, table: string): string[] =>
   db.query<{ name: string }>(`PRAGMA table_info(${table})`).map((r) => r.name)
 
 const REALIZED_S1 = JSON.stringify([{ blockId: 'b1', tokens: ['1', '2'] }])
-const REALIZED_S2 = JSON.stringify([{ blockId: 'b1', tokens: ['1', '2'] }, { blockId: 'b2', tokens: ['3'] }])
+const REALIZED_S2 = JSON.stringify([
+  { blockId: 'b1', tokens: ['1', '2'] },
+  { blockId: 'b2', tokens: ['3'] },
+])
 
 /**
  * A database as a build at migration 004 left it: two finished sessions,
@@ -138,20 +141,38 @@ describe('upgrading a database that already holds sessions (004 → current)', (
   })
 
   it('moves each session’s realized stream into workout_runs', () => {
-    expect(
-      db.query('SELECT * FROM workout_runs ORDER BY session_id'),
-    ).toEqual([
-      { session_id: 's1', generated_workout_id: 'w1', realized_tokens_json: REALIZED_S1, created_at: '2026-08-24T10:03:00.000Z' },
-      { session_id: 's2', generated_workout_id: 'w2', realized_tokens_json: REALIZED_S2, created_at: '2026-08-25T10:01:00.000Z' },
+    expect(db.query('SELECT * FROM workout_runs ORDER BY session_id')).toEqual([
+      {
+        session_id: 's1',
+        generated_workout_id: 'w1',
+        realized_tokens_json: REALIZED_S1,
+        created_at: '2026-08-24T10:03:00.000Z',
+      },
+      {
+        session_id: 's2',
+        generated_workout_id: 'w2',
+        realized_tokens_json: REALIZED_S2,
+        created_at: '2026-08-25T10:01:00.000Z',
+      },
     ])
   })
 
   it('keeps every plan, including one no session ran, and drops only the two moved columns', () => {
-    expect(db.query<{ id: string }>('SELECT id FROM generated_workouts ORDER BY id').map((r) => r.id)).toEqual(['w1', 'w2', 'w3'])
+    expect(
+      db.query<{ id: string }>('SELECT id FROM generated_workouts ORDER BY id').map((r) => r.id),
+    ).toEqual(['w1', 'w2', 'w3'])
     const cols = columns(db, 'generated_workouts')
     expect(cols).not.toContain('session_id')
     expect(cols).not.toContain('realized_tokens_json')
-    expect(cols).toEqual(expect.arrayContaining(['recipe_id', 'generator_version', 'seed', 'params_snapshot_json', 'blocks_json']))
+    expect(cols).toEqual(
+      expect.arrayContaining([
+        'recipe_id',
+        'generator_version',
+        'seed',
+        'params_snapshot_json',
+        'blocks_json',
+      ]),
+    )
   })
 
   it('keeps punches and adaptations, with the new acceleration column empty', () => {
@@ -239,8 +260,11 @@ describe('a shipped migration is append-only', () => {
     const db = new MemoryDb()
     runMigrations(asSqlite(db))
     const insert = (mode: string): void =>
-      db.execSync(`INSERT INTO sessions (id, mode, status, created_at) VALUES ('${mode}', '${mode}', 'completed', 't')`)
-    for (const mode of ['velocity-test', 'punchcraft', 'puncheokie']) expect(() => insert(mode)).not.toThrow()
+      db.execSync(
+        `INSERT INTO sessions (id, mode, status, created_at) VALUES ('${mode}', '${mode}', 'completed', 't')`,
+      )
+    for (const mode of ['velocity-test', 'punchcraft', 'puncheokie'])
+      expect(() => insert(mode)).not.toThrow()
     expect(() => insert('workouts')).toThrow(/CHECK/i)
   })
 })

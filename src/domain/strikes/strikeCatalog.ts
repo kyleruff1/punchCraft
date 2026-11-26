@@ -39,18 +39,7 @@ import type { PunchNumber } from '@domain/workout/WorkoutTokens'
 
 /** Canonical strike identifier — one of 12 stance-relative shots. */
 export type StrikeToken =
-  | '1'
-  | '1B'
-  | '2'
-  | '2B'
-  | '3'
-  | '3B'
-  | '4'
-  | '4B'
-  | '5'
-  | '5B'
-  | '6'
-  | '6B'
+  '1' | '1B' | '2' | '2B' | '3' | '3B' | '4' | '4B' | '5' | '5B' | '6' | '6B'
 
 /** Technique family, independent of stance. */
 export type StrikeFamily = 'jab' | 'cross' | 'hook' | 'uppercut'
@@ -199,7 +188,18 @@ export const STRIKE_CATALOG: Readonly<Record<StrikeToken, StrikeDefinition>> = O
 
 /** Every strike, in canonical order. */
 export const STRIKE_TOKENS: readonly StrikeToken[] = Object.freeze([
-  '1', '1B', '2', '2B', '3', '3B', '4', '4B', '5', '5B', '6', '6B',
+  '1',
+  '1B',
+  '2',
+  '2B',
+  '3',
+  '3B',
+  '4',
+  '4B',
+  '5',
+  '5B',
+  '6',
+  '6B',
 ])
 
 /**
@@ -248,10 +248,6 @@ export const DEFAULT_REP_ID = 'rep-0' as const
  * pre-Phase-3 codepath still produces unique strikeIds via
  * distinct cueIds + `rep-0`.
  */
-export function strikeIdFor(
-  cueId: string,
-  repId: string,
-  strikeIndex: number,
-): string {
+export function strikeIdFor(cueId: string, repId: string, strikeIndex: number): string {
   return `${cueId}:${repId}:${strikeIndex}`
 }

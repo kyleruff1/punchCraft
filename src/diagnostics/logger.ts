@@ -49,7 +49,9 @@ class ConsoleSink implements LogSink {
 }
 
 const sinks: LogSink[] = [new ConsoleSink()]
-export function addSink(s: LogSink): void { sinks.push(s) }
+export function addSink(s: LogSink): void {
+  sinks.push(s)
+}
 export function replaceSinks(next: LogSink[]): void {
   sinks.length = 0
   sinks.push(...next)
@@ -65,15 +67,24 @@ function nowMonotonicMs(): number {
 }
 
 /** Mark a value as 'safe' — appears everywhere. Shortcut for `{value, class:'safe'}`. */
-export function safe(value: unknown): ClassifiedField { return { value, class: 'safe' } }
-export function deviceSensitive(value: unknown): ClassifiedField { return { value, class: 'device-sensitive' } }
+export function safe(value: unknown): ClassifiedField {
+  return { value, class: 'safe' }
+}
+export function deviceSensitive(value: unknown): ClassifiedField {
+  return { value, class: 'device-sensitive' }
+}
 export function secret(_value: unknown): ClassifiedField {
   // Never store the actual value — the classifier's contract is that a
   // 'secret' field never leaves this call. Store only a marker.
   return { value: '[redacted]', class: 'secret' }
 }
 
-export function log(level: LogLevel, code: string, message: string, fields: Record<string, ClassifiedField> = {}): void {
+export function log(
+  level: LogLevel,
+  code: string,
+  message: string,
+  fields: Record<string, ClassifiedField> = {},
+): void {
   const record: LogRecord = {
     level,
     monotonicTimeMs: nowMonotonicMs(),
@@ -86,8 +97,12 @@ export function log(level: LogLevel, code: string, message: string, fields: Reco
 }
 
 export const logger = {
-  debug: (code: string, message: string, fields?: Record<string, ClassifiedField>) => log('debug', code, message, fields),
-  info: (code: string, message: string, fields?: Record<string, ClassifiedField>) => log('info', code, message, fields),
-  warn: (code: string, message: string, fields?: Record<string, ClassifiedField>) => log('warn', code, message, fields),
-  error: (code: string, message: string, fields?: Record<string, ClassifiedField>) => log('error', code, message, fields),
+  debug: (code: string, message: string, fields?: Record<string, ClassifiedField>) =>
+    log('debug', code, message, fields),
+  info: (code: string, message: string, fields?: Record<string, ClassifiedField>) =>
+    log('info', code, message, fields),
+  warn: (code: string, message: string, fields?: Record<string, ClassifiedField>) =>
+    log('warn', code, message, fields),
+  error: (code: string, message: string, fields?: Record<string, ClassifiedField>) =>
+    log('error', code, message, fields),
 } as const

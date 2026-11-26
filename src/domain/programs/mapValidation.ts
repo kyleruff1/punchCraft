@@ -32,9 +32,7 @@ export function silenceAudit(
   map: RoundRhythmMap,
   ceilingMs: number = SILENCE_CEILING_MS,
 ): SilenceAudit {
-  const times = map.voicedEvents
-    .map((index) => map.events[index]?.atMs ?? 0)
-    .sort((a, b) => a - b)
+  const times = map.voicedEvents.map((index) => map.events[index]?.atMs ?? 0).sort((a, b) => a - b)
   if (times.length === 0) {
     return { ok: map.workDurationMs <= ceilingMs, maxGapMs: map.workDurationMs }
   }

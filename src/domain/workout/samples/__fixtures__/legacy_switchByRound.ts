@@ -95,7 +95,11 @@ const ROUND_PLAN: Array<{ theme: string; stance: BlockStance }> = [
 ]
 
 const rounds: ProgramRound[] = ROUND_PLAN.map((plan, index) => {
-  const blocks = padBlocksToRound(layBlocks(roundSpecs(`sw-r${index + 1}`, plan.stance), BPM), BPM, 240_000)
+  const blocks = padBlocksToRound(
+    layBlocks(roundSpecs(`sw-r${index + 1}`, plan.stance), BPM),
+    BPM,
+    240_000,
+  )
   const isLast = index === ROUND_PLAN.length - 1
   return {
     id: `sw-r${index + 1}`,

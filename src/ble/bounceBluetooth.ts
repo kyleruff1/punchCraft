@@ -32,11 +32,7 @@ import { armAutoRetry } from './autoConnectTrackers'
 import { logger, safe } from '@/diagnostics/logger'
 
 export type BounceStatus =
-  | 'ok'
-  | 'timed-out'
-  | 'never-turned-off'
-  | 'settings-unavailable'
-  | 'unauthorized'
+  'ok' | 'timed-out' | 'never-turned-off' | 'settings-unavailable' | 'unauthorized'
 
 export interface BounceResult {
   status: BounceStatus

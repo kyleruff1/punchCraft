@@ -78,11 +78,7 @@ function wordmarkTabButton(app: WordmarkApp) {
       >
         {/* The tab link is the isolated silver wordmark's ONE job —
             everywhere else punchCraft is the color wordmark. */}
-        <Wordmark
-          app={app}
-          size="tab"
-          variant={app === 'punchCraft' ? 'isolated' : 'brand'}
-        />
+        <Wordmark app={app} size="tab" variant={app === 'punchCraft' ? 'isolated' : 'brand'} />
       </Pressable>
     )
   }

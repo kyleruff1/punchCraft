@@ -94,10 +94,7 @@ export const useVoiceSettingsStore = create<VoiceSettingsState>((set, get) => ({
     // existed comes back complete rather than missing it. What it cannot do
     // is vouch for the VALUES: the row is JSON, and the type parameter below
     // is a hope, not a check.
-    const stored = repo.read<VoiceCoachPolicy>(
-      SETTINGS_KEYS.voicePolicy,
-      defaultVoiceCoachPolicy(),
-    )
+    const stored = repo.read<VoiceCoachPolicy>(SETTINGS_KEYS.voicePolicy, defaultVoiceCoachPolicy())
     // So every field is checked. This is where a retired style is migrated
     // (an install carrying `coach-shorthand` would otherwise keep beeping its
     // repetitions with no control left in the UI to explain why, D22) — and

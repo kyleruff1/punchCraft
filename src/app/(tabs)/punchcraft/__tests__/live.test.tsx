@@ -191,9 +191,7 @@ function drive(patch: Partial<LiveState>): void {
 }
 
 function textOf(node: ReactTestInstance): string {
-  return node.children
-    .map((child) => (typeof child === 'string' ? child : textOf(child)))
-    .join('')
+  return node.children.map((child) => (typeof child === 'string' ? child : textOf(child))).join('')
 }
 
 const allText = (tree: ReactTestRenderer): string => textOf(tree.root)
@@ -497,9 +495,9 @@ describe('controls', () => {
     const tree = render()
     drive({ phase: 'work' })
     for (const id of ['control-pause', 'control-skip', 'control-repeat', 'control-stop']) {
-      const flat = StyleSheet.flatten(
-        tree.root.findByProps({ testID: id }).props.style,
-      ) as { minHeight?: number }
+      const flat = StyleSheet.flatten(tree.root.findByProps({ testID: id }).props.style) as {
+        minHeight?: number
+      }
       expect(flat.minHeight ?? 0).toBeGreaterThanOrEqual(48)
     }
   })

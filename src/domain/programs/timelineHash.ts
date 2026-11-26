@@ -92,15 +92,8 @@ export function hashTimelineContent(content: unknown): string {
  * the tie-break so two cues with identical strike content in
  * different rounds still classify distinctly.
  */
-export function sameTimelineIdentity(
-  a: TimelineIdentity,
-  b: TimelineIdentity,
-): boolean {
-  return (
-    a.revision === b.revision &&
-    a.cueId === b.cueId &&
-    a.timelineHash === b.timelineHash
-  )
+export function sameTimelineIdentity(a: TimelineIdentity, b: TimelineIdentity): boolean {
+  return a.revision === b.revision && a.cueId === b.cueId && a.timelineHash === b.timelineHash
 }
 
 // ---------------------------------------------------------------------------

@@ -86,7 +86,11 @@ const TIER_OPTIONS: ReadonlyArray<PickerOption<'beginner' | 'intermediate' | 'ad
 
 const FOCUS_OPTIONS: ReadonlyArray<PickerOption<WorkoutRecipe['focus']>> = [
   { value: 'hands', label: 'Hands', description: 'Punch-forward, less footwork.' },
-  { value: 'movement', label: 'Movement', description: 'Lowers punch target for footwork and defense.' },
+  {
+    value: 'movement',
+    label: 'Movement',
+    description: 'Lowers punch target for footwork and defense.',
+  },
   { value: 'balanced', label: 'Balanced', description: 'Middle ground on punch density.' },
 ]
 
@@ -136,10 +140,12 @@ const PLAN_OPTIONS: ReadonlyArray<PickerOption<WorkoutRecipe['adaptationMode']>>
 
 const TIER_ORDER: IntensityTier[] = ['technique', 'steady', 'hard', 'high-volume', 'extreme']
 
-const INTENSITY_TIER_OPTIONS: ReadonlyArray<PickerOption<IntensityTier>> = TIER_ORDER.map((tier) => ({
-  value: tier,
-  label: TIER_LABELS[tier],
-}))
+const INTENSITY_TIER_OPTIONS: ReadonlyArray<PickerOption<IntensityTier>> = TIER_ORDER.map(
+  (tier) => ({
+    value: tier,
+    label: TIER_LABELS[tier],
+  }),
+)
 
 function stanceChoiceFor(recipe: WorkoutRecipe): StanceChoice {
   if (recipe.stanceMode === 'switch-by-round') return 'switch-by-round'
@@ -183,9 +189,7 @@ export default function RecipeScreen(): React.JSX.Element {
   const dryRounds = useMemo(() => {
     if (selectedSampleKey) return null
     try {
-      return coverageConflict(
-        generateWorkout(deferredRecipe, fillOptionsForRecipe(deferredRecipe)),
-      )
+      return coverageConflict(generateWorkout(deferredRecipe, fillOptionsForRecipe(deferredRecipe)))
     } catch {
       return null
     }

@@ -47,8 +47,7 @@ export const useBackdropSettingsStore = create<BackdropSettingsState>((set) => (
   },
 }))
 
-export const useBackdropQuality = (): BackdropQuality =>
-  useBackdropSettingsStore((s) => s.quality)
+export const useBackdropQuality = (): BackdropQuality => useBackdropSettingsStore((s) => s.quality)
 
 /** Reset for tests — the module-level repository handle outlives a render. */
 export function __resetBackdropSettingsForTests(): void {

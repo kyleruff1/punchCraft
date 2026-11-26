@@ -79,9 +79,7 @@ afterEach(() => {
 })
 
 function textOf(node: ReactTestInstance): string {
-  return node.children
-    .map((child) => (typeof child === 'string' ? child : textOf(child)))
-    .join('')
+  return node.children.map((child) => (typeof child === 'string' ? child : textOf(child))).join('')
 }
 
 function allText(tree: ReactTestRenderer): string {
@@ -129,8 +127,9 @@ describe('the phase on screen follows the clock, not a timer of its own', () => 
   })
 
   it('counts the rest down rather than up', () => {
-    expect(textOf(render({ restElapsedMs: 0 }).root.findByProps({ testID: 'rest-countdown' })))
-      .toBe('1:00')
+    expect(
+      textOf(render({ restElapsedMs: 0 }).root.findByProps({ testID: 'rest-countdown' })),
+    ).toBe('1:00')
     expect(
       textOf(render({ restElapsedMs: 45_000 }).root.findByProps({ testID: 'rest-countdown' })),
     ).toBe('0:15')
@@ -262,7 +261,10 @@ describe('a short round is a result, not a failure (doc §21, D13)', () => {
   it('shows the note for a short round only', () => {
     expect(has(render({ restElapsedMs: AT.result }), 'rest-short-note')).toBe(false)
     expect(
-      has(render({ frozen: { ...FROZEN, actual: 240 }, restElapsedMs: AT.result }), 'rest-short-note'),
+      has(
+        render({ frozen: { ...FROZEN, actual: 240 }, restElapsedMs: AT.result }),
+        'rest-short-note',
+      ),
     ).toBe(false)
     expect(has(render({ frozen: SHORT, restElapsedMs: AT.result }), 'rest-short-note')).toBe(true)
   })
@@ -416,11 +418,7 @@ describe('voice stays behind the port (D1, M34)', () => {
     update(AT.recovery)
     update(AT.preview)
     expect(onAnnounce).toHaveBeenCalledTimes(3)
-    expect(onAnnounce.mock.calls.map((c) => c[0].phase)).toEqual([
-      'result',
-      'recovery',
-      'preview',
-    ])
+    expect(onAnnounce.mock.calls.map((c) => c[0].phase)).toEqual(['result', 'recovery', 'preview'])
   })
 
   it('is silent when no port is wired', () => {

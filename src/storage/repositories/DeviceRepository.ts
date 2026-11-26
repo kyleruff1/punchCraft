@@ -83,7 +83,9 @@ export class DeviceRepository {
    */
   upsertByAndroidId(input: UpsertByAndroidIdInput): TrackerDeviceRow {
     const nowIso = new Date().toISOString()
-    const findStmt = this.db.prepareSync('SELECT * FROM tracker_devices WHERE android_device_id = ?')
+    const findStmt = this.db.prepareSync(
+      'SELECT * FROM tracker_devices WHERE android_device_id = ?',
+    )
     let existing: RawRow | null = null
     try {
       const rows = findStmt.executeSync<RawRow>([input.androidDeviceId]).getAllSync()

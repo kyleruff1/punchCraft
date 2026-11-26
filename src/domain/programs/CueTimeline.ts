@@ -419,10 +419,7 @@ function expandBlock(block: WorkoutBlock, ctx: BlockContext): CueInstance[] {
       // per-token engine widening is gone (M39-V2 Phase 5-ii: the
       // compiled `SpineSchedule.compiled[cueId]` carries the
       // engine-authoring surface now).
-      windowEndMs: Math.min(
-        ctx.workDurationMs,
-        scheduledEndMs + ctx.graceAfterMs,
-      ),
+      windowEndMs: Math.min(ctx.workDurationMs, scheduledEndMs + ctx.graceAfterMs),
       ...(block.spokenPhrase === undefined ? {} : { spokenPhrase: block.spokenPhrase }),
       ...(block.instruction === undefined ? {} : { instruction: block.instruction }),
       // The ceremony belongs to the set, not the rep: first cue only.
@@ -485,7 +482,7 @@ function expandCountScoredBlock(block: WorkoutBlock, ctx: BlockContext): CueInst
     windowStartMs: Math.max(0, scheduledStartMs - ctx.graceBeforeMs),
     windowEndMs: Math.min(ctx.workDurationMs, scheduledEndMs + ctx.graceAfterMs),
     ...(block.spokenPhrase === undefined ? {} : { spokenPhrase: block.spokenPhrase }),
-      ...(block.instruction === undefined ? {} : { instruction: block.instruction }),
+    ...(block.instruction === undefined ? {} : { instruction: block.instruction }),
     ...(block.setupCallout === undefined ? {} : { setupCallout: block.setupCallout }),
     ...(block.voicePolicy === undefined ? {} : { voicePolicy: block.voicePolicy }),
   }

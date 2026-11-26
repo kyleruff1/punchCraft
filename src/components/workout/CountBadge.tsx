@@ -130,7 +130,10 @@ export function CountBadge(props: CountBadgeProps): React.JSX.Element {
         ]}
         testID={`count-badge-circle-${grade.outcome}`}
       >
-        <Text style={[styles.count, { fontSize: COUNT_FONT_SIZE[size] }]} testID="count-badge-count">
+        <Text
+          style={[styles.count, { fontSize: COUNT_FONT_SIZE[size] }]}
+          testID="count-badge-count"
+        >
           {countText}
         </Text>
       </View>

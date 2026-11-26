@@ -34,10 +34,7 @@ import type { PunchEventSourceCapability } from '../punch/PunchEventSource'
 import type { TrackerPunchEvent } from '../punch/PunchEvent'
 
 export type CapabilityTier =
-  | 'hand-only'
-  | 'hand-timestamp'
-  | 'hand-broad-type'
-  | 'hand-distinct-type'
+  'hand-only' | 'hand-timestamp' | 'hand-broad-type' | 'hand-distinct-type'
 
 export interface ResolvedCapability {
   tier: CapabilityTier
@@ -46,8 +43,7 @@ export interface ResolvedCapability {
 }
 
 export type CapabilityInput =
-  | { capability: PunchEventSourceCapability }
-  | { observedEvents: readonly TrackerPunchEvent[] }
+  { capability: PunchEventSourceCapability } | { observedEvents: readonly TrackerPunchEvent[] }
 
 /**
  * Resolve the tier from either a declared capability or an observed sample.

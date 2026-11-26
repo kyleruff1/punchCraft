@@ -14,9 +14,7 @@ import { defaultRecipe, type WorkoutRecipe } from '@domain/workout/WorkoutRecipe
 import { validateRecipe, type RecipeConflict } from '@domain/workout/recipeValidation'
 
 function textOf(node: ReactTestInstance): string {
-  return node.children
-    .map((child) => (typeof child === 'string' ? child : textOf(child)))
-    .join('')
+  return node.children.map((child) => (typeof child === 'string' ? child : textOf(child))).join('')
 }
 
 function renderMenu(overrides: Partial<WorkoutRecipe> = {}): {
@@ -113,10 +111,7 @@ describe('toggles emit the right patch', () => {
     const { tree, patches } = renderMenu()
     pressSegment(tree, 'cadence-sprint')
     pressSegment(tree, 'extra-punch-policy-discouraged')
-    expect(patches).toEqual([
-      { cadenceProfile: 'sprint' },
-      { extraPunchPolicy: 'discouraged' },
-    ])
+    expect(patches).toEqual([{ cadenceProfile: 'sprint' }, { extraPunchPolicy: 'discouraged' }])
   })
 
   it('never emits a full recipe — only the fields that changed', () => {

@@ -20,7 +20,12 @@
 import { createAudioPlaylist } from 'expo-audio'
 import { IntroPlayer } from '../IntroPlayer'
 import { MetronomePlayer } from '../MetronomePlayer'
-import { OBSERVED_PLAYLIST_UPDATE_INTERVAL_MS, PlaybackObserver, type ObservedRecord, type StatusLike } from '../PlaybackObserver'
+import {
+  OBSERVED_PLAYLIST_UPDATE_INTERVAL_MS,
+  PlaybackObserver,
+  type ObservedRecord,
+  type StatusLike,
+} from '../PlaybackObserver'
 import { RecoveryPlayer } from '../RecoveryPlayer'
 import { RoundWarningPlayer } from '../RoundWarningPlayer'
 import type { MetronomeLoop } from '../voiceAssets/metronomeAssets'
@@ -87,7 +92,11 @@ jest.mock('@/diagnostics/logger', () => ({
 }))
 
 /** A deterministic observer: manual clock, timers captured (never fired). */
-function rig(): { observer: PlaybackObserver; records: ObservedRecord[]; tick: (ms: number) => void } {
+function rig(): {
+  observer: PlaybackObserver
+  records: ObservedRecord[]
+  tick: (ms: number) => void
+} {
   let now = 10_000
   const records: ObservedRecord[] = []
   const observer = new PlaybackObserver({
@@ -123,8 +132,20 @@ const script: RecoveryScript = {
   ],
 } as unknown as RecoveryScript
 
-const LOOP_A: MetronomeLoop = { baseBpm: 60, division: 2, swing: 0.54, durationMs: 1_000, module: 42 }
-const LOOP_B: MetronomeLoop = { baseBpm: 60, division: 4, swing: 0.5, durationMs: 1_000, module: 99 }
+const LOOP_A: MetronomeLoop = {
+  baseBpm: 60,
+  division: 2,
+  swing: 0.54,
+  durationMs: 1_000,
+  module: 42,
+}
+const LOOP_B: MetronomeLoop = {
+  baseBpm: 60,
+  division: 4,
+  swing: 0.5,
+  durationMs: 1_000,
+  module: 99,
+}
 
 beforeEach(() => {
   playlists.length = 0
@@ -193,7 +214,9 @@ describe('IntroPlayer', () => {
     expect(playlist.remove).toHaveBeenCalledTimes(1)
     expect(observer.stats()).toMatchObject({ open: 0, listeners: 0 })
     // The observer let go BEFORE the native teardown ran.
-    expect(playlist.remove.mock.invocationCallOrder[0]!).toBeLessThan(playlist.destroy.mock.invocationCallOrder[0]!)
+    expect(playlist.remove.mock.invocationCallOrder[0]!).toBeLessThan(
+      playlist.destroy.mock.invocationCallOrder[0]!,
+    )
   })
 })
 
@@ -264,7 +287,11 @@ describe('RoundWarningPlayer', () => {
     playlists[0]!.emit({ playing: true, currentTime: 0 })
     player.stop()
     expect(records).toHaveLength(1)
-    expect(records[0]).toMatchObject({ kind: 'round-warning', label: 'warn-round-3', outcome: 'released' })
+    expect(records[0]).toMatchObject({
+      kind: 'round-warning',
+      label: 'warn-round-3',
+      outcome: 'released',
+    })
     expect(playlists[0]!.remove).toHaveBeenCalledTimes(1)
   })
 

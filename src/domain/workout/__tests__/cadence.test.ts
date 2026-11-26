@@ -81,7 +81,11 @@ describe('beatsToMs', () => {
   })
 
   it('round-trips through msToBeats', () => {
-    for (const [beats, bpm] of [[2.3, 100], [0.75, 130], [1.55, 85]] as Array<[number, number]>) {
+    for (const [beats, bpm] of [
+      [2.3, 100],
+      [0.75, 130],
+      [1.55, 85],
+    ] as Array<[number, number]>) {
       expect(msToBeats(beatsToMs(beats, bpm), bpm)).toBeCloseTo(beats, 10)
     }
   })

@@ -363,63 +363,61 @@ function CueStageInner(props: CueStageProps): React.JSX.Element {
         {...(avatarAnchor ? { anchor: avatarAnchor } : {})}
       />
       <View style={styles.zones}>
-      <View style={styles.nextZone}>
-        {next ? (
-          <>
-            <Text style={styles.nextLabel}>Next</Text>
-            <View style={styles.nextDim}>
-              <CueRow
-                view={next}
-                size="preview"
-                reducedMotion={reducedMotion}
-                testID="cue-stage-next"
-              />
-            </View>
-          </>
-        ) : null}
-      </View>
+        <View style={styles.nextZone}>
+          {next ? (
+            <>
+              <Text style={styles.nextLabel}>Next</Text>
+              <View style={styles.nextDim}>
+                <CueRow
+                  view={next}
+                  size="preview"
+                  reducedMotion={reducedMotion}
+                  testID="cue-stage-next"
+                />
+              </View>
+            </>
+          ) : null}
+        </View>
 
-      <View style={styles.currentZone}>
-        {current ? (
-          <>
-            <CueRow
-              view={current}
-              size="stage"
-              reducedMotion={reducedMotion}
-              testID="cue-stage-current"
-              {...(walked && current.cue.scoring === 'sequence'
-                ? { walkOrdinal }
-                : {})}
-            />
-          </>
-        ) : props.upNext ? (
-          <View style={styles.upNext} testID="cue-stage-upnext">
-            <Text style={styles.nextLabel}>Starting with</Text>
-            <View style={styles.upNextRow}>
-              {props.upNext.tokens.map((t, i) => (
-                <View
-                  key={i}
-                  style={[styles.upNextPill, t === '.' && styles.upNextRest]}
-                  testID={`cue-stage-upnext-${i}`}
-                >
-                  <Text style={[styles.upNextPillText, t === '.' && styles.upNextRestText]}>
-                    {t === '.' ? '·' : t}
-                  </Text>
-                </View>
-              ))}
+        <View style={styles.currentZone}>
+          {current ? (
+            <>
+              <CueRow
+                view={current}
+                size="stage"
+                reducedMotion={reducedMotion}
+                testID="cue-stage-current"
+                {...(walked && current.cue.scoring === 'sequence' ? { walkOrdinal } : {})}
+              />
+            </>
+          ) : props.upNext ? (
+            <View style={styles.upNext} testID="cue-stage-upnext">
+              <Text style={styles.nextLabel}>Starting with</Text>
+              <View style={styles.upNextRow}>
+                {props.upNext.tokens.map((t, i) => (
+                  <View
+                    key={i}
+                    style={[styles.upNextPill, t === '.' && styles.upNextRest]}
+                    testID={`cue-stage-upnext-${i}`}
+                  >
+                    <Text style={[styles.upNextPillText, t === '.' && styles.upNextRestText]}>
+                      {t === '.' ? '·' : t}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+              {props.upNext.rateWord ? (
+                <Text style={styles.upNextRate}>{props.upNext.rateWord}</Text>
+              ) : null}
             </View>
-            {props.upNext.rateWord ? (
-              <Text style={styles.upNextRate}>{props.upNext.rateWord}</Text>
-            ) : null}
-          </View>
-        ) : idleLabel ? (
-          // Free-work keeps its line; the bare countdown "Ready" is gone —
-          // the guard-parked trainer IS the ready state (Kyle, 2026-09-02).
-          <Text style={styles.idle} testID="cue-stage-idle">
-            {idleLabel}
-          </Text>
-        ) : null}
-      </View>
+          ) : idleLabel ? (
+            // Free-work keeps its line; the bare countdown "Ready" is gone —
+            // the guard-parked trainer IS the ready state (Kyle, 2026-09-02).
+            <Text style={styles.idle} testID="cue-stage-idle">
+              {idleLabel}
+            </Text>
+          ) : null}
+        </View>
       </View>
     </View>
   )
@@ -466,7 +464,12 @@ const styles = StyleSheet.create({
   // every time. Paging keeps the row at BAR_SLOTS or fewer, so at stage size
   // this is ~464dp: comfortable on the tablet, tight on a phone, where the
   // node diameter is the knob to turn rather than wrapping (GH #305).
-  tokens: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexWrap: 'nowrap' },
+  tokens: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexWrap: 'nowrap',
+  },
   repeat: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   repeatLabel: {
     fontSize: sizes.subtitle,

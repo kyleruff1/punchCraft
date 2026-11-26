@@ -66,11 +66,7 @@ describe('shouldHoldAudio', () => {
         .filter((isFocused) => !shouldHoldAudio({ phase, isFocused }))
         .map((isFocused) => `${phase}/${isFocused ? 'focused' : 'blurred'}`),
     )
-    expect(releasing.sort()).toEqual([
-      'cancelled/blurred',
-      'completed/blurred',
-      'idle/blurred',
-    ])
+    expect(releasing.sort()).toEqual(['cancelled/blurred', 'completed/blurred', 'idle/blurred'])
   })
 
   it('never releases mid-workout, whatever the focus', () => {

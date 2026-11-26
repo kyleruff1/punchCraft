@@ -27,13 +27,7 @@
 import type { MonotonicClock } from '../time/MonotonicClock'
 
 export type SessionPhase =
-  | 'idle'
-  | 'countdown'
-  | 'work'
-  | 'rest'
-  | 'paused'
-  | 'completed'
-  | 'cancelled'
+  'idle' | 'countdown' | 'work' | 'rest' | 'paused' | 'completed' | 'cancelled'
 
 export interface SessionRoundSpec {
   workDurationMs: number

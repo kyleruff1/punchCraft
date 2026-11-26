@@ -97,11 +97,7 @@ describe('wrappedPositionToAbsoluteTick — happy path', () => {
 describe('wrappedPositionToAbsoluteTick — defensive corners', () => {
   it('returns 0 when loop duration is 0 (unloaded playlist)', () => {
     expect(
-      wrappedPositionToAbsoluteTick(
-        sample({ loopDurationSec: 0 }),
-        1_000,
-        TICKS_PER_SECOND,
-      ),
+      wrappedPositionToAbsoluteTick(sample({ loopDurationSec: 0 }), 1_000, TICKS_PER_SECOND),
     ).toBe(0)
   })
 

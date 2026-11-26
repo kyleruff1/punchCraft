@@ -413,11 +413,7 @@ export function compileCue(cue: ProgramCue): CompiledCueTimeline {
     const repCoachIds: string[] = []
     if (shouldFireForRep(repIndex)) {
       for (const vocabulary of ['numeric', 'technique'] as const) {
-        const asset = cue.coachAssets(
-          cue.voicePolicy.contentKind,
-          vocabulary,
-          coachAssetContext,
-        )
+        const asset = cue.coachAssets(cue.voicePolicy.contentKind, vocabulary, coachAssetContext)
         if (!asset) continue
 
         const eventId = `${cue.cueId}:${repId}:coach:${vocabulary}:${cue.voicePolicy.contentKind}`
@@ -540,10 +536,7 @@ export function compileCue(cue: ProgramCue): CompiledCueTimeline {
  * (RhythmSpine's `TokenBeat.atMs`, CueEngine's `until` cap) use
  * this bridge until they move fully to tick math.
  */
-export function strikeStartMsFor(
-  strike: CompiledStrikeEvent,
-  baseBpm: number,
-): number {
+export function strikeStartMsFor(strike: CompiledStrikeEvent, baseBpm: number): number {
   return msAtTick(strike.startTick, baseBpm)
 }
 

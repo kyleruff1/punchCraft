@@ -41,7 +41,7 @@ describe('roundStartTicksFrom', () => {
     }
   })
 
-  it('agrees with the score\'s own round-start boundaries', () => {
+  it("agrees with the score's own round-start boundaries", () => {
     const ticks = roundStartTicksFrom(SCORE)
     for (const boundary of SCORE.phaseBoundaries) {
       if (boundary.kind !== 'round-start') continue

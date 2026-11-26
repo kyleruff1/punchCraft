@@ -15,7 +15,10 @@ jest.mock('react-native-reanimated', () => ({
   __esModule: true,
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest factory cannot use top-level imports
   default: { View: require('react-native').View },
-  runOnJS: <A extends unknown[]>(fn: (...args: A) => void) => (...args: A) => fn(...args),
+  runOnJS:
+    <A extends unknown[]>(fn: (...args: A) => void) =>
+    (...args: A) =>
+      fn(...args),
   useSharedValue: <T,>(init: T) => ({ value: init }),
   useFrameCallback: () => ({ setActive: () => {} }),
   useAnimatedStyle: (factory: () => object) => factory(),
@@ -43,13 +46,7 @@ const STATES: TokenVisualState[] = ['upcoming', 'active', 'completed']
 const PUNCHES: PunchNumber[] = [1, 2, 3, 4, 5, 6]
 const DEFENSE: DefenseCommand[] = ['duck', 'bob-weave', 'slip', 'roll', 'pull']
 const FOOTWORK: FootworkCommand[] = ['pivot', 'step-off', 'circle', 'cut-off-ring', 'reset']
-const COACH: CoachCommand[] = [
-  'double-up',
-  'put-it-on-em',
-  'touch-and-go',
-  'breathe',
-  'hands-up',
-]
+const COACH: CoachCommand[] = ['double-up', 'put-it-on-em', 'touch-and-go', 'breathe', 'hands-up']
 
 const mounted: ReactTestRenderer[] = []
 
@@ -75,9 +72,7 @@ afterEach(() => {
 })
 
 function textOf(node: ReactTestInstance): string {
-  return node.children
-    .map((child) => (typeof child === 'string' ? child : textOf(child)))
-    .join('')
+  return node.children.map((child) => (typeof child === 'string' ? child : textOf(child))).join('')
 }
 
 /** Every colour value appearing anywhere in the rendered tree's styles. */
@@ -130,9 +125,9 @@ describe('the no-red-flash rule (doc §13, §21)', () => {
 
   it('never renders red on the banner or the stance card', () => {
     for (const command of COACH) {
-      expect(colorsIn(render(<CoachBanner command={command} visible />)).filter((c) =>
-        RED.includes(c),
-      )).toEqual([])
+      expect(
+        colorsIn(render(<CoachBanner command={command} visible />)).filter((c) => RED.includes(c)),
+      ).toEqual([])
     }
     for (const stance of ['orthodox', 'southpaw'] as const) {
       expect(
@@ -262,18 +257,17 @@ describe('DefenseToken', () => {
     const tree = render(<DefenseToken command={command} state="upcoming" />)
     const text = textOf(tree.root.findByProps({ testID: `defense-token-${command}` }))
     expect(text.length).toBeGreaterThan(1)
-    expect(tree.root.findByProps({ testID: `defense-token-${command}` }).props.accessibilityLabel)
-      .toBeTruthy()
+    expect(
+      tree.root.findByProps({ testID: `defense-token-${command}` }).props.accessibilityLabel,
+    ).toBeTruthy()
   })
 
   it('uses a rounded rectangle, not a circle, so shape separates it from a punch', () => {
     const tree = render(<DefenseToken command="slip" state="upcoming" />)
-    const plate = tree.root
-      .findAllByProps({ testID: 'defense-token-slip' })[0]!
-      .findAll((n) => {
-        const flat = StyleSheet.flatten(n.props?.style) as { borderRadius?: number } | undefined
-        return typeof flat?.borderRadius === 'number'
-      })
+    const plate = tree.root.findAllByProps({ testID: 'defense-token-slip' })[0]!.findAll((n) => {
+      const flat = StyleSheet.flatten(n.props?.style) as { borderRadius?: number } | undefined
+      return typeof flat?.borderRadius === 'number'
+    })
     const radii = plate.map(
       (n) => (StyleSheet.flatten(n.props.style) as { borderRadius: number }).borderRadius,
     )
@@ -308,8 +302,9 @@ describe('FootworkToken', () => {
 describe('CoachBanner', () => {
   it.each(COACH)('renders %s when visible', (command) => {
     const tree = render(<CoachBanner command={command} visible />)
-    expect(textOf(tree.root.findByProps({ testID: `coach-banner-${command}` })).length)
-      .toBeGreaterThan(0)
+    expect(
+      textOf(tree.root.findByProps({ testID: `coach-banner-${command}` })).length,
+    ).toBeGreaterThan(0)
   })
 
   it('renders nothing when not visible', () => {
@@ -422,9 +417,9 @@ describe('the form affirmation (reward only)', () => {
 
   it('names the reward in the accessibility label', () => {
     const tree = render(<PunchToken number={3} body={false} state="completed" affirmed />)
-    expect(
-      tree.root.findByProps({ testID: 'punch-token-3' }).props.accessibilityLabel,
-    ).toContain('good form')
+    expect(tree.root.findByProps({ testID: 'punch-token-3' }).props.accessibilityLabel).toContain(
+      'good form',
+    )
   })
 
   it('uses gold, never red', () => {

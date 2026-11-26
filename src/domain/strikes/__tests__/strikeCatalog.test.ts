@@ -43,17 +43,17 @@ describe('STRIKE_CATALOG', () => {
 
   it('family / hand / target derivations are correct for every token', () => {
     const expected: Array<[StrikeToken, string, 'lead' | 'rear', 'head' | 'body']> = [
-      ['1',  'jab',      'lead', 'head'],
-      ['1B', 'jab',      'lead', 'body'],
-      ['2',  'cross',    'rear', 'head'],
-      ['2B', 'cross',    'rear', 'body'],
-      ['3',  'hook',     'lead', 'head'],
-      ['3B', 'hook',     'lead', 'body'],
-      ['4',  'hook',     'rear', 'head'],
-      ['4B', 'hook',     'rear', 'body'],
-      ['5',  'uppercut', 'lead', 'head'],
+      ['1', 'jab', 'lead', 'head'],
+      ['1B', 'jab', 'lead', 'body'],
+      ['2', 'cross', 'rear', 'head'],
+      ['2B', 'cross', 'rear', 'body'],
+      ['3', 'hook', 'lead', 'head'],
+      ['3B', 'hook', 'lead', 'body'],
+      ['4', 'hook', 'rear', 'head'],
+      ['4B', 'hook', 'rear', 'body'],
+      ['5', 'uppercut', 'lead', 'head'],
       ['5B', 'uppercut', 'lead', 'body'],
-      ['6',  'uppercut', 'rear', 'head'],
+      ['6', 'uppercut', 'rear', 'head'],
       ['6B', 'uppercut', 'rear', 'body'],
     ]
     for (const [token, family, hand, target] of expected) {

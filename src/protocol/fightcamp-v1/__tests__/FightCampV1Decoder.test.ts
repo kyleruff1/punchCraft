@@ -79,8 +79,7 @@ describe('FightCampV1Decoder', () => {
     // The golden sample's device timestamp is 2026-08-23T01:49:20.324Z;
     // each case below varies only the frame's ARRIVAL time around it.
     const at = (iso: string) =>
-      decodeFrame(buildFrame({ hex: '011001a0518a6a530a', wallTimeIso: iso }), v4State())
-        .events[0]!
+      decodeFrame(buildFrame({ hex: '011001a0518a6a530a', wallTimeIso: iso }), v4State()).events[0]!
 
     it('a punch that arrives promptly is live', () => {
       // Air latency and the 3.9ms timestamp quantization live in here.

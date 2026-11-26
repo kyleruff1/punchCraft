@@ -37,11 +37,7 @@
 
 /** Which code path produced a token transition. */
 export type VizTokenSource =
-  | 'token-due'
-  | 'cue-active'
-  | 'matcher-credit'
-  | 'sync-recompute'
-  | 'cue-settled'
+  'token-due' | 'cue-active' | 'matcher-credit' | 'sync-recompute' | 'cue-settled'
 
 export interface VizTokenRecord {
   kind: 'token'
@@ -169,9 +165,7 @@ export class VizForensics {
     this.buffer.push(record)
   }
 
-  token(
-    input: Omit<VizTokenRecord, 'kind' | 'monotonicMs'>,
-  ): void {
+  token(input: Omit<VizTokenRecord, 'kind' | 'monotonicMs'>): void {
     this.push({ ...input, kind: 'token', monotonicMs: this.now() })
   }
 

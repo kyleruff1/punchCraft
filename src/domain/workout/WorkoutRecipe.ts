@@ -22,7 +22,13 @@
  * into a single enum is what left §18.1 and §26 disagreeing.
  */
 
-import type { PunchNumber, Stance, DefenseCommand, FootworkCommand, CoachCommand } from './WorkoutTokens'
+import type {
+  PunchNumber,
+  Stance,
+  DefenseCommand,
+  FootworkCommand,
+  CoachCommand,
+} from './WorkoutTokens'
 import { suggestGoal } from './punchGoals'
 import { GENERATOR_VERSION } from './versions'
 import type { CoachTempo } from '../timing/TimingEngine'
@@ -148,7 +154,6 @@ export interface WorkoutRecipe {
 // Defaults (M31-04)
 // ---------------------------------------------------------------------------
 
-
 /**
  * A clean, useful workout with no further input (doc §8 — the athlete should
  * be training inside a minute).
@@ -229,13 +234,15 @@ export function defaultRecipe(): WorkoutRecipe {
  * The mapping is Kyle's spec verbatim: 4 profiles are 4 subdivisions of ONE
  * clock, not four unrelated BPMs.
  */
-export function divisionForCadenceProfile(
-  cadence: CadenceProfile,
-): CoachTempo['division'] {
+export function divisionForCadenceProfile(cadence: CadenceProfile): CoachTempo['division'] {
   switch (cadence) {
-    case 'technical': return 1
-    case 'steady':    return 2
-    case 'pressure':  return 3
-    case 'sprint':    return 4
+    case 'technical':
+      return 1
+    case 'steady':
+      return 2
+    case 'pressure':
+      return 3
+    case 'sprint':
+      return 4
   }
 }

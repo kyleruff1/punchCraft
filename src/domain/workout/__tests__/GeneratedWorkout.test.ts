@@ -7,11 +7,7 @@
  * make fixing a generated workout an iterative guessing game.
  */
 
-import {
-  scoredRounds,
-  validateGeneratedWorkout,
-  type GeneratedWorkout,
-} from '../GeneratedWorkout'
+import { scoredRounds, validateGeneratedWorkout, type GeneratedWorkout } from '../GeneratedWorkout'
 import { parseCombo, type ProgramRound, type WorkoutBlock } from '../WorkoutTokens'
 import type { WorkoutRecipe } from '../WorkoutRecipe'
 
@@ -93,10 +89,24 @@ describe('validateGeneratedWorkout', () => {
   it('accepts the three-round shape with warm-up and cooldown excluded from goals', () => {
     const w = workout({
       schedule: [
-        round({ id: 'w', order: 0, kind: 'warm-up', countsTowardGoal: false, targetPunches: 0, workDurationMs: 120_000 }),
+        round({
+          id: 'w',
+          order: 0,
+          kind: 'warm-up',
+          countsTowardGoal: false,
+          targetPunches: 0,
+          workDurationMs: 120_000,
+        }),
         round({ id: 'r1', order: 1 }),
         round({ id: 'r2', order: 2 }),
-        round({ id: 'c', order: 3, kind: 'cooldown', countsTowardGoal: false, targetPunches: 0, workDurationMs: 60_000 }),
+        round({
+          id: 'c',
+          order: 3,
+          kind: 'cooldown',
+          countsTowardGoal: false,
+          targetPunches: 0,
+          workDurationMs: 60_000,
+        }),
       ],
       roundPunchTargets: [200, 200],
     })
@@ -120,7 +130,11 @@ describe('validateGeneratedWorkout', () => {
     })
     const found = codes(w)
     expect(found).toEqual(
-      expect.arrayContaining(['rounds-not-ordered', 'counts-toward-goal-mismatch', 'round-targets-length-mismatch']),
+      expect.arrayContaining([
+        'rounds-not-ordered',
+        'counts-toward-goal-mismatch',
+        'round-targets-length-mismatch',
+      ]),
     )
     expect(found.length).toBeGreaterThanOrEqual(3)
   })
@@ -177,12 +191,16 @@ describe('validateGeneratedWorkout', () => {
   })
 
   it('flags repeat on a block kind other than repeated-combo', () => {
-    const w = workout({ schedule: [round({ blocks: [block({ kind: 'exact-combo', repeat: 4 })] })] })
+    const w = workout({
+      schedule: [round({ blocks: [block({ kind: 'exact-combo', repeat: 4 })] })],
+    })
     expect(codes(w)).toContain('repeat-on-wrong-block-kind')
   })
 
   it('allows repeat on repeated-combo', () => {
-    const w = workout({ schedule: [round({ blocks: [block({ kind: 'repeated-combo', repeat: 4 })] })] })
+    const w = workout({
+      schedule: [round({ blocks: [block({ kind: 'repeated-combo', repeat: 4 })] })],
+    })
     expect(codes(w)).not.toContain('repeat-on-wrong-block-kind')
   })
 

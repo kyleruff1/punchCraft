@@ -220,7 +220,11 @@ describe('autoConnectKnownTrackers', () => {
 
   it('coalesces concurrent calls into a single scan', async () => {
     let release: (v: unknown[]) => void = () => {}
-    mockScan.mockReturnValue(new Promise((r) => { release = r }))
+    mockScan.mockReturnValue(
+      new Promise((r) => {
+        release = r
+      }),
+    )
 
     const a = autoConnectKnownTrackers()
     const b = autoConnectKnownTrackers()

@@ -191,7 +191,7 @@ describe('compileWorkoutScore — strikes', () => {
     // ticks). Monotonicity is guaranteed only WITHIN a single
     // rep of a single cue — which is the unit compileCue emits.
     const score = compileWorkoutScore(threeRoundFundamentals, baseConfig())
-    const byRep = new Map<string, typeof score.strikes[number][]>()
+    const byRep = new Map<string, (typeof score.strikes)[number][]>()
     for (const strike of score.strikes) {
       const key = `${strike.cueId}:${strike.repId}`
       const list = byRep.get(key) ?? []
@@ -377,10 +377,7 @@ describe('compileWorkoutScore — slice boundary (ceremonies still intentionally
  * exercise the CONSERVATIVE reservation window (technique is
  * always longer here so the slot's end matches technique.end).
  */
-const stubCoachAssets = (
-  contentKind: string,
-  vocabulary: 'numeric' | 'technique',
-) => ({
+const stubCoachAssets = (contentKind: string, vocabulary: 'numeric' | 'technique') => ({
   assetId: `stub:${contentKind}:${vocabulary}`,
   mappedDurationTicks: vocabulary === 'numeric' ? 240 : 480,
 })

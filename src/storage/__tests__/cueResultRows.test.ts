@@ -157,7 +157,11 @@ describe('event lookup is by id, not by position', () => {
       result: result({ assignments: assigned(0, 'gone', 5), missedExpectedIndexes: [1] }),
       events: [],
     })
-    expect(rows[0]).toMatchObject({ outcome: 'matched', observedEventId: 'gone', velocityRaw: null })
+    expect(rows[0]).toMatchObject({
+      outcome: 'matched',
+      observedEventId: 'gone',
+      velocityRaw: null,
+    })
   })
 })
 

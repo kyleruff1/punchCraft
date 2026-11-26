@@ -28,7 +28,11 @@ interface Recorded {
   characteristicUuid: string
 }
 
-function recordingFacade(): { facade: BleManagerFacade; ops: Recorded[]; unsubscribes: () => number } {
+function recordingFacade(): {
+  facade: BleManagerFacade
+  ops: Recorded[]
+  unsubscribes: () => number
+} {
   const ops: Recorded[] = []
   let unsubscribed = 0
   const snapshot: GattSnapshot = { deviceId: DEVICE, services: [], discoveredAtMonotonicMs: 0 }

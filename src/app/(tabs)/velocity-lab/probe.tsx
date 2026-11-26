@@ -20,11 +20,7 @@ import { Link } from 'expo-router'
 
 import { getBleManager } from '@ble/BleManagerFacade'
 import type { SubscriptionHandle } from '@ble/BleManagerFacade'
-import type {
-  GattCharacteristicSnapshot,
-  GattSnapshot,
-  RawBleFrame,
-} from '@ble/bleTypes'
+import type { GattCharacteristicSnapshot, GattSnapshot, RawBleFrame } from '@ble/bleTypes'
 import { deviceSensitive, logger, safe } from '@/diagnostics/logger'
 import { useCaptureSession } from '@capture/useCaptureSession'
 import { useLeftSlot, useRightSlot } from '@/state/useTrackerStore'
@@ -228,25 +224,30 @@ export default function ProtocolProbeScreen(): React.ReactElement {
   const firstMonotonicRef = useRef<number | null>(null)
   const mountedRef = useRef(true)
 
-  const append = useCallback((partial: Omit<LogEntry, 'seq' | 'monotonicTimeMs'> & { monotonicTimeMs?: number }) => {
-    const now = partial.monotonicTimeMs ?? (typeof performance !== 'undefined' ? performance.now() : Date.now())
-    if (firstMonotonicRef.current == null) firstMonotonicRef.current = now
-    const entry: LogEntry = {
-      seq: seqRef.current++,
-      monotonicTimeMs: now,
-      kind: partial.kind,
-      serviceUuid: partial.serviceUuid,
-      characteristicUuid: partial.characteristicUuid,
-      hex: partial.hex,
-      error: partial.error,
-      direction: partial.direction,
-    }
-    setEntries((prev) => {
-      const next = [entry, ...prev]
-      if (next.length > MAX_LOG_ENTRIES) next.length = MAX_LOG_ENTRIES
-      return next
-    })
-  }, [])
+  const append = useCallback(
+    (partial: Omit<LogEntry, 'seq' | 'monotonicTimeMs'> & { monotonicTimeMs?: number }) => {
+      const now =
+        partial.monotonicTimeMs ??
+        (typeof performance !== 'undefined' ? performance.now() : Date.now())
+      if (firstMonotonicRef.current == null) firstMonotonicRef.current = now
+      const entry: LogEntry = {
+        seq: seqRef.current++,
+        monotonicTimeMs: now,
+        kind: partial.kind,
+        serviceUuid: partial.serviceUuid,
+        characteristicUuid: partial.characteristicUuid,
+        hex: partial.hex,
+        error: partial.error,
+        direction: partial.direction,
+      }
+      setEntries((prev) => {
+        const next = [entry, ...prev]
+        if (next.length > MAX_LOG_ENTRIES) next.length = MAX_LOG_ENTRIES
+        return next
+      })
+    },
+    [],
+  )
 
   // Discover + subscribe on mount.
   useEffect(() => {
@@ -270,7 +271,9 @@ export default function ProtocolProbeScreen(): React.ReactElement {
         // else the first writable characteristic overall.
         const writable = collectWritable(snap)
         const h07 = writable.find((w) => startsWith(w.characteristicUuid, H07_COMMAND_UUID_PREFIX))
-        setTargetUuid((prev) => prev ?? h07?.characteristicUuid ?? writable[0]?.characteristicUuid ?? null)
+        setTargetUuid(
+          (prev) => prev ?? h07?.characteristicUuid ?? writable[0]?.characteristicUuid ?? null,
+        )
 
         setStatus(`Subscribing on ${truncateDeviceId(deviceId)}…`)
         const handles = await facade.monitorAllNotifiable(snap, (frame: RawBleFrame) => {
@@ -291,14 +294,20 @@ export default function ProtocolProbeScreen(): React.ReactElement {
         })
         if (cancelled || !mountedRef.current) {
           for (const h of handles) {
-            try { h.unsubscribe() } catch { /* ignore */ }
+            try {
+              h.unsubscribe()
+            } catch {
+              /* ignore */
+            }
           }
           return
         }
         handlesRef.current = handles
         const okCount = handles.filter((h) => h.result.success).length
         setSubscribedCount(okCount)
-        setStatus(`Subscribed to ${okCount} of ${handles.length} channels on ${truncateDeviceId(deviceId)}.`)
+        setStatus(
+          `Subscribed to ${okCount} of ${handles.length} channels on ${truncateDeviceId(deviceId)}.`,
+        )
         for (const h of handles) {
           if (!h.result.success) {
             append({
@@ -325,7 +334,11 @@ export default function ProtocolProbeScreen(): React.ReactElement {
       const handles = handlesRef.current
       handlesRef.current = []
       for (const h of handles) {
-        try { h.unsubscribe() } catch { /* ignore */ }
+        try {
+          h.unsubscribe()
+        } catch {
+          /* ignore */
+        }
       }
     }
     // Intentionally re-run only if the active device changes.
@@ -348,7 +361,12 @@ export default function ProtocolProbeScreen(): React.ReactElement {
   )
 
   const dispatchWrite = useCallback(
-    async (serviceUuid: string, characteristicUuid: string, props: GattCharacteristicSnapshot['properties'], hex: string) => {
+    async (
+      serviceUuid: string,
+      characteristicUuid: string,
+      props: GattCharacteristicSnapshot['properties'],
+      hex: string,
+    ) => {
       if (!activeSlot) return
       const facade = getBleManager()
       const withResponse = props.write || !props.writeWithoutResponse
@@ -403,7 +421,11 @@ export default function ProtocolProbeScreen(): React.ReactElement {
         serviceUuid: deviceSensitive(serviceUuid),
       })
       try {
-        const result = await facade.readCharacteristic(activeSlot.deviceId, serviceUuid, characteristicUuid)
+        const result = await facade.readCharacteristic(
+          activeSlot.deviceId,
+          serviceUuid,
+          characteristicUuid,
+        )
         if (result.success) {
           const hex = result.valueHex ?? (result.valueBase64 ? base64ToHex(result.valueBase64) : '')
           logger.info('probe.read.ok', 'characteristic read succeeded', {
@@ -449,44 +471,55 @@ export default function ProtocolProbeScreen(): React.ReactElement {
       })
       return
     }
-    void dispatchWrite(targetWritable.serviceUuid, targetWritable.characteristicUuid, targetWritable.props, hex)
+    void dispatchWrite(
+      targetWritable.serviceUuid,
+      targetWritable.characteristicUuid,
+      targetWritable.props,
+      hex,
+    )
   }, [append, dispatchWrite, hexInput, targetWritable])
 
   const onPreset = useCallback(
     (hex: string) => {
       if (!targetWritable) return
-      void dispatchWrite(targetWritable.serviceUuid, targetWritable.characteristicUuid, targetWritable.props, hex)
+      void dispatchWrite(
+        targetWritable.serviceUuid,
+        targetWritable.characteristicUuid,
+        targetWritable.props,
+        hex,
+      )
     },
     [dispatchWrite, targetWritable],
   )
 
-  const onUnsubscribe = useCallback(
-    (serviceUuid: string, characteristicUuid: string) => {
-      const handles = handlesRef.current
-      let removed = 0
-      const remaining: SubscriptionHandle[] = []
-      for (const h of handles) {
-        if (
-          h.result.serviceUuid.toLowerCase() === serviceUuid.toLowerCase() &&
-          h.result.characteristicUuid.toLowerCase() === characteristicUuid.toLowerCase()
-        ) {
-          try { h.unsubscribe() } catch { /* ignore */ }
-          removed++
-        } else {
-          remaining.push(h)
+  const onUnsubscribe = useCallback((serviceUuid: string, characteristicUuid: string) => {
+    const handles = handlesRef.current
+    let removed = 0
+    const remaining: SubscriptionHandle[] = []
+    for (const h of handles) {
+      if (
+        h.result.serviceUuid.toLowerCase() === serviceUuid.toLowerCase() &&
+        h.result.characteristicUuid.toLowerCase() === characteristicUuid.toLowerCase()
+      ) {
+        try {
+          h.unsubscribe()
+        } catch {
+          /* ignore */
         }
+        removed++
+      } else {
+        remaining.push(h)
       }
-      handlesRef.current = remaining
-      if (removed > 0) {
-        setSubscribedCount(remaining.filter((h) => h.result.success).length)
-        logger.info('probe.unsubscribe', 'characteristic unsubscribed', {
-          characteristicUuid: deviceSensitive(characteristicUuid),
-          serviceUuid: deviceSensitive(serviceUuid),
-        })
-      }
-    },
-    [],
-  )
+    }
+    handlesRef.current = remaining
+    if (removed > 0) {
+      setSubscribedCount(remaining.filter((h) => h.result.success).length)
+      logger.info('probe.unsubscribe', 'characteristic unsubscribed', {
+        characteristicUuid: deviceSensitive(characteristicUuid),
+        serviceUuid: deviceSensitive(serviceUuid),
+      })
+    }
+  }, [])
 
   const onClearLog = useCallback(() => {
     setEntries([])
@@ -500,7 +533,10 @@ export default function ProtocolProbeScreen(): React.ReactElement {
       subscribedCount,
       entries: entries.map((e) => ({
         seq: e.seq,
-        elapsedMs: firstMonotonicRef.current != null ? Math.round(e.monotonicTimeMs - firstMonotonicRef.current) : 0,
+        elapsedMs:
+          firstMonotonicRef.current != null
+            ? Math.round(e.monotonicTimeMs - firstMonotonicRef.current)
+            : 0,
         kind: e.kind,
         serviceUuid: e.serviceUuid,
         characteristicUuid: e.characteristicUuid,
@@ -546,7 +582,7 @@ export default function ProtocolProbeScreen(): React.ReactElement {
         <Text style={styles.title}>Protocol Probe</Text>
         <Text style={styles.subtitle}>Connect a tracker on the Velocity Lab landing first.</Text>
         <View style={styles.row}>
-          <Link href='/(tabs)/velocity-lab' style={styles.linkBtn}>
+          <Link href="/(tabs)/velocity-lab" style={styles.linkBtn}>
             <Text style={styles.btnText}>Back to Velocity Lab</Text>
           </Link>
         </View>
@@ -559,7 +595,8 @@ export default function ProtocolProbeScreen(): React.ReactElement {
       <Text style={styles.title}>Protocol Probe</Text>
       <Text style={styles.subtitle}>{status}</Text>
       <Text style={styles.phase}>
-        device {truncateDeviceId(activeSlot.deviceId)} · state {activeSlot.state} · subscribed {subscribedCount}
+        device {truncateDeviceId(activeSlot.deviceId)} · state {activeSlot.state} · subscribed{' '}
+        {subscribedCount}
       </Text>
       {discoverError ? <Text style={styles.errorText}>Discover error: {discoverError}</Text> : null}
 
@@ -593,7 +630,10 @@ export default function ProtocolProbeScreen(): React.ReactElement {
               key={`w-${w.serviceUuid}-${w.characteristicUuid}`}
               style={[styles.charRow, isTarget && styles.charRowSelected]}
             >
-              <Pressable onPress={() => setTargetUuid(w.characteristicUuid)} style={styles.charInfo}>
+              <Pressable
+                onPress={() => setTargetUuid(w.characteristicUuid)}
+                style={styles.charInfo}
+              >
                 <View style={styles.charHeader}>
                   <Text style={styles.charUuid}>{shortUuid(w.characteristicUuid)}</Text>
                   <Text style={styles.charProps}>{propsSummary(w)}</Text>
@@ -627,7 +667,10 @@ export default function ProtocolProbeScreen(): React.ReactElement {
                   <Text style={styles.smallBtnText}>Send: {parseHexInput(hexInput) ?? '--'}</Text>
                 </Pressable>
                 {canRead ? (
-                  <Pressable style={styles.smallBtnAlt} onPress={() => void dispatchRead(w.serviceUuid, w.characteristicUuid)}>
+                  <Pressable
+                    style={styles.smallBtnAlt}
+                    onPress={() => void dispatchRead(w.serviceUuid, w.characteristicUuid)}
+                  >
                     <Text style={styles.smallBtnText}>Read</Text>
                   </Pressable>
                 ) : null}
@@ -659,7 +702,10 @@ export default function ProtocolProbeScreen(): React.ReactElement {
               </View>
               <View style={styles.rowBtns}>
                 {canRead ? (
-                  <Pressable style={styles.smallBtnAlt} onPress={() => void dispatchRead(n.serviceUuid, n.characteristicUuid)}>
+                  <Pressable
+                    style={styles.smallBtnAlt}
+                    onPress={() => void dispatchRead(n.serviceUuid, n.characteristicUuid)}
+                  >
                     <Text style={styles.smallBtnText}>Read</Text>
                   </Pressable>
                 ) : null}
@@ -682,13 +728,16 @@ export default function ProtocolProbeScreen(): React.ReactElement {
             style={styles.input}
             value={hexInput}
             onChangeText={setHexInput}
-            autoCapitalize='none'
+            autoCapitalize="none"
             autoCorrect={false}
-            placeholder='hex bytes e.g. 01 or aa 55 03'
+            placeholder="hex bytes e.g. 01 or aa 55 03"
             placeholderTextColor={colors.textMuted}
           />
           <Pressable
-            style={[styles.btn, (!targetWritable || !parseHexInput(hexInput)) && styles.btnDisabled]}
+            style={[
+              styles.btn,
+              (!targetWritable || !parseHexInput(hexInput)) && styles.btnDisabled,
+            ]}
             onPress={onSend}
             disabled={!targetWritable || !parseHexInput(hexInput)}
           >
@@ -715,7 +764,9 @@ export default function ProtocolProbeScreen(): React.ReactElement {
 
       <View style={styles.section}>
         <View style={styles.logHeader}>
-          <Text style={styles.sectionTitle}>Event log ({filteredEntries.length}/{entries.length})</Text>
+          <Text style={styles.sectionTitle}>
+            Event log ({filteredEntries.length}/{entries.length})
+          </Text>
           <View style={styles.rowBtns}>
             <Pressable style={styles.smallBtnAlt} onPress={onClearLog}>
               <Text style={styles.smallBtnText}>Clear log</Text>
@@ -726,13 +777,12 @@ export default function ProtocolProbeScreen(): React.ReactElement {
           </View>
         </View>
         <Text style={styles.sectionHint}>newest first · elapsed ms from first event</Text>
-        {filteredEntries.length === 0 ? (
-          <Text style={styles.mutedRow}>no entries</Text>
-        ) : null}
+        {filteredEntries.length === 0 ? <Text style={styles.mutedRow}>no entries</Text> : null}
         {filteredEntries.map((e) => {
-          const elapsed = firstMonotonicRef.current != null
-            ? Math.round(e.monotonicTimeMs - firstMonotonicRef.current)
-            : 0
+          const elapsed =
+            firstMonotonicRef.current != null
+              ? Math.round(e.monotonicTimeMs - firstMonotonicRef.current)
+              : 0
           const arrow = e.kind === 'W' ? '←' : e.kind === 'R' ? '=' : e.kind === 'N' ? '→' : '←'
           const prefix = `[${elapsed.toString().padStart(6, ' ')}ms] ${e.kind}  ${shortUuid(e.characteristicUuid)} ${arrow} ${e.hex || '--'}`
           const suffix = e.error ? `  ERR: ${e.error}` : ''
@@ -746,7 +796,8 @@ export default function ProtocolProbeScreen(): React.ReactElement {
                   : styles.logRowRead
           return (
             <Text key={e.seq} style={[styles.logRow, style]} selectable>
-              {prefix}{suffix}
+              {prefix}
+              {suffix}
             </Text>
           )
         })}
@@ -817,7 +868,12 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   smallBtnText: { color: colors.textPrimary, fontSize: 12, fontWeight: '600' },
-  btn: { backgroundColor: colors.accent, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8 },
+  btn: {
+    backgroundColor: colors.accent,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
   btnDisabled: { opacity: 0.4 },
   btnText: { color: colors.textPrimary, fontWeight: '600' },
   linkBtn: {
@@ -846,7 +902,12 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   presetText: { color: colors.textPrimary, fontFamily: 'monospace', fontSize: 12 },
-  logHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  logHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
   logRow: { fontFamily: 'monospace', fontSize: 11, paddingVertical: 1 },
   logRowWrite: { color: colors.trackerLeft },
   logRowRead: { color: colors.textSecondary },

@@ -18,15 +18,8 @@
  * bridge returns, and downstream `beatsToMs` continues to consume
  * that number without special-casing.
  */
-import {
-  bpmForRecipe,
-  CADENCE_PROFILES,
-} from '../cadence'
-import {
-  defaultRecipe,
-  divisionForCadenceProfile,
-  type CadenceProfile,
-} from '../WorkoutRecipe'
+import { bpmForRecipe, CADENCE_PROFILES } from '../cadence'
+import { defaultRecipe, divisionForCadenceProfile, type CadenceProfile } from '../WorkoutRecipe'
 import { expandTimeline } from '@domain/programs/CueTimeline'
 import { listLegacySampleWorkouts as listSampleWorkouts } from '../samples/__fixtures__'
 

@@ -36,9 +36,7 @@ function anchor(overrides: Partial<SharedTransportAnchor> = {}): SharedTransport
   }
 }
 
-function snapshot(
-  overrides: Partial<MetronomeTransportSnapshot> = {},
-): MetronomeTransportSnapshot {
+function snapshot(overrides: Partial<MetronomeTransportSnapshot> = {}): MetronomeTransportSnapshot {
   return {
     generation: 3,
     state: 'running',

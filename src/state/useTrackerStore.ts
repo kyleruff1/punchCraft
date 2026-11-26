@@ -84,7 +84,7 @@ export const useTrackerStore = create<TrackerStoreState>((set) => ({
       const next: SlotState = {
         ...existing,
         state,
-        errorMessage: state === 'error' ? errorMessage : errorMessage ?? existing.errorMessage,
+        errorMessage: state === 'error' ? errorMessage : (errorMessage ?? existing.errorMessage),
       }
       return { slots: { ...prev.slots, [hand]: next } }
     })
@@ -111,11 +111,9 @@ export const useTrackerStore = create<TrackerStoreState>((set) => ({
 
 // --- React hooks (subscribe minimally) --------------------------------------
 
-export const useLeftSlot = (): SlotState | null =>
-  useTrackerStore((s) => s.slots.left)
+export const useLeftSlot = (): SlotState | null => useTrackerStore((s) => s.slots.left)
 
-export const useRightSlot = (): SlotState | null =>
-  useTrackerStore((s) => s.slots.right)
+export const useRightSlot = (): SlotState | null => useTrackerStore((s) => s.slots.right)
 
 export const useBothReady = (): boolean =>
   useTrackerStore((s) => {
@@ -166,7 +164,11 @@ export function setSlotConnected(hand: SlotHand, connected: boolean): void {
  * false, either transition to 'error' with the given message, or leave
  * the state alone (facade will emit a real state via onConnectionChange).
  */
-export function setSlotConnecting(hand: SlotHand, connecting: boolean, errorMessage?: string): void {
+export function setSlotConnecting(
+  hand: SlotHand,
+  connecting: boolean,
+  errorMessage?: string,
+): void {
   if (connecting) {
     setSlotState(hand, 'connecting')
     return

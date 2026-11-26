@@ -25,7 +25,11 @@
 
 /* eslint-disable @typescript-eslint/no-require-imports */
 
-import { FUSED_BODY_ASSET_IDS, VOICE_ASSET_IDS, type VoiceAssetId } from '@domain/coach/VoiceOutputPort'
+import {
+  FUSED_BODY_ASSET_IDS,
+  VOICE_ASSET_IDS,
+  type VoiceAssetId,
+} from '@domain/coach/VoiceOutputPort'
 import type { VoiceVocabulary } from '@domain/coach/VoiceCoachPolicy'
 // Set Ceremonies: generated per-directory require maps (47 call-out
 // clips × 4 sections) — see tools/voice/make-callout-clips.mjs.
@@ -117,7 +121,7 @@ export const voiceAssetManifest: VoiceAssetManifest = {
         'double-up': require('../../../assets/voice/numbers/standalone/double-up.wav'),
         'put-it-on-em': require('../../../assets/voice/numbers/standalone/put-it-on-em.wav'),
         'touch-and-go': require('../../../assets/voice/numbers/standalone/touch-and-go.wav'),
-        'breathe': require('../../../assets/voice/numbers/standalone/breathe.wav'),
+        breathe: require('../../../assets/voice/numbers/standalone/breathe.wav'),
         'hands-up': require('../../../assets/voice/numbers/standalone/hands-up.wav'),
       },
       combo: {
@@ -154,7 +158,7 @@ export const voiceAssetManifest: VoiceAssetManifest = {
         'double-up': require('../../../assets/voice/numbers/combo/double-up.wav'),
         'put-it-on-em': require('../../../assets/voice/numbers/combo/put-it-on-em.wav'),
         'touch-and-go': require('../../../assets/voice/numbers/combo/touch-and-go.wav'),
-        'breathe': require('../../../assets/voice/numbers/combo/breathe.wav'),
+        breathe: require('../../../assets/voice/numbers/combo/breathe.wav'),
         'hands-up': require('../../../assets/voice/numbers/combo/hands-up.wav'),
       },
     },
@@ -193,7 +197,7 @@ export const voiceAssetManifest: VoiceAssetManifest = {
         'double-up': require('../../../assets/voice/names/standalone/double-up.wav'),
         'put-it-on-em': require('../../../assets/voice/names/standalone/put-it-on-em.wav'),
         'touch-and-go': require('../../../assets/voice/names/standalone/touch-and-go.wav'),
-        'breathe': require('../../../assets/voice/names/standalone/breathe.wav'),
+        breathe: require('../../../assets/voice/names/standalone/breathe.wav'),
         'hands-up': require('../../../assets/voice/names/standalone/hands-up.wav'),
       },
       combo: {
@@ -230,7 +234,7 @@ export const voiceAssetManifest: VoiceAssetManifest = {
         'double-up': require('../../../assets/voice/names/combo/double-up.wav'),
         'put-it-on-em': require('../../../assets/voice/names/combo/put-it-on-em.wav'),
         'touch-and-go': require('../../../assets/voice/names/combo/touch-and-go.wav'),
-        'breathe': require('../../../assets/voice/names/combo/breathe.wav'),
+        breathe: require('../../../assets/voice/names/combo/breathe.wav'),
         'hands-up': require('../../../assets/voice/names/combo/hands-up.wav'),
       },
     },

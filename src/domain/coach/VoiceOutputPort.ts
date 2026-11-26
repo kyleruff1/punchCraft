@@ -223,14 +223,7 @@ export interface CombinationVoice {
  * blocks are not expected to carry them; the completeness check in
  * `missingAssetIds` skips them for those slots.
  */
-export const FUSED_BODY_ASSET_IDS: readonly VoiceAssetId[] = [
-  '1b',
-  '2b',
-  '3b',
-  '4b',
-  '5b',
-  '6b',
-]
+export const FUSED_BODY_ASSET_IDS: readonly VoiceAssetId[] = ['1b', '2b', '3b', '4b', '5b', '6b']
 
 /** Every id, for manifest completeness checks (M34-04). */
 export const VOICE_ASSET_IDS: readonly VoiceAssetId[] = [
@@ -526,7 +519,11 @@ export interface VoiceOutputPort {
    */
   metronome?: {
     /** Load and play the loop wav at `volume`. Restart on the downbeat when the loop changes. When `baseBpm` is provided, the shared `MetronomeTransport` starts alongside the audio loop. */
-    start(loop: { module: number; division: 1 | 2 | 3 | 4; swing: number; durationMs: number }, volume: number, baseBpm?: number): void
+    start(
+      loop: { module: number; division: 1 | 2 | 3 | 4; swing: number; durationMs: number },
+      volume: number,
+      baseBpm?: number,
+    ): void
     stop(): void
     /** Change the mixer volume without restarting the loop. */
     setVolume(volume: number): void

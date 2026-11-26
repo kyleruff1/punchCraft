@@ -14,7 +14,10 @@ jest.mock('react-native-reanimated', () => ({
   __esModule: true,
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest factory cannot use top-level imports
   default: { View: require('react-native').View },
-  runOnJS: <A extends unknown[]>(fn: (...args: A) => void) => (...args: A) => fn(...args),
+  runOnJS:
+    <A extends unknown[]>(fn: (...args: A) => void) =>
+    (...args: A) =>
+      fn(...args),
   useSharedValue: <T,>(init: T) => ({ value: init }),
   useFrameCallback: () => ({ setActive: () => {} }),
   useAnimatedStyle: (factory: () => object) => factory(),
@@ -327,10 +330,11 @@ describe('PunchAvatarCard — the flip repeats', () => {
     // On glass the FOURTH pump never showed. Walk the card exactly as the
     // lead track does (token index advancing every 600ms) and assert a
     // STRIKE (step1 visible) is painted for every one of the four.
-    const combo = cue(
-      [punch(1), punch(1), punch(1), punch(1)],
-      { tokenOffsetsMs: [0, 600, 1200, 1800], scheduledEndMs: 14_800, windowEndMs: 14_800 },
-    )
+    const combo = cue([punch(1), punch(1), punch(1), punch(1)], {
+      tokenOffsetsMs: [0, 600, 1200, 1800],
+      scheduledEndMs: 14_800,
+      windowEndMs: 14_800,
+    })
     const tree = render(<PunchAvatarCard cue={combo} activeTokenIndex={0} />)
     const opacityOf = (id: string): number => {
       const node = tree.root.findAllByProps({ testID: id }, { deep: false })[0]!
@@ -563,9 +567,7 @@ describe('PunchAvatarCard — under the live re-render cadence', () => {
     const tree = render(<PunchAvatarCard cue={combo} activeTokenIndex={0} />)
     const isStrike = (): boolean => {
       const node = tree.root.findAllByProps({ testID: 'punch-avatar-step1' }, { deep: false })[0]!
-      return [node.props.style]
-        .flat()
-        .some((s) => s && s.opacity === 1)
+      return [node.props.style].flat().some((s) => s && s.opacity === 1)
     }
     let sawStrike = false
     for (let tick = 0; tick < 40; tick += 1) {

@@ -32,7 +32,10 @@ import { fonts, sizes } from '@/theme/typography'
 import { BridgeClient, type BridgeStatus, type PatchIdentity } from '@/instrument/bridgeClient'
 import { createInstrumentVoice, type InstrumentVoice } from '@audio/InstrumentVoice'
 import { useInstrumentSettingsStore } from '@state/useInstrumentSettingsStore'
-import { INSTRUMENT_TEXTURE_IDS, type InstrumentTextureId } from '@audio/voiceAssets/instrumentBankManifest'
+import {
+  INSTRUMENT_TEXTURE_IDS,
+  type InstrumentTextureId,
+} from '@audio/voiceAssets/instrumentBankManifest'
 import { compileBrassCube } from '@domain/instrument/brassCube'
 import { compilePunchPatch, midiNoteName } from '@domain/instrument/cubeCompiler'
 import {
@@ -150,7 +153,6 @@ export default function SignatureAuditionScreen(): React.JSX.Element {
     }, [output, textureId, layers, audioEngine]),
   )
 
-
   const connect = useCallback(() => {
     bridgeRef.current?.disconnect()
     const client = new BridgeClient({ onStatus: (status) => setBridgeStatus(status) })
@@ -165,7 +167,12 @@ export default function SignatureAuditionScreen(): React.JSX.Element {
         }
       : { mapHash: cubeMap.patchHash }
     const { mapHash, ...rest } = identity
-    client.connect(DEFAULT_BRIDGE_URL, `audition-${Math.floor(globalThis.performance.now())}`, mapHash, rest)
+    client.connect(
+      DEFAULT_BRIDGE_URL,
+      `audition-${Math.floor(globalThis.performance.now())}`,
+      mapHash,
+      rest,
+    )
   }, [cubeMap.patchHash, field])
 
   /**
@@ -222,9 +229,7 @@ export default function SignatureAuditionScreen(): React.JSX.Element {
             : {
                 ...result.gesture,
                 transient: { ...result.gesture.transient, velocity: 1 },
-                ...(result.gesture.drums
-                  ? { drums: { ...result.gesture.drums, hits: [] } }
-                  : {}),
+                ...(result.gesture.drums ? { drums: { ...result.gesture.drums, hits: [] } } : {}),
               }
         engineRef.current?.handleGesture(voiced)
       }
@@ -248,7 +253,18 @@ export default function SignatureAuditionScreen(): React.JSX.Element {
         ].slice(0, 14),
       )
     },
-    [patch, cubeMap, brassMap, field, velocityIndex, accelerationIndex, leftZone, rightZone, output, layers],
+    [
+      patch,
+      cubeMap,
+      brassMap,
+      field,
+      velocityIndex,
+      accelerationIndex,
+      leftZone,
+      rightZone,
+      output,
+      layers,
+    ],
   )
 
   /**
@@ -318,7 +334,6 @@ export default function SignatureAuditionScreen(): React.JSX.Element {
     ),
   )
 
-
   /**
    * Kyle's diagnostic sequence, played blind on-device: the screen shows
    * the slot number only, and reveals the key when the pass finishes.
@@ -365,7 +380,9 @@ export default function SignatureAuditionScreen(): React.JSX.Element {
       <View style={styles.header}>
         <Text style={styles.title}>Twelve-Signature Audition</Text>
         <Pressable onPress={connect} style={styles.connectBtn} testID="audition-connect">
-          <Text style={styles.connectText}>{bridgeStatus === 'open' ? 'bridge open' : 'connect'}</Text>
+          <Text style={styles.connectText}>
+            {bridgeStatus === 'open' ? 'bridge open' : 'connect'}
+          </Text>
         </Pressable>
       </View>
       <Text style={styles.subtitle}>
@@ -455,7 +472,8 @@ export default function SignatureAuditionScreen(): React.JSX.Element {
         {cycleRow(
           'PATCH',
           patchId,
-          () => setPatchId((p) => (p === 'dorian-brass-v2' ? 'dorian-brass-cube' : 'dorian-brass-v2')),
+          () =>
+            setPatchId((p) => (p === 'dorian-brass-v2' ? 'dorian-brass-cube' : 'dorian-brass-v2')),
           'audition-patch',
         )}
         {cycleRow(

@@ -64,7 +64,10 @@ let eventSeq = 0
  * timestamp, and a tracker-reported velocity in tracker units. `punchType`
  * is 'unknown' because the type byte carries no portable meaning (H12).
  */
-function fightcampEvent(hand: 'left' | 'right', patch: Partial<TrackerPunchEvent> = {}): TrackerPunchEvent {
+function fightcampEvent(
+  hand: 'left' | 'right',
+  patch: Partial<TrackerPunchEvent> = {},
+): TrackerPunchEvent {
   const n = eventSeq++
   return {
     id: `frame-${n}-r0`,

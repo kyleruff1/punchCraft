@@ -36,7 +36,6 @@ export default function VelocityLabLanding() {
         }}
       />
 
-
       <Text style={styles.paragraph}>
         Raw tracker frames, timestamps, and velocity — no workout, no scoring.
       </Text>

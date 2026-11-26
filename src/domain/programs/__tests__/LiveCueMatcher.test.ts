@@ -21,8 +21,7 @@ import type { ExtraPunchPolicy } from '../../workout/WorkoutRecipe'
 import type { TrackerPunchEvent } from '../../punch/PunchEvent'
 
 const STEADY_BPM = CADENCE_PROFILES.steady.nominalBpm
-const CUE: CueInstance = expandTimeline(threeRoundFundamentals, 'orthodox', STEADY_BPM)[0]!
-  .cues[1]!
+const CUE: CueInstance = expandTimeline(threeRoundFundamentals, 'orthodox', STEADY_BPM)[0]!.cues[1]!
 
 /**
  * How long the app had been running when the bell rang — the gap between the
@@ -83,12 +82,30 @@ const land = (matcher: LiveCueMatcher, punch: Landed): void => {
 const DEVICE_EPOCH_MS = 1_790_000_000_000
 
 /** Minimal CueEngine events — only the two the matcher listens for. */
-const windowOpened = (): CueEvent =>
-  ({ type: 'cue-window-opened', cue: CUE, status: 'active', timestamps: {} as never, workElapsedMs: 0, nowMs: 0 })
-const windowClosed = (): CueEvent =>
-  ({ type: 'cue-window-closed', cue: CUE, status: 'accepting', timestamps: {} as never, workElapsedMs: 0, nowMs: 0 })
-const cueCancelled = (): CueEvent =>
-  ({ type: 'cue-cancelled', cue: CUE, status: 'cancelled', timestamps: {} as never, workElapsedMs: 0, nowMs: 0 })
+const windowOpened = (): CueEvent => ({
+  type: 'cue-window-opened',
+  cue: CUE,
+  status: 'active',
+  timestamps: {} as never,
+  workElapsedMs: 0,
+  nowMs: 0,
+})
+const windowClosed = (): CueEvent => ({
+  type: 'cue-window-closed',
+  cue: CUE,
+  status: 'accepting',
+  timestamps: {} as never,
+  workElapsedMs: 0,
+  nowMs: 0,
+})
+const cueCancelled = (): CueEvent => ({
+  type: 'cue-cancelled',
+  cue: CUE,
+  status: 'cancelled',
+  timestamps: {} as never,
+  workElapsedMs: 0,
+  nowMs: 0,
+})
 
 function harness(policy: ExtraPunchPolicy = 'neutral') {
   const matcher = new LiveCueMatcher({ tier: 'hand-timestamp', extraPunchPolicy: policy })

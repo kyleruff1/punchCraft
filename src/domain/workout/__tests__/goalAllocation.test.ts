@@ -63,15 +63,16 @@ function roundWith(blocks: WorkoutBlock[], countsTowardGoal = true): ProgramRoun
 // ---------------------------------------------------------------------------
 
 describe('the sum invariant', () => {
-  it.each(
-    DURATIONS.flatMap((minutes) => FOCUSES.map((focus) => [minutes, focus] as const)),
-  )('sums exactly to the goal at %s minutes with %s focus', (minutes, focus) => {
-    const schedule = bareSchedule(minutes)
-    for (const goal of [800, 1_000, 1_237, 2_000, 4_500]) {
-      const targets = allocateRoundTargets(goal, schedule, focus)
-      expect(targets.reduce((a, b) => a + b, 0)).toBe(goal)
-    }
-  })
+  it.each(DURATIONS.flatMap((minutes) => FOCUSES.map((focus) => [minutes, focus] as const)))(
+    'sums exactly to the goal at %s minutes with %s focus',
+    (minutes, focus) => {
+      const schedule = bareSchedule(minutes)
+      for (const goal of [800, 1_000, 1_237, 2_000, 4_500]) {
+        const targets = allocateRoundTargets(goal, schedule, focus)
+        expect(targets.reduce((a, b) => a + b, 0)).toBe(goal)
+      }
+    },
+  )
 
   it('sums exactly for goals that divide badly', () => {
     // Seven rounds, a prime goal: the remainder has to go somewhere.
@@ -206,8 +207,10 @@ describe('the high-goal rule (doc §17)', () => {
     const activeMinutes = 3
     const atCeiling = EXACT_COMBO_DENSITY_CEILING_PER_MIN * comboLength * activeMinutes
     expect(assessDensity(atCeiling, 180_000, comboLength).needsVolumeBlocks).toBe(false)
-    expect(assessDensity(atCeiling + comboLength * activeMinutes, 180_000, comboLength)
-      .needsVolumeBlocks).toBe(true)
+    expect(
+      assessDensity(atCeiling + comboLength * activeMinutes, 180_000, comboLength)
+        .needsVolumeBlocks,
+    ).toBe(true)
   })
 
   it('reports the implied pace it judged on', () => {

@@ -108,11 +108,7 @@ export interface CompiledRoundScript {
  * came from a compiled RhythmMap event.
  */
 export type ScriptEntry =
-  | ScriptCoachPlay
-  | ScriptCoachPhrase
-  | ScriptRingTokenDue
-  | ScriptCeremony
-  | ScriptBell
+  ScriptCoachPlay | ScriptCoachPhrase | ScriptRingTokenDue | ScriptCeremony | ScriptBell
 
 export interface ScriptEntryBase {
   atMs: number
@@ -234,8 +230,7 @@ export function compileWorkoutScript(
   config: ScriptConfig,
 ): CompiledWorkoutScript {
   const perWordEstimateMs = config.perWordEstimateMs ?? DEFAULT_PER_WORD_ESTIMATE_MS
-  const interCueReleaseGraceMs =
-    config.interCueReleaseGraceMs ?? DEFAULT_INTER_CUE_RELEASE_GRACE_MS
+  const interCueReleaseGraceMs = config.interCueReleaseGraceMs ?? DEFAULT_INTER_CUE_RELEASE_GRACE_MS
 
   const timeline = expandTimeline(workout, config.stance, config.bpm)
 
@@ -322,7 +317,7 @@ function compileRoundScript(
       const tokenLabel: StrikeToken | 'defense' | 'footwork' | 'coach' | 'rest' =
         token?.kind === 'punch'
           ? ((token.body ? `${token.number}B` : `${token.number}`) as StrikeToken)
-          : token?.kind ?? 'coach'
+          : (token?.kind ?? 'coach')
       entries.push({
         kind: 'ring.tokenDue',
         atMs: cue.scheduledStartMs + offset,
@@ -504,9 +499,7 @@ function detectPhraseCollisions(
   for (const entry of entries) {
     if (entry.kind !== 'coach.play' && entry.kind !== 'coach.phrase') continue
     const duration =
-      entry.kind === 'coach.phrase'
-        ? entry.expectedDurationMs
-        : entry.expectedDurationMs ?? 0
+      entry.kind === 'coach.phrase' ? entry.expectedDurationMs : (entry.expectedDurationMs ?? 0)
     if (entry.atMs < prevCoachEnd && entry.cueId !== prevCueId) {
       faults.push({
         kind: 'phrase-collision',

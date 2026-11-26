@@ -44,7 +44,9 @@ jest.mock('expo-audio', () => ({
       }),
       destroy: jest.fn(),
       remove: jest.fn(),
-      addListener: jest.fn((_event: string, _cb: (status: StatusLike) => void) => ({ remove: () => stub.remove() })),
+      addListener: jest.fn((_event: string, _cb: (status: StatusLike) => void) => ({
+        remove: () => stub.remove(),
+      })),
       volumeAtPlay: null,
       playing: false,
       volume: 0,
@@ -88,7 +90,10 @@ describe('silenceTrack', () => {
     // caller can forget to.
     const pl = new CeremonyPlaylist(null, 'workout.test')
     expect(pl.silenceTrack(123, { round: 4 })).toBeUndefined()
-    expect(logger.warn).toHaveBeenCalledWith('workout.test', 'no silence track for planned gap', { round: 4, gapMs: 123 })
+    expect(logger.warn).toHaveBeenCalledWith('workout.test', 'no silence track for planned gap', {
+      round: 4,
+      gapMs: 123,
+    })
   })
 })
 
@@ -111,7 +116,11 @@ describe('build', () => {
     expect(pl.build([1, 2], 500, 'x loaded', { round: 2 })).toBe(false)
     expect(pl.loaded).toBe(false)
     expect(pl.plannedMs).toBe(0)
-    expect(logger.warn).toHaveBeenCalledWith('workout.test', 'playlist creation failed', expect.objectContaining({ round: 2 }))
+    expect(logger.warn).toHaveBeenCalledWith(
+      'workout.test',
+      'playlist creation failed',
+      expect.objectContaining({ round: 2 }),
+    )
   })
 
   it('logs the ceremony’s own message with the track and boundary counts', () => {
@@ -158,7 +167,10 @@ describe('start', () => {
     const playId = pl.start(0.7, { kind: 'intro', label: 'intro', playIdPrefix: 'intro' })
     expect(playId).toBe('intro-1')
     expect(playlists[0]!.volumeAtPlay).toBe(0.7)
-    expect(playlists[0]!.addListener).toHaveBeenCalledWith('playlistStatusUpdate', expect.any(Function))
+    expect(playlists[0]!.addListener).toHaveBeenCalledWith(
+      'playlistStatusUpdate',
+      expect.any(Function),
+    )
     expect(observer.stats()).toMatchObject({ watched: 1, open: 1, listeners: 1 })
   })
 
@@ -176,7 +188,9 @@ describe('start', () => {
     playlists[0]!.play.mockImplementationOnce(() => {
       throw new Error('boom')
     })
-    expect(() => pl.start(0.5, { kind: 'intro', label: 'i', playIdPrefix: 'intro' })).toThrow('boom')
+    expect(() => pl.start(0.5, { kind: 'intro', label: 'i', playIdPrefix: 'intro' })).toThrow(
+      'boom',
+    )
   })
 })
 
@@ -213,7 +227,9 @@ describe('dispose', () => {
     const stub = playlists[0]!
     expect(records).toHaveLength(1)
     expect(records[0]).toMatchObject({ kind: 'intro', outcome: 'released' })
-    expect(stub.remove.mock.invocationCallOrder[0]!).toBeLessThan(stub.destroy.mock.invocationCallOrder[0]!)
+    expect(stub.remove.mock.invocationCallOrder[0]!).toBeLessThan(
+      stub.destroy.mock.invocationCallOrder[0]!,
+    )
     // pause + destroy + release — destroy() alone is a registry unlink.
     expect(stub.pause).toHaveBeenCalled()
     expect(pl.loaded).toBe(false)

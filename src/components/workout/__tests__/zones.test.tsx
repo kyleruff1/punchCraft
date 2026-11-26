@@ -20,7 +20,10 @@ jest.mock('react-native-reanimated', () => ({
   __esModule: true,
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest factory cannot use top-level imports
   default: { View: require('react-native').View },
-  runOnJS: <A extends unknown[]>(fn: (...args: A) => void) => (...args: A) => fn(...args),
+  runOnJS:
+    <A extends unknown[]>(fn: (...args: A) => void) =>
+    (...args: A) =>
+      fn(...args),
   useSharedValue: <T,>(init: T) => ({ value: init }),
   useFrameCallback: () => ({ setActive: () => {} }),
   useAnimatedStyle: (factory: () => object) => factory(),
@@ -30,7 +33,13 @@ import React from 'react'
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer'
 
 import { CueStage, type CueView } from '../CueStage'
-import { MetricsRail, MAX_OPTIONAL_TILES, OPTIONAL_TILES, type TileId, type VelocityView } from '../MetricsRail'
+import {
+  MetricsRail,
+  MAX_OPTIONAL_TILES,
+  OPTIONAL_TILES,
+  type TileId,
+  type VelocityView,
+} from '../MetricsRail'
 import { RoundTopBar, TrackerLamp, formatCountdown } from '../RoundTopBar'
 import { expandTimeline } from '@domain/programs/CueTimeline'
 import { CADENCE_PROFILES } from '@domain/workout/cadence'
@@ -58,9 +67,7 @@ afterEach(() => {
 })
 
 function textOf(node: ReactTestInstance): string {
-  return node.children
-    .map((child) => (typeof child === 'string' ? child : textOf(child)))
-    .join('')
+  return node.children.map((child) => (typeof child === 'string' ? child : textOf(child))).join('')
 }
 
 const allText = (tree: ReactTestRenderer): string => textOf(tree.root)
@@ -130,7 +137,9 @@ describe('CueStage', () => {
     // The active token is highlighted, but the rest stay on screen rather
     // than being revealed one at a time.
     const view = cueView(0)
-    const states = view.cue.tokens.map((_, i) => (i === 0 ? ('active' as const) : ('upcoming' as const)))
+    const states = view.cue.tokens.map((_, i) =>
+      i === 0 ? ('active' as const) : ('upcoming' as const),
+    )
     const tree = render(<CueStage current={{ ...view, tokenStates: states }} />)
     const markers = nodes(tree, 'state-marker')
     // Exactly one active marker; the other tokens render without one.
@@ -169,16 +178,12 @@ describe('CueStage', () => {
     const view = cueView(0)
     const tree = render(<CueStage current={view} />)
     const hints = nodes(tree, 'hand-hint').map((n) => textOf(n))
-    expect(hints).toEqual(
-      view.cue.expectedPunches.map((p) => (p.hand === 'left' ? 'L' : 'R')),
-    )
+    expect(hints).toEqual(view.cue.expectedPunches.map((p) => (p.hand === 'left' ? 'L' : 'R')))
   })
 
   it('renders defense tokens with their own shape', () => {
     // Round 1 block 2 of the sample is a slip-led defense counter.
-    const defenseCue = TIMELINE[0]!.cues.find((c) =>
-      c.tokens.some((t) => t.kind === 'defense'),
-    )!
+    const defenseCue = TIMELINE[0]!.cues.find((c) => c.tokens.some((t) => t.kind === 'defense'))!
     const tree = render(
       <CueStage
         current={{
@@ -274,12 +279,12 @@ describe('RoundTopBar', () => {
   it('TrackerLamp (the header led) names each glove state accessibly', () => {
     const left = render(<TrackerLamp hand="L" state="streaming" />)
     const right = render(<TrackerLamp hand="R" state="error" />)
-    expect(
-      left.root.findByProps({ testID: 'tracker-lamp-L' }).props.accessibilityLabel,
-    ).toContain('Left tracker connected')
-    expect(
-      right.root.findByProps({ testID: 'tracker-lamp-R' }).props.accessibilityLabel,
-    ).toContain('Right tracker not connected')
+    expect(left.root.findByProps({ testID: 'tracker-lamp-L' }).props.accessibilityLabel).toContain(
+      'Left tracker connected',
+    )
+    expect(right.root.findByProps({ testID: 'tracker-lamp-R' }).props.accessibilityLabel).toContain(
+      'Right tracker not connected',
+    )
   })
 })
 
@@ -363,7 +368,9 @@ describe('MetricsRail', () => {
 
   it('derives the left/right tile from counts when no value is supplied', () => {
     const tree = render(<MetricsRail {...base} tiles={['left-right-balance']} />)
-    expect(textOf(tree.root.findByProps({ testID: 'tile-left-right-balance' }))).toContain('20 / 22')
+    expect(textOf(tree.root.findByProps({ testID: 'tile-left-right-balance' }))).toContain(
+      '20 / 22',
+    )
   })
 
   it('shows an em dash for a tile with no data yet', () => {

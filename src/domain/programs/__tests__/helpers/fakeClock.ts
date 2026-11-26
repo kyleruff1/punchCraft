@@ -22,11 +22,7 @@
  */
 
 import { CueEngine, DEFAULT_LEAD_TIMES } from '../../CueEngine'
-import {
-  DEFAULT_FAKE_CLOCK_ORIGIN_MS,
-  createFakeClock,
-  type FakeClock,
-} from '@testing/fakeClock'
+import { DEFAULT_FAKE_CLOCK_ORIGIN_MS, createFakeClock, type FakeClock } from '@testing/fakeClock'
 import type { CueEngineLeadTimes } from '../../CueEngine'
 import type { CueEvent, CueStatus } from '../../CueState'
 import type { RoundTimeline } from '../../CueTimeline'

@@ -232,8 +232,7 @@ export function PunchAvatarCard(props: {
     const current = shownRef.current
     // Same art AND same occurrence: nothing new to show. A repeat of the
     // same punch in a new occurrence falls through and re-flips.
-    if (current && current.key === req.key && adoptedOccurrenceRef.current === occurrenceKey)
-      return
+    if (current && current.key === req.key && adoptedOccurrenceRef.current === occurrenceKey) return
 
     const adoptNow = (
       next: NonNullable<ReturnType<typeof requestedFor>>,
@@ -265,9 +264,7 @@ export function PunchAvatarCard(props: {
     // is async, so the flushed adoption is tracked LOCALLY — shownRef
     // still holds the pre-flush punch until the next render.
     const pending = pendingAdoptRef.current
-    const now = pending
-      ? adoptNow(pending.req, pending.occurrenceKey, current.frames.key)
-      : current
+    const now = pending ? adoptNow(pending.req, pending.occurrenceKey, current.frames.key) : current
     const hold = minHoldMs(now.windowMs, now.isLast)
     const heldFor = Date.now() - now.startedAt
     if (heldFor >= hold) {
@@ -286,8 +283,6 @@ export function PunchAvatarCard(props: {
       promoteRef.current = null
     }
   }, [requestedKey, requestedWindowMs, requestedIsLast, occurrenceKey])
-
-
 
   // Flip: wind-up, strike, hold the strike, back to guard, repeat on the
   // beat. LEVEL-TRIGGERED on purpose — the frame is recomputed from elapsed
@@ -318,8 +313,7 @@ export function PunchAvatarCard(props: {
     // settled the interval clears itself — still means ZERO timers.
     const flip = flipFrameMs(shown.windowMs)
     const lead = shown.pump ? flip : 0
-    const settleAtMs =
-      Math.max(lead + MIN_FRAME_MS, shown.windowMs - flip) + flip + FLIP_TICK_MS
+    const settleAtMs = Math.max(lead + MIN_FRAME_MS, shown.windowMs - flip) + flip + FLIP_TICK_MS
     const id = setInterval(() => {
       // Deterministic handoff: if the transport starts mid-adoption the
       // worklet takes over; two writers on `step` would fight.
@@ -477,7 +471,15 @@ const styles = StyleSheet.create({
   leftSpacer: { flex: 2 },
   rightSpacer: { flex: 3 },
   card: { height: CARD_HEIGHT, maxWidth: '96%', aspectRatio: CARD_ASPECT },
-  frame: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, width: '100%', height: '100%' },
+  frame: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+  },
   frameOn: { opacity: 1 },
   frameOff: { opacity: 0 },
 })

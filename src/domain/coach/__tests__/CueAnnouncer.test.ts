@@ -67,10 +67,16 @@ class RecordingPort implements VoiceOutputPort {
     this.calls.push({ kind: 'instruction', ...clip })
   }
   playPhrase(ids: readonly VoiceAssetId[], atMs?: number, tightness = 1): void {
-    this.calls.push({ kind: 'phrase', ids: [...ids], tightness, ...(atMs === undefined ? {} : { atMs }) })
+    this.calls.push({
+      kind: 'phrase',
+      ids: [...ids],
+      tightness,
+      ...(atMs === undefined ? {} : { atMs }),
+    })
     // Also recorded per clip so the existing assertions about which words
     // were said keep working across both call shapes.
-    for (const id of ids) this.calls.push(atMs === undefined ? { kind: 'asset', id } : { kind: 'asset', id, atMs })
+    for (const id of ids)
+      this.calls.push(atMs === undefined ? { kind: 'asset', id } : { kind: 'asset', id, atMs })
   }
   speak(text: string, priority: number): void {
     this.calls.push({ kind: 'speak', text, priority })
@@ -663,9 +669,7 @@ describe('a metric never interrupts a combination (doc §18)', () => {
 
 describe('a rendered combination is preferred over per-word clips', () => {
   /** A port that has a phrase for whatever it is asked for. */
-  function phraseHarness(
-    over: { has?: boolean; durationMs?: number } = {},
-  ): {
+  function phraseHarness(over: { has?: boolean; durationMs?: number } = {}): {
     port: RecordingPort
     announcer: CueAnnouncer
     calls: Array<[string, string, number?, CombinationVoice?]>
@@ -794,9 +798,7 @@ describe('a rendered combination is preferred over per-word clips', () => {
 // ---------------------------------------------------------------------------
 
 describe('VoicePolicy = announce-then-work', () => {
-  function phraseHarness(
-    over: { durationMs?: number; has?: boolean } = {},
-  ): {
+  function phraseHarness(over: { durationMs?: number; has?: boolean } = {}): {
     port: RecordingPort
     announcer: CueAnnouncer
     calls: Array<[string, string, number?, CombinationVoice?]>
@@ -957,9 +959,7 @@ describe('VoicePolicy = announce-then-work — Phase B2 combo-announce clip', ()
     })
     h.announcer.onCueEvent(cueEvent('cue-announcing', first))
 
-    expect(h.announces).toEqual([
-      { text: 'One, Two, go!', module: 42, durationMs: 1500 },
-    ])
+    expect(h.announces).toEqual([{ text: 'One, Two, go!', module: 42, durationMs: 1500 }])
     // The per-punch phrase path did NOT fire — the announce clip owns rep 0.
     expect(h.phrases).toEqual([])
   })
@@ -1095,7 +1095,11 @@ describe('the callout vocabulary and performance reach the port (D15, Phase C)',
   function voiceHarness(opts: {
     vocabulary?: 'numbers' | 'techniques'
     performanceFor?: (cue: CueInstance) => 'teach' | 'work' | 'push'
-  }): { announcer: CueAnnouncer; play: Array<CombinationVoice | undefined>; duration: Array<CombinationVoice | undefined> } {
+  }): {
+    announcer: CueAnnouncer
+    play: Array<CombinationVoice | undefined>
+    duration: Array<CombinationVoice | undefined>
+  } {
     const port = new RecordingPort()
     const play: Array<CombinationVoice | undefined> = []
     const duration: Array<CombinationVoice | undefined> = []
@@ -1439,7 +1443,8 @@ describe('a count-scored burst re-anchors the motif periodically', () => {
     const c = cue()
     for (const s of h.scheduled) {
       expect(s.atMs).toBeDefined()
-      const atCue = (s.atMs ?? 0) - (cueEvent('cue-active', c).nowMs - cueEvent('cue-active', c).workElapsedMs)
+      const atCue =
+        (s.atMs ?? 0) - (cueEvent('cue-active', c).nowMs - cueEvent('cue-active', c).workElapsedMs)
       expect(atCue).toBeGreaterThan(c.scheduledStartMs)
     }
   })

@@ -41,7 +41,10 @@ describe('scriptPunchesPerMinute', () => {
 
   it('is linear in tempo', () => {
     const base = scriptPunchesPerMinute('combo-1-2-3-2')
-    expect(scriptPunchesPerMinute('combo-1-2-3-2', SCRIPT_NOMINAL_BPM * 1.5)).toBeCloseTo(base * 1.5, 6)
+    expect(scriptPunchesPerMinute('combo-1-2-3-2', SCRIPT_NOMINAL_BPM * 1.5)).toBeCloseTo(
+      base * 1.5,
+      6,
+    )
   })
 })
 
@@ -63,12 +66,16 @@ describe('simBpmForWorkout', () => {
   })
 
   it('clamps to the playable range on both sides', () => {
-    expect(simBpmForWorkout('burst', { estimatedActivePunchesPerMinute: 100_000 })).toBe(SIM_BPM_MAX)
+    expect(simBpmForWorkout('burst', { estimatedActivePunchesPerMinute: 100_000 })).toBe(
+      SIM_BPM_MAX,
+    )
     expect(simBpmForWorkout('burst', { estimatedActivePunchesPerMinute: 0.001 })).toBe(SIM_BPM_MIN)
   })
 
   it('fails safe to the minimum on a zero or broken density', () => {
-    expect(simBpmForWorkout('captured-jam', { estimatedActivePunchesPerMinute: 0 })).toBe(SIM_BPM_MIN)
+    expect(simBpmForWorkout('captured-jam', { estimatedActivePunchesPerMinute: 0 })).toBe(
+      SIM_BPM_MIN,
+    )
     expect(simBpmForWorkout('captured-jam', { estimatedActivePunchesPerMinute: Number.NaN })).toBe(
       SIM_BPM_MIN,
     )

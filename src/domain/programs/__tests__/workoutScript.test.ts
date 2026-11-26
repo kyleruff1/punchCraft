@@ -57,9 +57,7 @@ describe('compileWorkoutScript — output shape + basic invariants', () => {
   it('every round emits round-start (0 ms) + round-end (workDurationMs) bells', () => {
     const script = compileWorkoutScript(threeRoundFundamentals, baseConfig())
     for (const round of script.rounds) {
-      const start = round.entries.find(
-        (e) => e.kind === 'bell' && e.phase === 'round-start',
-      )
+      const start = round.entries.find((e) => e.kind === 'bell' && e.phase === 'round-start')
       const end = round.entries.find((e) => e.kind === 'bell' && e.phase === 'round-end')
       expect(start).toBeDefined()
       expect(end).toBeDefined()
@@ -72,9 +70,7 @@ describe('compileWorkoutScript — output shape + basic invariants', () => {
     const script = compileWorkoutScript(threeRoundFundamentals, baseConfig())
     for (const round of script.rounds) {
       for (let i = 1; i < round.entries.length; i += 1) {
-        expect(round.entries[i]!.atMs).toBeGreaterThanOrEqual(
-          round.entries[i - 1]!.atMs,
-        )
+        expect(round.entries[i]!.atMs).toBeGreaterThanOrEqual(round.entries[i - 1]!.atMs)
       }
     }
   })
@@ -137,9 +133,7 @@ describe('compileWorkoutScript — the 1-2b-3 fused-body surface (task #46 lande
     // shape and asserts NO legacy 'body' assets survive.
     const script = compileWorkoutScript(bodyWork, baseConfig())
     const bw1 = script.rounds[0]!
-    const coachPlays = bw1.entries.filter(
-      (e): e is ScriptCoachPlay => e.kind === 'coach.play',
-    )
+    const coachPlays = bw1.entries.filter((e): e is ScriptCoachPlay => e.kind === 'coach.play')
     const fusedBodyPlays = coachPlays.filter((e) => /^[1-6]b$/.test(e.assetId))
     expect(fusedBodyPlays.length).toBeGreaterThan(0)
     const legacyBodyPlays = coachPlays.filter((e) => e.assetId === 'body')

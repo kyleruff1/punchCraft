@@ -149,7 +149,16 @@ export function generateWorkout(
     const target = roundPunchTargets[scoredIndex] ?? 0
     // D26: the round fills to the bell on the build-up template; its punch
     // target is an OUTPUT of that fill, not an input.
-    const { round, usedFallback } = fillScoredRound(order, target, p, entry, recipe, bpm, rng, options)
+    const { round, usedFallback } = fillScoredRound(
+      order,
+      target,
+      p,
+      entry,
+      recipe,
+      bpm,
+      rng,
+      options,
+    )
     rounds.push(round)
     accumulateDistribution(round.blocks, tally)
     realizedTotal += round.targetPunches
@@ -194,7 +203,8 @@ export function generateWorkout(
     schedule: rounds,
     roundPunchTargets,
     expectedTechniqueDistribution: distribution,
-    estimatedActivePunchesPerMinute: activeMinutes > 0 ? Math.round(realizedTotal / activeMinutes) : 0,
+    estimatedActivePunchesPerMinute:
+      activeMinutes > 0 ? Math.round(realizedTotal / activeMinutes) : 0,
     warnings,
   }
 }

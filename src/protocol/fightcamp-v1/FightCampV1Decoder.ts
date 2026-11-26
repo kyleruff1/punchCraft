@@ -69,10 +69,7 @@ export interface DecodeFrameResult {
  *     independently. See `decodeRecordV4Plus` / `decodeRecordV3` for
  *     the per-record field layout.
  */
-export function decodeFrame(
-  frame: RawBleFrame,
-  state: FightCampV1State,
-): DecodeFrameResult {
+export function decodeFrame(frame: RawBleFrame, state: FightCampV1State): DecodeFrameResult {
   if (
     frame.serviceUuid.toLowerCase() !== FIGHTCAMP_SERVICE_UUID ||
     frame.characteristicUuid.toLowerCase() !== CHAR.DATA_STREAM
@@ -103,9 +100,7 @@ export function decodeFrame(
       events: [],
       malformed: true,
       unknown: false,
-      notes: [
-        `payload length ${payload.length} not a multiple of record width ${recordWidth}`,
-      ],
+      notes: [`payload length ${payload.length} not a multiple of record width ${recordWidth}`],
     }
   }
 
@@ -114,10 +109,7 @@ export function decodeFrame(
   for (let i = 0; i < recordCount; i++) {
     const start = i * recordWidth
     const record = payload.subarray(start, start + recordWidth)
-    const decoded =
-      recordWidth === 9
-        ? decodeRecordV4Plus(record)
-        : decodeRecordV3(record)
+    const decoded = recordWidth === 9 ? decodeRecordV4Plus(record) : decodeRecordV3(record)
 
     const qualityFlags: PunchQualityFlag[] = []
     // §12.5 punchType enum has no 'kick'; type 0 and type 5 are
@@ -126,7 +118,11 @@ export function decodeFrame(
     // Session can filter; we only flag `unknownType` when the mapping
     // fell through to 'unknown' because the raw enum was out of the
     // known set (i.e. not 0..5).
-    if (decoded.punchType === 'unknown' && decoded.punchTypeRaw !== 0 && decoded.punchTypeRaw !== 5) {
+    if (
+      decoded.punchType === 'unknown' &&
+      decoded.punchTypeRaw !== 0 &&
+      decoded.punchTypeRaw !== 5
+    ) {
       qualityFlags.push('unknownType')
     }
 
@@ -237,12 +233,10 @@ function decodeRecordV4Plus(bytes: Uint8Array): DecodedRecord {
   // Force UNSIGNED 32-bit interpretation. `x >>> 0` on the OR'd bytes
   // would clobber the top bit as signed; we build the value in
   // floating point instead so the epoch stays correct past 2038.
-  const epochSeconds =
-    b3 + b4 * 0x100 + b5 * 0x10000 + b6 * 0x1000000
+  const epochSeconds = b3 + b4 * 0x100 + b5 * 0x10000 + b6 * 0x1000000
 
   const subSecondByte = b7
-  const trackerTimestampMs =
-    epochSeconds * 1000 + Math.floor((subSecondByte * 1000) / 256)
+  const trackerTimestampMs = epochSeconds * 1000 + Math.floor((subSecondByte * 1000) / 256)
 
   const velocityByteRaw = b8
   const vRaw = velocityByteRaw / 2
@@ -304,11 +298,9 @@ function decodeRecordV3(bytes: Uint8Array): DecodedRecord {
 
   const punchTypeRaw = b0
   const accelerationRaw = b2 | (b3 << 8)
-  const epochSeconds =
-    b4 + b5 * 0x100 + b6 * 0x10000 + b7 * 0x1000000
+  const epochSeconds = b4 + b5 * 0x100 + b6 * 0x10000 + b7 * 0x1000000
   const subSecondByte = b8
-  const trackerTimestampMs =
-    epochSeconds * 1000 + Math.floor((subSecondByte * 1000) / 256)
+  const trackerTimestampMs = epochSeconds * 1000 + Math.floor((subSecondByte * 1000) / 256)
   const velocityByteRaw = b11
   const velocityCalibrated = velocityByteRaw / 2
 
@@ -365,8 +357,7 @@ function mapType(_type: number): PunchType {
 // Base64 → Uint8Array (pure JS, no Node Buffer)
 // ---------------------------------------------------------------------------
 
-const BASE64_ALPHABET =
-  'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
 
 const BASE64_LOOKUP: Int16Array = (() => {
   const table = new Int16Array(256)

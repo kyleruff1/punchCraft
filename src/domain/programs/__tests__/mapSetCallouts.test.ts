@@ -37,10 +37,7 @@ const reserveMsFor = (
   800
 
 function generatedRounds(seed: string) {
-  const workout = generateWorkout(
-    { ...defaultRecipe(), seed },
-    { setupCallouts: { reserveMsFor } },
-  )
+  const workout = generateWorkout({ ...defaultRecipe(), seed }, { setupCallouts: { reserveMsFor } })
   return { workout, timeline: expandTimeline(workout, 'orthodox', 100) }
 }
 
@@ -49,9 +46,7 @@ describe('set ceremonies on the rhythm map', () => {
   const scored = timeline.filter((r) => r.cues.length > 0)
 
   it('stamps ceremonies on most sets — the coach procures them', () => {
-    const stamped = scored
-      .flatMap((r) => r.cues)
-      .filter((c) => c.setupCallout !== undefined)
+    const stamped = scored.flatMap((r) => r.cues).filter((c) => c.setupCallout !== undefined)
     // Density (Kyle, 2026-08-28): the co-buildup-start, co-buildup-next
     // and co-pressure ceremonies were ripped out — they weren't
     // additive. The remaining ceremonies (co-downstairs, co-movement,
@@ -72,9 +67,7 @@ describe('set ceremonies on the rhythm map', () => {
       })
       const times = (m: typeof off) =>
         m.events
-          .filter(
-            (e) => e.kind === 'call' || e.kind === 'refire' || e.kind === 'phase-announce',
-          )
+          .filter((e) => e.kind === 'call' || e.kind === 'refire' || e.kind === 'phase-announce')
           .map((e) => `${e.kind}:${e.id}@${e.atMs}`)
           .sort()
       expect(times(on)).toEqual(times(off))
@@ -103,8 +96,7 @@ describe('set ceremonies on the rhythm map', () => {
         const ordered = [...parts].sort((a, b) => a.atMs - b.atMs)
         // The whole chain ends before the set's own call, with the margin.
         const last = ordered.at(-1)!
-        const lastMs =
-          'recite' in (last.payload as SetCalloutPayload) ? 1_600 : SENTENCE_MS
+        const lastMs = 'recite' in (last.payload as SetCalloutPayload) ? 1_600 : SENTENCE_MS
         expect(last.atMs + lastMs).toBeLessThanOrEqual(call.atMs - SET_CALLOUT_QUIET_MS + 1)
         // And starts clear of the previous cue's window.
         const prev = round.cues[cueIndex - 1]
@@ -137,9 +129,7 @@ describe('set ceremonies on the rhythm map', () => {
     }
     // The reservations cost punches; D26 keeps targets honest as OUTPUTS —
     // the drift warning must not trip on the default recipe.
-    expect(
-      workout.warnings.filter((w) => w.toLowerCase().includes('drift')),
-    ).toHaveLength(0)
+    expect(workout.warnings.filter((w) => w.toLowerCase().includes('drift'))).toHaveLength(0)
   })
 
   it('announces every same-move stretch longer than a minute', () => {

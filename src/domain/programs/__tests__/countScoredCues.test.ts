@@ -151,7 +151,7 @@ describe('expansion (doc §14)', () => {
 })
 
 describe('open pressure carries a finishing constraint', () => {
-  it('takes the constraint from the block\'s last punch', () => {
+  it("takes the constraint from the block's last punch", () => {
     // "Punch freely, but finish every exchange with this" (doc §14).
     const cue = timelineFor([block({ kind: 'open-pressure' })])[0]!.cues[0]!
     expect(cue.countScored?.constraint).toEqual({ finisher: 2, hand: 'rear' })

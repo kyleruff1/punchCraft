@@ -134,7 +134,9 @@ export default function PunchCraftLanding() {
         {/* Throwaway M32-05 spike entry (#182); removed when the spike closes. */}
         <Link href="/(tabs)/punchcraft/orientation-spike" asChild>
           <Pressable accessibilityRole="button" style={styles.spikeAction} testID="open-spike">
-            <Text style={styles.spikeActionText}>M32-05 spike: orientation / keep-awake / haptics</Text>
+            <Text style={styles.spikeActionText}>
+              M32-05 spike: orientation / keep-awake / haptics
+            </Text>
           </Pressable>
         </Link>
       </ScrollView>

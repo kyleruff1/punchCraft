@@ -112,9 +112,9 @@ describe('a successful write lands everything together', () => {
     expect(finished.sessions.getById(persist(finished).sessionId)!.status).toBe('completed')
 
     const stopped = harness()
-    expect(
-      stopped.sessions.getById(persist(stopped, { cancelled: true }).sessionId)!.status,
-    ).toBe('cancelled')
+    expect(stopped.sessions.getById(persist(stopped, { cancelled: true }).sessionId)!.status).toBe(
+      'cancelled',
+    )
   })
 
   it('stores adaptations against the workout', () => {
@@ -132,9 +132,7 @@ describe('a successful write lands everything together', () => {
   it('keeps monotonic time exactly as given (spec §3.2, §18.3)', () => {
     const h = harness()
     const result = persist(h, {
-      adaptations: [
-        { decidedAtMonotonicMs: 123_456, boundary: 'round', inputs: {}, decision: {} },
-      ],
+      adaptations: [{ decidedAtMonotonicMs: 123_456, boundary: 'round', inputs: {}, decision: {} }],
     })
     expect(h.workouts.listAdaptations(result.generatedWorkoutId)[0]?.decidedAtMonotonicMs).toBe(
       123_456,
@@ -171,7 +169,12 @@ describe('a failure leaves nothing behind (spec §19.1)', () => {
     expect(() =>
       persist(h, {
         adaptations: [
-          { decidedAtMonotonicMs: 1, boundary: 'not-a-boundary' as never, inputs: {}, decision: {} },
+          {
+            decidedAtMonotonicMs: 1,
+            boundary: 'not-a-boundary' as never,
+            inputs: {},
+            decision: {},
+          },
         ],
       }),
     ).toThrow()
@@ -184,9 +187,7 @@ describe('a failure leaves nothing behind (spec §19.1)', () => {
     persist(h)
     expect(h.count('sessions')).toBe(1)
 
-    expect(() =>
-      persist(h, { cueResults: [cueRow({ outcome: 'nonsense' as never })] }),
-    ).toThrow()
+    expect(() => persist(h, { cueResults: [cueRow({ outcome: 'nonsense' as never })] })).toThrow()
 
     // The first workout is still whole.
     expect(h.count('sessions')).toBe(1)
@@ -195,9 +196,7 @@ describe('a failure leaves nothing behind (spec §19.1)', () => {
 
   it('can write again after a failure — the connection is not left in a transaction', () => {
     const h = harness()
-    expect(() =>
-      persist(h, { cueResults: [cueRow({ outcome: 'nonsense' as never })] }),
-    ).toThrow()
+    expect(() => persist(h, { cueResults: [cueRow({ outcome: 'nonsense' as never })] })).toThrow()
 
     expect(() => persist(h)).not.toThrow()
     expect(h.count('sessions')).toBe(1)

@@ -11,11 +11,7 @@
 import { generateWorkout } from '@domain/workout/generateWorkout'
 import { defaultRecipe, type WorkoutRecipe } from '@domain/workout/WorkoutRecipe'
 
-import {
-  INTRO_SEGMENT_GAP_MS,
-  INTRO_TAIL_PAD_MS,
-  planIntro,
-} from '../introPlan'
+import { INTRO_SEGMENT_GAP_MS, INTRO_TAIL_PAD_MS, planIntro } from '../introPlan'
 import { INTRO_SEGMENTS, type IntroSegment } from '../voiceAssets/introManifest'
 import { silenceFor } from '../voiceAssets/silenceManifest'
 
@@ -67,24 +63,17 @@ describe('planIntro', () => {
     for (const tier of ['beginner', 'intermediate', 'advanced'] as const) {
       for (const cadenceProfile of ['technical', 'steady', 'pressure', 'sprint'] as const) {
         const plan = planIntro(workoutFor({ tier, cadenceProfile }), FULL_FAKE)
-        expect(plan.segments.map((s) => s.id)).toContain(
-          `intro-program-${tier}-${cadenceProfile}`,
-        )
+        expect(plan.segments.map((s) => s.id)).toContain(`intro-program-${tier}-${cadenceProfile}`)
       }
     }
   })
 
   it('totals clips plus every planned pause plus the pre-bell beat', () => {
-    const plan = planIntro(
-      workoutFor(),
-      fakeManifest(['intro-hello', 'intro-letsgo'], 4_000),
-    )
+    const plan = planIntro(workoutFor(), fakeManifest(['intro-hello', 'intro-letsgo'], 4_000))
     // Program segment is absent from this manifest, so the plan
     // shrinks to hello → (breath) → send-off.
     expect(plan.segments.map((s) => s.id)).toEqual(['intro-hello', 'intro-letsgo'])
-    expect(plan.totalMs).toBe(
-      4_000 + INTRO_SEGMENT_GAP_MS + 4_000 + INTRO_TAIL_PAD_MS,
-    )
+    expect(plan.totalMs).toBe(4_000 + INTRO_SEGMENT_GAP_MS + 4_000 + INTRO_TAIL_PAD_MS)
   })
 
   it('returns an empty plan when nothing is rendered — the default countdown stands', () => {

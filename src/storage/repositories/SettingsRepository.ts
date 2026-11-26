@@ -43,7 +43,9 @@ export class SettingsRepository {
     try {
       const parsed: unknown = JSON.parse(raw)
       if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
-        throw new Error(`expected an object, got ${Array.isArray(parsed) ? 'array' : typeof parsed}`)
+        throw new Error(
+          `expected an object, got ${Array.isArray(parsed) ? 'array' : typeof parsed}`,
+        )
       }
       // Fallback first: a key added since this row was written keeps its
       // default rather than arriving undefined.

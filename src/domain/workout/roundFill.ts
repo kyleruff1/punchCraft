@@ -376,9 +376,7 @@ export function fillScoredRound(
   // Set Ceremonies: a SEPARATE rng stream so callout draws never disturb
   // the main stream's sequence (rng call order is the determinism
   // contract), keyed like the main one plus the round.
-  const calloutRng = makeRng(
-    `${recipe.seed}|${GENERATOR_VERSION}|callouts|r${order}`,
-  )
+  const calloutRng = makeRng(`${recipe.seed}|${GENERATOR_VERSION}|callouts|r${order}`)
   const calloutFor = (
     pattern: SetupPatternId,
     notation?: string,
@@ -480,10 +478,7 @@ export function fillScoredRound(
       const wantedReps = Math.round(desiredPunches / Math.max(1, pick.punchCount))
       const reps = Math.max(2, Math.min(12, wantedReps))
       const solvedGap = budgetBeats / reps - comboBeats
-      const gapBeats = Math.max(
-        MIN_GAP_BEATS,
-        Math.min(MAX_PHASE_GAP_BEATS, solvedGap * tighten),
-      )
+      const gapBeats = Math.max(MIN_GAP_BEATS, Math.min(MAX_PHASE_GAP_BEATS, solvedGap * tighten))
       // With the gap clamped, honour the TIME budget over the punch share:
       // duration is the D26 contract, punches are the recipe's wish.
       //
@@ -557,7 +552,14 @@ export function fillScoredRound(
       )
       const durationBeats = Math.min(Math.max(8, budgetBeats), MAX_BURST_DURATION_BEATS)
       const targetPunches = Math.max(MIN_BURST_TARGET_PUNCHES, Math.round(effTarget * 0.13))
-      const spec = volumeSpecFor(nextId(), 'volume-burst', base.notation, durationBeats, targetPunches, gap)
+      const spec = volumeSpecFor(
+        nextId(),
+        'volume-burst',
+        base.notation,
+        durationBeats,
+        targetPunches,
+        gap,
+      )
       spec.cadence = shiftCadence(recipe.cadenceProfile, 1)
       if (callout !== undefined) {
         spec.leadInBeats = msToBeats(reserveMs, bpm)
@@ -600,8 +602,10 @@ export function fillScoredRound(
 
     // 6 — movement / defense counters, frequency-gated.
     {
-      let defenseLeft = defenseMotifs.length > 0 ? Math.min(2, callsPerRound(recipe.defenseFrequency, rng)) : 0
-      let footworkLeft = footworkMotifs.length > 0 ? Math.min(1, callsPerRound(recipe.footworkFrequency, rng)) : 0
+      let defenseLeft =
+        defenseMotifs.length > 0 ? Math.min(2, callsPerRound(recipe.defenseFrequency, rng)) : 0
+      let footworkLeft =
+        footworkMotifs.length > 0 ? Math.min(1, callsPerRound(recipe.footworkFrequency, rng)) : 0
       const movementDeadline = span() + phaseBudget(PHASE_SHARE.movement)
       let guard = 0
       let movementAnnounced = false
@@ -638,10 +642,20 @@ export function fillScoredRound(
         MAX_BURST_DURATION_BEATS,
         Math.floor(msToBeats(flurrySeconds * 1000, bpm)),
       )
-      const loop = base.punchCount <= 2 ? base : ((stages.find((s) => s.punchCount <= 2) ?? base) as LadderStagePick)
+      const loop =
+        base.punchCount <= 2
+          ? base
+          : ((stages.find((s) => s.punchCount <= 2) ?? base) as LadderStagePick)
       const deficit = Math.max(0, target - roundPunchCount(layBlocks(specs, bpm)))
       const targetPunches = Math.max(MIN_BURST_TARGET_PUNCHES, Math.min(deficit, flurrySeconds * 2))
-      const spec = volumeSpecFor(nextId(), 'open-pressure', loop.notation, durationBeats, targetPunches, 0)
+      const spec = volumeSpecFor(
+        nextId(),
+        'open-pressure',
+        loop.notation,
+        durationBeats,
+        targetPunches,
+        0,
+      )
       spec.cadence = 'sprint'
       const callout = calloutFor('co-flurry')
       if (callout !== undefined) {
@@ -692,19 +706,20 @@ export function fillScoredRound(
   let topUp: () => void = () => undefined
   {
     const jabShareOf = (notation: string): number => {
-      const nums = notation.split('-').map((t) => Number.parseInt(t, 10)).filter((n) => n >= 1)
+      const nums = notation
+        .split('-')
+        .map((t) => Number.parseInt(t, 10))
+        .filter((n) => n >= 1)
       return nums.length === 0 ? 0 : nums.filter((n) => n === 1).length / nums.length
     }
     const repairPick =
       ladder === null
         ? null
-        : [...ladder.stages]
+        : ([...ladder.stages]
             .filter((s) => s.punchCount >= 2)
-            .sort((a, b) => jabShareOf(b.notation) - jabShareOf(a.notation))[0] ?? null
+            .sort((a, b) => jabShareOf(b.notation) - jabShareOf(a.notation))[0] ?? null)
     const closing =
-      (repairPick
-        ? comboSpecFor('probe-repair', repairPick.notation, 1, gap)
-        : undefined) ??
+      (repairPick ? comboSpecFor('probe-repair', repairPick.notation, 1, gap) : undefined) ??
       [...specs].reverse().find((s) => s.kind === 'repeated-combo') ??
       specs[specs.length - 1]
     if (repairPick) blockCount += 0 // probe spec above never enters the list
@@ -788,11 +803,7 @@ export function fillScoredRound(
         // coast" for single-strike or 1-2 sections where the boxer is
         // meant to deliver slow, heavy, deliberate shots.
         const isPowerNotation = /^(1b?|2b?|1-2|2-1)$/.test(notation)
-        const patternId = allJab
-          ? 'co-jab-volume'
-          : isPowerNotation
-            ? 'co-power-coast'
-            : 'co-coast'
+        const patternId = allJab ? 'co-jab-volume' : isPowerNotation ? 'co-power-coast' : 'co-coast'
         const callout = calloutFor(patternId, first.notation)
         if (callout !== undefined) {
           first.leadInBeats = (first.leadInBeats ?? 0) + msToBeats(callout.reserveMs, bpm)

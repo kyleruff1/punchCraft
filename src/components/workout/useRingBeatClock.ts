@@ -34,10 +34,7 @@ import {
 } from 'react-native-reanimated'
 
 import { logger, safe } from '@/diagnostics/logger'
-import {
-  sharedWorkElapsedMs,
-  type SharedWorkClock,
-} from '@domain/timing/SharedWorkClock'
+import { sharedWorkElapsedMs, type SharedWorkClock } from '@domain/timing/SharedWorkClock'
 import { beatOrdinalAtMsWorklet } from './ringBeatMath'
 
 /** One bar of the round's walk plan, in walk order. */

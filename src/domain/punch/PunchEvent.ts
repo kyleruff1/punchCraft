@@ -15,13 +15,7 @@ export type PunchHand = 'left' | 'right' | 'unknown'
 
 export type PunchType = 'straight' | 'hook' | 'uppercut' | 'power' | 'unknown'
 
-export type PunchVelocityUnit =
-  | 'unknown'
-  | 'tracker-unit'
-  | 'index'
-  | 'cm/s'
-  | 'm/s'
-  | 'mph'
+export type PunchVelocityUnit = 'unknown' | 'tracker-unit' | 'index' | 'cm/s' | 'm/s' | 'mph'
 
 export interface TrackerPunchEvent {
   id: string

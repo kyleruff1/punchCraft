@@ -36,7 +36,11 @@ describe.each(SEEDS)('D26 fill properties (seed %s)', (seed) => {
       const coverage = coverageAudit(round.blocks, round.workDurationMs)
       expect(coverage.ok).toBe(true)
 
-      const timelineRound = timeline.find((t) => t.workDurationMs === round.workDurationMs && t.roundIndex === workout.schedule.indexOf(round))
+      const timelineRound = timeline.find(
+        (t) =>
+          t.workDurationMs === round.workDurationMs &&
+          t.roundIndex === workout.schedule.indexOf(round),
+      )
       if (!timelineRound) continue
       const map = compileRoundRhythmMap(timelineRound, {
         cadence: workout.recipe.cadenceProfile,
@@ -177,7 +181,10 @@ describe.each(LOW_VARIETY)('with ceremonies priced in — %s', (_label, over) =>
       for (const round of scoredRounds(workout.schedule)) {
         const coverage = coverageAudit(round.blocks, round.workDurationMs)
         const at = `${workout.recipe.cadenceProfile}/${workout.recipe.durationMinutes}/${workout.recipe.seed}/${round.id}`
-        expect({ at, shortByMs: coverage.ok ? 0 : Math.round(round.workDurationMs - coverage.spanMs) }).toEqual({ at, shortByMs: 0 })
+        expect({
+          at,
+          shortByMs: coverage.ok ? 0 : Math.round(round.workDurationMs - coverage.spanMs),
+        }).toEqual({ at, shortByMs: 0 })
       }
     }
   })
@@ -208,7 +215,10 @@ describe.each(LOW_VARIETY)('with ceremonies priced in — %s', (_label, over) =>
           const runMs = last.startOffsetMs + last.durationMs - first.startOffsetMs
           if (runMs > MANDATORY_SAME_MOVE_MS) {
             const at = `${workout.recipe.cadenceProfile}/${workout.recipe.seed}/${round.id}/${first.id}`
-            expect({ at, announced: first.setupCallout !== undefined }).toEqual({ at, announced: true })
+            expect({ at, announced: first.setupCallout !== undefined }).toEqual({
+              at,
+              announced: true,
+            })
           }
           start = end
         }

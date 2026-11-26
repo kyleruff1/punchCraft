@@ -43,9 +43,7 @@ describe('round trip', () => {
     h.repo.write(SETTINGS_KEYS.voicePolicy, { mode: 'a', loud: false })
     h.repo.write(SETTINGS_KEYS.voicePolicy, { mode: 'b', loud: false })
 
-    const count = h.db.raw
-      .prepare('SELECT COUNT(*) AS n FROM app_settings')
-      .get() as { n: number }
+    const count = h.db.raw.prepare('SELECT COUNT(*) AS n FROM app_settings').get() as { n: number }
     expect(count.n).toBe(1)
     expect(h.repo.read(SETTINGS_KEYS.voicePolicy, DEFAULTS).mode).toBe('b')
   })

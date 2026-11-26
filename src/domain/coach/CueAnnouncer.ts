@@ -213,8 +213,7 @@ export class CueAnnouncer {
   private readonly performanceFor: (cue: CueInstance) => PerformanceState
   private readonly delivery: CueDelivery
   private readonly phraseShiftFor:
-    | ((combination: string, cadence: string) => number | undefined)
-    | undefined
+    ((combination: string, cadence: string) => number | undefined) | undefined
   private readonly comboAnnounceFor:
     | ((
         combination: string,
@@ -525,9 +524,11 @@ export class CueAnnouncer {
         // The bus's `audibleUntilMs` catches a late collision with a
         // call or refire that landed on the same beat — dropping the
         // instruction rather than letting two coach voices stack.
-        const insPayload = event.payload as
-          | { text?: string; module?: number; durationMs?: number }
-          | null
+        const insPayload = event.payload as {
+          text?: string
+          module?: number
+          durationMs?: number
+        } | null
         if (
           !insPayload ||
           typeof insPayload.module !== 'number' ||
@@ -539,10 +540,7 @@ export class CueAnnouncer {
         // aside is a coach line, not a call. `standard` mode plays them;
         // `minimal` opts out.
         if (!this.speakable('punch-command')) return
-        if (
-          typeof this.output.audibleUntilMs === 'function' &&
-          this.output.audibleUntilMs() > 0
-        )
+        if (typeof this.output.audibleUntilMs === 'function' && this.output.audibleUntilMs() > 0)
           return
         this.armFor(event.cueId, 'instruction')
         this.output.playInstruction?.({
@@ -572,10 +570,7 @@ export class CueAnnouncer {
         // still be audible. Skipping a filler that would collide is
         // better than doubling coach voices — the next filler in
         // rotation still fires.
-        if (
-          typeof this.output.audibleUntilMs === 'function' &&
-          this.output.audibleUntilMs() > 0
-        )
+        if (typeof this.output.audibleUntilMs === 'function' && this.output.audibleUntilMs() > 0)
           return
         this.armFor(event.cueId, 'encouragement')
         this.output.playAsset(payload.asset)
@@ -1147,7 +1142,11 @@ export class CueAnnouncer {
     // Defense and footwork are announced under their own category, so a
     // policy that speaks punches but not footwork is honoured per token.
     const category =
-      token.kind === 'defense' ? 'defense' : token.kind === 'footwork' ? 'footwork' : 'punch-command'
+      token.kind === 'defense'
+        ? 'defense'
+        : token.kind === 'footwork'
+          ? 'footwork'
+          : 'punch-command'
     if (token.kind === 'coach') return
     if (!shouldSpeak(this.policy, category, false)) return
 

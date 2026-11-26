@@ -16,7 +16,9 @@ import {
 import type { PunchEventSourceCapability } from '../../punch/PunchEventSource'
 import type { TrackerPunchEvent } from '../../punch/PunchEvent'
 
-const capability = (over: Partial<PunchEventSourceCapability> = {}): PunchEventSourceCapability => ({
+const capability = (
+  over: Partial<PunchEventSourceCapability> = {},
+): PunchEventSourceCapability => ({
   hand: true,
   timestamp: true,
   punchType: 'none',
@@ -148,7 +150,9 @@ describe('the two input shapes agree for equivalent sources', () => {
       capability: capability({ punchType: 'none', timestamp: true, velocity: true }),
     })
     const observed = resolveCapabilityTier({
-      observedEvents: [event({ trackerTimestampMs: 1, velocityRaw: 9, velocityUnit: 'tracker-unit' })],
+      observedEvents: [
+        event({ trackerTimestampMs: 1, velocityRaw: 9, velocityUnit: 'tracker-unit' }),
+      ],
     })
     expect(observed).toEqual(declared)
   })

@@ -89,8 +89,7 @@ export function Wordmark({
 }: WordmarkProps): React.JSX.Element {
   const height = SIZE_HEIGHTS[size]
   const width = height * WORDMARK_ASPECT
-  const source =
-    app === 'punchCraft' && variant === 'isolated' ? PUNCHCRAFT_ISOLATED : SOURCES[app]
+  const source = app === 'punchCraft' && variant === 'isolated' ? PUNCHCRAFT_ISOLATED : SOURCES[app]
   return (
     <View style={[styles.wrap, style]} testID={testID ?? `wordmark-${app}`}>
       <Image

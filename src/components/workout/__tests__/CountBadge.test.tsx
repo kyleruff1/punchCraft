@@ -43,9 +43,7 @@ afterEach(() => {
 })
 
 function textOf(node: ReactTestInstance): string {
-  return node.children
-    .map((child) => (typeof child === 'string' ? child : textOf(child)))
-    .join('')
+  return node.children.map((child) => (typeof child === 'string' ? child : textOf(child))).join('')
 }
 
 /** Every colour value appearing anywhere in the rendered tree's styles. */
@@ -303,9 +301,7 @@ describe('sizing and shape', () => {
   it('tags the circle with the outcome so the state is queryable', () => {
     for (const { outcome, actual, target } of CASES) {
       const tree = render(<CountBadge actual={actual} target={target} />)
-      expect(() =>
-        tree.root.findByProps({ testID: `count-badge-circle-${outcome}` }),
-      ).not.toThrow()
+      expect(() => tree.root.findByProps({ testID: `count-badge-circle-${outcome}` })).not.toThrow()
       expect(gradeRound(actual, target).outcome).toBe(outcome)
     }
   })

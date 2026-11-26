@@ -42,13 +42,14 @@ describe('generateWorkout — validity across the recipe matrix', () => {
     }
   }
 
-  it.each(cases.map((r) => [`${r.durationMinutes}m/${r.focus}/${r.cadenceProfile}/${r.bias}`, r] as const))(
-    'produces a structurally valid workout for %s',
-    (_label, r) => {
-      const workout = generateWorkout(r)
-      expect(validateGeneratedWorkout(workout)).toEqual([])
-    },
-  )
+  it.each(
+    cases.map(
+      (r) => [`${r.durationMinutes}m/${r.focus}/${r.cadenceProfile}/${r.bias}`, r] as const,
+    ),
+  )('produces a structurally valid workout for %s', (_label, r) => {
+    const workout = generateWorkout(r)
+    expect(validateGeneratedWorkout(workout)).toEqual([])
+  })
 
   it('is valid for every goal tier', () => {
     for (const tier of ['technique', 'steady', 'hard', 'high-volume', 'extreme'] as const) {
@@ -87,7 +88,9 @@ describe('generateWorkout — targets and structure', () => {
   })
 
   it('escalates: later scored rounds reach longer combinations than the first', () => {
-    const workout = generateWorkout(recipe({ durationMinutes: 40, comboComplexity: 5, maximumComboPunches: 5 }))
+    const workout = generateWorkout(
+      recipe({ durationMinutes: 40, comboComplexity: 5, maximumComboPunches: 5 }),
+    )
     const scored = scoredRounds(workout.schedule)
     const maxLen = (round: (typeof scored)[number]) =>
       Math.max(0, ...round.blocks.map((b) => punchTokens(b.tokens).length))
@@ -175,7 +178,11 @@ describe('generateWorkout — distribution', () => {
 describe('generateWorkout — warnings', () => {
   it('warns and adds volume blocks for an extreme goal at high cadence', () => {
     const workout = generateWorkout(
-      recipe({ durationMinutes: 60, totalPunchGoal: GOAL_TIERS.extreme[60], cadenceProfile: 'sprint' }),
+      recipe({
+        durationMinutes: 60,
+        totalPunchGoal: GOAL_TIERS.extreme[60],
+        cadenceProfile: 'sprint',
+      }),
     )
     expect(validateGeneratedWorkout(workout)).toEqual([])
     // D26: the clock is filled first; an unreachable goal surfaces as drift.
@@ -187,7 +194,9 @@ describe('generateWorkout — warnings', () => {
   })
 
   it('has no warnings for a comfortable steady workout', () => {
-    const workout = generateWorkout(recipe({ durationMinutes: 20, totalPunchGoal: GOAL_TIERS.technique[20] }))
+    const workout = generateWorkout(
+      recipe({ durationMinutes: 20, totalPunchGoal: GOAL_TIERS.technique[20] }),
+    )
     expect(workout.warnings).toEqual([])
   })
 })

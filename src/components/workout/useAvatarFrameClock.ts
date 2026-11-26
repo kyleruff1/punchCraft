@@ -189,7 +189,20 @@ export function useAvatarFrameClock(
     // screen's store churn. A new adoption is a new `shownKey`; a
     // re-render is not.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shownKey, shown?.windowMs, shown?.isLast, shown?.pump, anchor, active, startedAtTick, windowMs, isLast, pump, lastStep, nowFrameTimestampMs])
+  }, [
+    shownKey,
+    shown?.windowMs,
+    shown?.isLast,
+    shown?.pump,
+    anchor,
+    active,
+    startedAtTick,
+    windowMs,
+    isLast,
+    pump,
+    lastStep,
+    nowFrameTimestampMs,
+  ])
 
   const cb = useFrameCallback(({ timestamp }) => {
     'worklet'

@@ -95,8 +95,20 @@ describe('PickerRow', () => {
   it('with a PickerProvider, opening a second picker closes the first', () => {
     const tree = render(
       <PickerProvider>
-        <PickerRow id="first" label="First" value="a" options={OPTIONS} onChange={() => undefined} />
-        <PickerRow id="second" label="Second" value="a" options={OPTIONS} onChange={() => undefined} />
+        <PickerRow
+          id="first"
+          label="First"
+          value="a"
+          options={OPTIONS}
+          onChange={() => undefined}
+        />
+        <PickerRow
+          id="second"
+          label="Second"
+          value="a"
+          options={OPTIONS}
+          onChange={() => undefined}
+        />
       </PickerProvider>,
     )
     press(tree, 'picker-first-toggle')

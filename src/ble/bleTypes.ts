@@ -150,7 +150,13 @@ export interface SpikeReport {
       uuid: string
       characteristics: Array<{
         uuid: string
-        properties: { read: boolean; write: boolean; writeWithoutResponse: boolean; notify: boolean; indicate: boolean }
+        properties: {
+          read: boolean
+          write: boolean
+          writeWithoutResponse: boolean
+          notify: boolean
+          indicate: boolean
+        }
       }>
     }>
   }
@@ -161,7 +167,12 @@ export interface SpikeReport {
     subscriptions: SubscriptionResult[]
     /** Every raw frame the spike captured, in receive order. Truncated to
      * the first N to keep the report copy-pasteable. */
-    frames?: Array<{ serviceUuid: string; characteristicUuid: string; monotonicTimeMs: number; valueHex: string }>
+    frames?: Array<{
+      serviceUuid: string
+      characteristicUuid: string
+      monotonicTimeMs: number
+      valueHex: string
+    }>
     errorMessage?: string
   }
   startedAtIso: string

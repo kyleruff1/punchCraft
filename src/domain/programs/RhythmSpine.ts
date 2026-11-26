@@ -31,10 +31,7 @@ import type { PunchHand, PunchType } from '../punch/PunchEvent'
 import { DEFAULT_REP_ID, strikeIdFor } from '../strikes/strikeCatalog'
 import { findPhraseTiming, type PhraseTimingEntry } from './phraseTimingManifest'
 import type { CoachAssetResolver, CompiledCueTimeline } from './compileCue'
-import {
-  NULL_COACH_ASSET_RESOLVER,
-  compileCueFromInstance,
-} from './programCueBridge'
+import { NULL_COACH_ASSET_RESOLVER, compileCueFromInstance } from './programCueBridge'
 /**
  * The rail's fixed offset between a word's audible end and the ring
  * lighting for that token. Kept as one constant so the spine, the
@@ -214,8 +211,7 @@ export function beatsFor(cue: CueInstance): TokenBeat[] {
   // preview.
   const onScreenMs = Math.max(0, cue.scheduledEndMs - cue.scheduledStartMs)
   const punchTokenCount = cue.tokens.filter((t) => t.kind === 'punch').length
-  const avatarFrameMs =
-    punchTokenCount > 0 ? onScreenMs / (2 * punchTokenCount) : 0
+  const avatarFrameMs = punchTokenCount > 0 ? onScreenMs / (2 * punchTokenCount) : 0
   for (let i = 0; i < cue.tokens.length; i += 1) {
     const off = cue.tokenOffsetsMs[i]
     if (off === undefined) continue
@@ -300,12 +296,7 @@ export function pulsesFor(cue: CueInstance): TokenBeat[] {
         atMs,
         audioAtMs: atMs,
         audioEndMs: atMs,
-        hand:
-          token?.kind === 'punch'
-            ? token.number % 2 === 1
-              ? 'left'
-              : 'right'
-            : 'unknown',
+        hand: token?.kind === 'punch' ? (token.number % 2 === 1 ? 'left' : 'right') : 'unknown',
         avatarFrameMs: token?.kind === 'punch' ? avatarFrameMs : 0,
       })
     }
