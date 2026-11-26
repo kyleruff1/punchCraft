@@ -2,10 +2,10 @@
   "project": {
     "id": "PVT_kwHOAvpEDc4BhJtG",
     "number": 5,
-    "title": "punchCraft Puncheokie",
+    "title": "punchCraft punchCraft workouts",
     "url": "https://github.com/users/kyleruff1/projects/5",
     "owner": "@me",
-    "repo": "kyleruff1/punchCraft-Puncheokie"
+    "repo": "kyleruff1/punchCraft-punchCraft workouts"
   },
   "fields": {
     "Phase": {
@@ -61,7 +61,7 @@
         "punchCraft": {
           "id": "988c21ce"
         },
-        "Puncheokie": {
+        "punchCraft workouts": {
           "id": "925f42ad"
         },
         "Spotify": {

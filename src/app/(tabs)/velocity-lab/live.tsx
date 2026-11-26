@@ -34,6 +34,7 @@ import {
   startPunchStream as startPunchStreamModule,
   type PunchStreamController,
 } from '@protocol/PunchStream'
+import { getTrackerKeepaliveSource } from '@protocol/trackerKeepalive'
 import type { BleCaptureService } from '@capture/BleCaptureService'
 import { getCaptureService } from '@capture/getCaptureService'
 import { useCaptureSession } from '@capture/useCaptureSession'
@@ -114,11 +115,27 @@ function startPunchStream(args: StartPunchStreamArgs): StreamController {
     lastReportedInitErrors = errors.length
   }
 
+  // The app-wide keepalive initialises a known glove the moment it connects
+  // and keeps a stream on it for the app's life. When it has — plan finished,
+  // no errors — this screen only listens: running the plan a second time
+  // would re-send the clock sync, which re-bases the tracker's timestamps
+  // under the stream that is already decoding them. Any doubt (keepalive
+  // not running, still starting, init errors, a glove it does not own) and
+  // the full plan runs here exactly as it always has.
+  const alreadyInitialized = getTrackerKeepaliveSource()?.hasInitialized(deviceId) ?? false
+  if (alreadyInitialized) {
+    onDecodeMeta({
+      kind: 'info',
+      text: 'glove already initialised by the app; listening only (no init writes sent)',
+    })
+  }
+
   startPunchStreamModule({
     facade,
     deviceId,
     adapter,
     hand,
+    initialize: !alreadyInitialized,
     // Raw frames are persisted by the TRANSPORT before they ever reach
     // PunchStream (BleManagerFacade.setFrameSink), so only decoded events are
     // this screen's concern. There is deliberately no `sink` option here —

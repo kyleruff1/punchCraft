@@ -81,8 +81,26 @@ const PHASE_SHARE = {
   pressure: 0.14,
 } as const
 
-/** Repair-pass bound: extending pressure reps must terminate loudly. */
-const MAX_REPAIR_PASSES = 24
+/**
+ * Backstop for the repair loops, far past anything a round can hold. They
+ * are bounded by PROGRESS — every pass must move the span toward the bell,
+ * and the loop ends at the bell margin or when the next block will not fit
+ * — so this is never the reason one stops.
+ *
+ * It used to be: 24 two-rep passes, then 6 single reps, counted. At sprint
+ * tempo a pass adds well under a second, so around 250 punches a round the
+ * count ran out 5-7 s before the bell (generator 1.3.0 pinned 6 of 144
+ * sampled sprint cells short). A bound that is a number of passes is only a
+ * bound on time at one tempo.
+ */
+const REPAIR_HARD_CAP = 2_000
+
+/**
+ * The widest gap a repeat phase may leave between reps, in beats. Past this
+ * the stretch between calls stops reading as a rhythm and starts reading as
+ * dead air.
+ */
+const MAX_PHASE_GAP_BEATS = 5
 
 /**
  * How close to the bell the repair pass fills. Was 4s; the switch-test
@@ -185,6 +203,56 @@ export function volumeSpecFor(
   }
   if (offsets) spec.offsets = offsets
   return spec
+}
+
+/**
+ * Take time back from the END of a round until it fits `workMs` again.
+ *
+ * Used when something earlier in the round has claimed time after the round
+ * was already filled to its bell — the "settle in" announcement. Mutates
+ * `specs`; never touches a block before `floorIndex` and never removes the
+ * block AT it (that is the one being announced).
+ *
+ * Two rules, in this order, because the back of a round is two different
+ * things:
+ *
+ * 1. **A block worth no more than what is owed goes whole.** That is the
+ *    repair tail — two-rep filler — and removing filler is exact.
+ * 2. **A block worth more than what is owed gives up reps instead.** That is
+ *    an authored phase. Dropping it whole is how a 6.6 s announcement used
+ *    to cost a 25 s pressure block. If the last block has no reps to give
+ *    (a flurry, a single rep), the nearest repeated block before it does, so
+ *    the round keeps its finale; only when nothing can give a rep is the
+ *    last block dropped after all.
+ *
+ * The result fits, and is within one rep of `workMs` — the caller tops up.
+ */
+export function trimToFit(
+  specs: BlockSpec[],
+  workMs: number,
+  bpm: number,
+  floorIndex: number,
+): void {
+  const spanOf = (list: readonly BlockSpec[]): number => blocksSpanMs(layBlocks(list, bpm))
+  // Every pass removes a rep or a block, so this ends; the cap is a backstop.
+  for (let guard = 0; guard < REPAIR_HARD_CAP; guard++) {
+    const owedMs = spanOf(specs) - workMs
+    if (owedMs <= 0) return
+    const lastIndex = specs.length - 1
+    const droppable = lastIndex > floorIndex
+    if (droppable && spanOf(specs) - spanOf(specs.slice(0, -1)) <= owedMs) {
+      specs.pop()
+      continue
+    }
+    let donor: BlockSpec | undefined
+    for (let i = lastIndex; i >= floorIndex && donor === undefined; i--) {
+      const spec = specs[i] as BlockSpec
+      if (spec.kind === 'repeated-combo' && (spec.repeat ?? 1) > 1) donor = spec
+    }
+    if (donor !== undefined) donor.repeat = (donor.repeat ?? 1) - 1
+    else if (droppable) specs.pop()
+    else return
+  }
 }
 
 /** Span a spec list would occupy once laid — the budget guard. */
@@ -412,11 +480,31 @@ export function fillScoredRound(
       const wantedReps = Math.round(desiredPunches / Math.max(1, pick.punchCount))
       const reps = Math.max(2, Math.min(12, wantedReps))
       const solvedGap = budgetBeats / reps - comboBeats
-      const gapBeats = Math.max(MIN_GAP_BEATS, Math.min(5, solvedGap * tighten))
+      const gapBeats = Math.max(
+        MIN_GAP_BEATS,
+        Math.min(MAX_PHASE_GAP_BEATS, solvedGap * tighten),
+      )
       // With the gap clamped, honour the TIME budget over the punch share:
       // duration is the D26 contract, punches are the recipe's wish.
+      //
+      // That has to hold in BOTH directions. Clamped at the floor, the wanted
+      // reps overrun the budget and `fitReps` trims them. Clamped at the
+      // CEILING — a punch target so low that the reps it asks for would sit
+      // more than five beats apart — the wanted reps fall SHORT of the
+      // budget, and taking the smaller of the two kept them short: the phase
+      // spanned a fraction of its share, every phase did the same, and the
+      // repair pass could not make up the difference. A 60-minute workout at
+      // a 900 goal ran out of blocks 41-61 s before every bell (605 s of a
+      // 2 880 s work block with the coach silent, measured). At the ceiling
+      // the time budget sets the reps.
       const fitReps = Math.max(2, Math.min(12, Math.floor(budgetBeats / (comboBeats + gapBeats))))
-      const spec = comboSpecFor(nextId(), pick.notation, Math.min(reps, fitReps), gapBeats)
+      const gapHitCeiling = solvedGap > MAX_PHASE_GAP_BEATS
+      const spec = comboSpecFor(
+        nextId(),
+        pick.notation,
+        gapHitCeiling ? fitReps : Math.min(reps, fitReps),
+        gapBeats,
+      )
       if (cadence !== undefined) spec.cadence = cadence
       if (callout !== undefined) {
         spec.leadInBeats = msToBeats(reserveMs, bpm)
@@ -597,6 +685,11 @@ export function fillScoredRound(
   // ---- coverage repair (D26): extend the closing pattern until the blocks
   // span the bell. Bounded; a round that cannot be filled is a content bug
   // the property tests surface, not a silent tail.
+  //
+  // `topUp` is declared out here because the announcement pass below needs
+  // it too: anything that takes time out of a filled round has to be able to
+  // put the last few seconds back.
+  let topUp: () => void = () => undefined
   {
     const jabShareOf = (notation: string): number => {
       const nums = notation.split('-').map((t) => Number.parseInt(t, 10)).filter((n) => n >= 1)
@@ -615,53 +708,65 @@ export function fillScoredRound(
       [...specs].reverse().find((s) => s.kind === 'repeated-combo') ??
       specs[specs.length - 1]
     if (repairPick) blockCount += 0 // probe spec above never enters the list
-    let guard = 0
-    while (closing && workMs - span() > REPAIR_BELL_MARGIN_MS && guard++ < MAX_REPAIR_PASSES) {
+    // One repair block, or the reason to stop: it would overrun the bell, or
+    // it would not move the span at all (which would otherwise spin to the
+    // backstop). Either way the id it took is handed back.
+    const extend = (reps: number): boolean => {
+      if (!closing) return false
       const spec = comboSpecFor(
         nextId(),
         closing.notation,
-        2,
+        reps,
         Math.max(MIN_GAP_BEATS, gap * 0.8),
         closing.offsets,
       )
-      if (spanWith(specs, spec, bpm) > workMs) {
+      const next = spanWith(specs, spec, bpm)
+      if (next > workMs || next <= span()) {
         blockCount -= 1
-        break
+        return false
       }
       specs.push(spec)
+      return true
+    }
+    let guard = 0
+    while (workMs - span() > REPAIR_BELL_MARGIN_MS && guard++ < REPAIR_HARD_CAP) {
+      if (!extend(2)) break
     }
 
     // Single-rep top-off: the 2-rep repair blocks are ~3.5-5s each, so
     // block granularity — not the margin — was leaving ~4s of dead air
     // before the ding (switch-test lab). One-rep closers fill the last
     // gap almost to the margin, one breath at a time.
-    let topOff = 0
-    while (closing && workMs - span() > REPAIR_BELL_MARGIN_MS && topOff++ < 6) {
-      const spec = comboSpecFor(
-        nextId(),
-        closing.notation,
-        1,
-        Math.max(MIN_GAP_BEATS, gap * 0.8),
-        closing.offsets,
-      )
-      if (spanWith(specs, spec, bpm) > workMs) {
-        blockCount -= 1
-        break
+    topUp = (): void => {
+      let topOff = 0
+      while (workMs - span() > REPAIR_BELL_MARGIN_MS && topOff++ < REPAIR_HARD_CAP) {
+        if (!extend(1)) break
       }
-      specs.push(spec)
     }
+    topUp()
   }
 
   // ---- mandatory same-move announcement (Set Ceremonies, Kyle's rule):
   // any contiguous run of one notation longer than a minute MUST be
   // announced — "settle in" — so the athlete knows the stretch is
   // deliberate. The repair tail is the usual culprit (it can extend the
-  // closing pattern 60-90s). If the added reservation pushes the span
-  // past the bell, trailing repair reps are dropped to pay for it.
+  // closing pattern 60-90s).
+  //
+  // The reservation is time the round does not have — it was filled to the
+  // bell before this pass ran — so it is paid for from the back of the
+  // round, a REP at a time, and the last seconds are then topped up again.
+  // It used to be paid for by dropping whole trailing blocks, with no
+  // top-up: a 6.6 s reservation could cost a 25 s pressure block, and the
+  // round ended 15-25 s before its bell (generator 1.3.0 and earlier).
   if (opts.setupCallouts) {
-    const laid = layBlocks(specs, bpm)
+    const fitToBell = (announcedAt: number): void => {
+      trimToFit(specs, workMs, bpm, announcedAt)
+    }
     let runStart = 0
     while (runStart < specs.length) {
+      // Laid afresh for every run: an earlier announcement has shifted,
+      // trimmed and extended everything after it.
+      const laid = layBlocks(specs, bpm)
       const first = specs[runStart] as BlockSpec
       let runEnd = runStart + 1
       while (
@@ -692,14 +797,12 @@ export function fillScoredRound(
         if (callout !== undefined) {
           first.leadInBeats = (first.leadInBeats ?? 0) + msToBeats(callout.reserveMs, bpm)
           first.setupCallout = callout
-          let guard = 0
-          while (
-            blocksSpanMs(layBlocks(specs, bpm)) > workMs &&
-            specs.length - 1 > runStart &&
-            guard++ < MAX_REPAIR_PASSES
-          ) {
-            specs.pop()
-          }
+          fitToBell(runStart)
+          // Trimming lands within one rep of the bell, and a slow rep is
+          // several seconds. Close the last of it the way the repair pass
+          // does. Anything appended here is visited by the iterations that
+          // follow, so it cannot become an unannounced stretch of its own.
+          topUp()
         }
       }
       runStart = runEnd

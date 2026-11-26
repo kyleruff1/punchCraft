@@ -46,10 +46,19 @@ function driveRound(
   const clock = createFakeClock()
   const recorded: Recorded[] = []
 
+  // Every `atMs` the announcer hands the port is a MONOTONIC deadline — that
+  // is the port's contract — while the map and the cues are written on the
+  // round's work clock. This drive moves the two in lockstep, so one
+  // subtraction puts a recording on the work clock. It used to be skipped,
+  // which only worked while the fake clock happened to start at zero.
+  const roundStartedAtMs = clock.now()
+  const onWorkClock = (atMs: number | undefined): number =>
+    (atMs ?? clock.now()) - roundStartedAtMs
+
   const output: VoiceOutputPort = {
     playAsset: (asset, atMs) => {
       if (asset === 'tone-ready') {
-        recorded.push({ kind: 'tone', at: atMs ?? clock.now(), detail: 'ready' })
+        recorded.push({ kind: 'tone', at: onWorkClock(atMs), detail: 'ready' })
       }
     },
     cancel: () => undefined,
@@ -57,10 +66,10 @@ function driveRound(
     tone: () => undefined,
     setVolumes: () => undefined,
     playPhrase: (assets, startAt) => {
-      recorded.push({ kind: 'per-word', at: startAt ?? clock.now(), detail: assets.join('+') })
+      recorded.push({ kind: 'per-word', at: onWorkClock(startAt), detail: assets.join('+') })
     },
     playCombination: (combination, _cadence, atMs) => {
-      recorded.push({ kind: 'phrase', at: atMs ?? clock.now(), detail: combination })
+      recorded.push({ kind: 'phrase', at: onWorkClock(atMs), detail: combination })
       return true
     },
     combinationDurationMs: (combination) => durationFor(combination),

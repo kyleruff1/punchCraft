@@ -31,7 +31,7 @@ const repBlock = ({ arm, rates = 'x', runId = 1, rep = 0, tracks, transitions, s
       .filter(Boolean)
       .join('|')
   return [
-    `08-31 12:00:00.000 I/ReactNativeJS( 100): '[INFO] puncheokie.plruler.rep', 'playlist rep timing', { runId: ${runId},`,
+    `08-31 12:00:00.000 I/ReactNativeJS( 100): '[INFO] workout.plruler.rep', 'playlist rep timing', { runId: ${runId},`,
     `08-31 12:00:00.000 I/ReactNativeJS( 100):   arm: '${arm}',`,
     `08-31 12:00:00.000 I/ReactNativeJS( 100):   rates: '${rates}',`,
     `08-31 12:00:00.000 I/ReactNativeJS( 100):   rep: ${rep},`,

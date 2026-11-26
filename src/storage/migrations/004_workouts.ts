@@ -1,5 +1,5 @@
 /**
- * Migration 004 — the Puncheokie workout tables (#176 / M31-08, spec §17.1 as
+ * Migration 004 — the punchCraft workouts workout tables (#176 / M31-08, spec §17.1 as
  * amended, doc §16/§22/§24).
  *
  * What this adds:
@@ -30,7 +30,7 @@
  * **The v1.0 `punch_programs`, `program_rounds` and `punch_cues` tables are
  * superseded and are deliberately never created** (spec §17.1 note, C5/D8).
  * Editable programs were retired in favour of recipe + seeded generator, and a
- * Puncheokie session points at a generated workout instead.
+ * punchCraft workouts session points at a generated workout instead.
  *
  * Foreign keys are declared throughout (`PRAGMA foreign_keys = ON` is set by
  * `database.ts`), with two deliberate delete policies:

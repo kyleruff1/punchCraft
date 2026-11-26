@@ -2,9 +2,10 @@
  * Three-Round Fundamentals — click-track edition (MVP v2 Part B, GH #305, Kyle 2026-08-31).
  *
  * Rewritten to the 4-slot bar format from `CLICK_MAPS['three-round-fundamentals']` — the
- * plan's B2-MAPS table, verbatim. The walk is the product: coach voice is
- * capped at 'minimal' (bells, stance, final countdown survive; every
- * punch call belongs to the visuals), the metronome is ON and AUDIBLE,
+ * plan's B2-MAPS table, verbatim. The walk is the product: this is a
+ * click-script workout (`coachPath`), so the announcer keeps to bells,
+ * stance and the final countdown while the authored click script speaks
+ * the punch calls; the metronome is ON and AUDIBLE,
  * and each round's rows sum exactly to its measure budget (the
  * denominator rule — see clickMaps.ts, self-checked in tests).
  *
@@ -61,15 +62,16 @@ const expectedTechniqueDistribution = Object.fromEntries(
 
 export const threeRoundFundamentals: GeneratedWorkout = {
   id: 'three-round-fundamentals',
+  // A click-track set: its authored lead-ins and per-bar calls are the
+  // punch calls (see `CoachPath`). How much of that the athlete hears is
+  // their own Voice Coach mode, not something this workout decides.
+  coachPath: 'click-script',
   recipe: {
     ...defaultRecipe(),
     durationMinutes: 20,
     totalPunchGoal: totalGoal,
     defaultStance: 'orthodox',
     cadenceProfile: 'steady',
-    // MVP v2: the click IS the audio. Minimal caps the coach at bells +
-    // stance + countdown; punch calls belong to the visuals.
-    voiceMode: 'minimal',
     // Loop-asset contract (metronomeAssets.ts): every wav is 1000ms = one
     // 60-BPM base pulse; TEMPO SCALES BY DIVISION, never baseBpm. Getting
     // this wrong told the transport 120 BPM against a 1s loop — a

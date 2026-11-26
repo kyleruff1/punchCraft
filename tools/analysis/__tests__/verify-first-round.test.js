@@ -51,19 +51,19 @@ const COMBO_EXPECTATION = {
 /** t0 for these fixtures: metronome 'loop started' at 13:49:47.342. */
 const T0_LINE = line(
   '13:49:47.342',
-  "'[INFO] puncheokie.metronome', 'loop started', { bpm: 240 }",
+  "'[INFO] workout.metronome', 'loop started', { bpm: 240 }",
 )
 
 describe('parseLogcat — defects that were silent', () => {
   it('parses voice.playFailed rather than swallowing it in the voice.play branch', () => {
-    // 'puncheokie.voice.playFailed' CONTAINS 'puncheokie.voice.play'. Tested
+    // 'workout.voice.playFailed' CONTAINS 'workout.voice.play'. Tested
     // in the wrong order it matches the play branch, satisfies neither inner
     // arm, and hits that branch's unconditional `continue` — parsed to
     // nothing at all, with no error anywhere.
     const text = [
       warn(
         '13:49:50.100',
-        "'[WARN] puncheokie.voice.playFailed', 'clip failed to play', { asset: '1',",
+        "'[WARN] workout.voice.playFailed', 'clip failed to play', { asset: '1',",
       ),
       warn('13:49:50.100', "  text: 'One' }"),
       '',
@@ -81,7 +81,7 @@ describe('parseLogcat — defects that were silent', () => {
     // in progress without pushing it, losing one event per logcat.
     const text = [
       T0_LINE,
-      line('13:49:48.000', "'[INFO] puncheokie.voice.play', 'clip playing', { asset: '1',"),
+      line('13:49:48.000', "'[INFO] workout.voice.play', 'clip playing', { asset: '1',"),
       line('13:49:48.000', '  priority: 2 }'),
       '', // trailing newline
     ].join('\n')
@@ -94,7 +94,7 @@ describe('parseLogcat — defects that were silent', () => {
     const text = [
       line(
         '13:49:19.038',
-        "'[INFO] puncheokie.slotDispatcher.armed', 'armed', { workout: 'speed-combos',",
+        "'[INFO] workout.slotDispatcher.armed', 'armed', { workout: 'speed-combos',",
       ),
       line('13:49:19.038', '  totalCompiledSlots: 98,'),
       line('13:49:19.038', '  enqueuedSlots: 23,'),
@@ -114,7 +114,7 @@ describe('parseLogcat — defects that were silent', () => {
 
   it('tags the bell ADDITIVELY — it is still a voice.clip', () => {
     const text = [
-      line('13:49:47.000', "'[INFO] puncheokie.voice.play', 'clip playing', { asset: 'bell' }"),
+      line('13:49:47.000', "'[INFO] workout.voice.play', 'clip playing', { asset: 'bell' }"),
       '',
     ].join('\n')
     const events = parseLogcat(text)
@@ -126,7 +126,7 @@ describe('parseLogcat — defects that were silent', () => {
     const text = [
       line(
         '13:49:47.342',
-        "'[INFO] puncheokie.round.boundary', 'session phase boundary', { transition: 'rest-entered',",
+        "'[INFO] workout.round.boundary', 'session phase boundary', { transition: 'rest-entered',",
       ),
       line('13:49:47.342', '  roundIndex: 0,'),
       line('13:49:47.342', '  workElapsedMs: 240000 }'),
@@ -143,7 +143,7 @@ describe('verify — a drifted event is labelled by the SIGN of its drift', () =
     [
       line(
         time,
-        "'[INFO] puncheokie.voice.play', 'combo-announce playing', { kind: 'combo-announce',",
+        "'[INFO] workout.voice.play', 'combo-announce playing', { kind: 'combo-announce',",
       ),
       line(time, `  text: '${COMBO_EXPECTATION.text}',`),
       line(time, '  durationMs: 900 }'),
@@ -191,7 +191,7 @@ describe('verify — deferral join', () => {
     [
       line(
         time,
-        `'[INFO] puncheokie.slotDispatcher.deferred', 'coach lane busy', { slotId: '${slotId}',`,
+        `'[INFO] workout.slotDispatcher.deferred', 'coach lane busy', { slotId: '${slotId}',`,
       ),
       line(time, '  audibleUntilMs: 1200 }'),
     ].join('\n')
@@ -233,7 +233,7 @@ describe('verify — provenance gating', () => {
     [
       line(
         '13:49:19.038',
-        "'[INFO] puncheokie.slotDispatcher.armed', 'armed', { workout: 'speed-combos',",
+        "'[INFO] workout.slotDispatcher.armed', 'armed', { workout: 'speed-combos',",
       ),
       line('13:49:19.038', `  timelineHash: '${hash}' }`),
     ].join('\n')
@@ -265,7 +265,7 @@ describe('verify — provenance gating', () => {
       T0_LINE,
       line(
         '13:49:52.903',
-        `'[INFO] puncheokie.slotDispatcher.deferred', 'coach lane busy', { slotId: '${COMBO_EXPECTATION.slotId}',`,
+        `'[INFO] workout.slotDispatcher.deferred', 'coach lane busy', { slotId: '${COMBO_EXPECTATION.slotId}',`,
       ),
       line('13:49:52.903', '  audibleUntilMs: 1200 }'),
       '',
@@ -274,5 +274,194 @@ describe('verify — provenance gating', () => {
     expect(result.health.deferred).toBe(1)
     expect(result.health.hardFail).toBe(false)
     expect(result.health.softWarn).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// The click path — every shipped sample.
+//
+// The gates above were built for the score path. On a click-path workout
+// they are inert: no such manifest has a combo-announce (so `notArmed` is
+// always false) and the click path writes neither `slotDispatcher.deferred`
+// nor `.assetMissing`. Until these, the only things that could fail a
+// shipped sample were a missing or duplicated lead-in — the ~70 per-bar
+// calls a round, a clip that failed to play, and whether the capture was
+// even of this workout were all unjudged.
+// ---------------------------------------------------------------------------
+
+describe('verify — the click path', () => {
+  /** A click-path manifest: no coach events to itemize, N loop-call bars. */
+  const clickManifest = (overrides = {}) =>
+    manifestWith([], { workoutId: 'heavy-hands', workoutName: 'Heavy Hands', ...overrides })
+
+  const provenance = (hash, workout = 'heavy-hands', path = 'click') =>
+    [
+      line(
+        '13:49:19.038',
+        `'[INFO] workout.timeline.provenance', 'compiled timeline identity', { workout: '${workout}',`,
+      ),
+      line('13:49:19.038', `  timelineHash: '${hash}',`),
+      line('13:49:19.038', `  path: '${path}' }`),
+    ].join('\n')
+
+  const runnerStart = (workout) =>
+    [
+      line(
+        '13:49:19.000',
+        `'[INFO] workout.runner.start', 'workout runner armed', { workout: '${workout}',`,
+      ),
+      line('13:49:19.000', '  rounds: 4,'),
+      line('13:49:19.000', "  source: 'simulated' }"),
+    ].join('\n')
+
+  /** One per-bar loop call, `seconds` after 13:49:48 (t0 is 13:49:47.342). */
+  const callAt = (seconds) => {
+    const time = `13:49:${String(48 + seconds).padStart(2, '0')}.000`
+    return [
+      line(time, "'[INFO] workout.clickScript.dispatch', 'click script dispatched', { kind: 'call',"),
+      line(time, "  slot: 'call/1-2-3-2',"),
+      line(time, '  dispatchAtMs: 1000 }'),
+    ].join('\n')
+  }
+  const calls = (n) => Array.from({ length: n }, (_, i) => callAt(i))
+
+  const VERIFIED = provenance('v2:921449d5')
+
+  describe('identity', () => {
+    it('parses the provenance record, and the workout a runner.start names', () => {
+      const events = parseLogcat([runnerStart('heavy-hands'), VERIFIED, ''].join('\n'))
+      expect(events.find((e) => e.type === 'timeline.provenance')).toMatchObject({
+        workout: 'heavy-hands',
+        timelineHash: 'v2:921449d5',
+        path: 'click',
+      })
+      expect(events.find((e) => e.type === 'runner.start').workout).toBe('heavy-hands')
+    })
+
+    it('does not mistake a provenance FAILURE for provenance', () => {
+      // 'workout.timeline.provenanceFailed' contains 'workout.timeline.provenance'.
+      const text = [
+        warn(
+          '13:49:19.038',
+          "'[WARN] workout.timeline.provenanceFailed', 'could not compile', { workout: 'heavy-hands',",
+        ),
+        warn('13:49:19.038', "  error: 'Error: boom' }"),
+        T0_LINE,
+        '',
+      ].join('\n')
+      expect(parseLogcat(text).filter((e) => e.type === 'timeline.provenance')).toHaveLength(0)
+      expect(verify(clickManifest(), text).provenance.state).toBe('unavailable')
+    })
+
+    it('verifies a click-path capture with no armed record at all', () => {
+      const result = verify(clickManifest(), [VERIFIED, T0_LINE, ''].join('\n'))
+      expect(result.provenance.state).toBe('match')
+      expect(result.provenance.path).toBe('click')
+      expect(result.health.verdict).toBe('PASS')
+    })
+
+    it('reports STALE when the click-path app compiled a different timeline', () => {
+      const text = [provenance('v2:d404ea55'), T0_LINE, ''].join('\n')
+      const result = verify(clickManifest(), text)
+      expect(result.provenance.state).toBe('mismatch')
+      expect(result.health.verdict).toBe('STALE')
+    })
+
+    it('fails a capture of a different workout, even with no hash to compare', () => {
+      // The run was real and clean; it was just not this manifest's workout.
+      const text = [runnerStart('body-work'), T0_LINE, ''].join('\n')
+      const result = verify(clickManifest(), text)
+      expect(result.provenance.workoutMismatch).toBe(true)
+      expect(result.health.hardFail).toBe(true)
+    })
+
+    it('never calls an unverified capture a pass', () => {
+      // No hash anywhere: nothing ties this run to the manifest's timeline.
+      const result = verify(clickManifest(), [runnerStart('heavy-hands'), T0_LINE, ''].join('\n'))
+      expect(result.provenance.state).toBe('unavailable')
+      expect(result.health.hardFail).toBe(false)
+      expect(result.health.verdict).toBe('WARN')
+    })
+  })
+
+  describe('a clip that did not sound', () => {
+    const clipMissingAt = (time) =>
+      [
+        warn(time, "'[WARN] workout.voice.clipMissing', 'clip did not load', { asset: 'call/1-2-3-2',"),
+        warn(time, "  error: 'Error: no such asset' }"),
+      ].join('\n')
+    const playFailedAt = (time) =>
+      [
+        warn(time, "'[WARN] workout.voice.playFailed', 'click-script did not play', { text: 'One, two!',"),
+        warn(time, "  error: 'Error: player released' }"),
+      ].join('\n')
+
+    it('fails when a clip did not load during the round', () => {
+      const text = [VERIFIED, T0_LINE, clipMissingAt('13:50:10.000'), ''].join('\n')
+      const result = verify(clickManifest(), text)
+      expect(result.dispatcher.clipMissingCount).toBe(1)
+      expect(result.health.playbackFailures).toBe(1)
+      expect(result.health.verdict).toBe('FAIL')
+    })
+
+    it('fails when a clip loaded and then did not play', () => {
+      const text = [VERIFIED, T0_LINE, playFailedAt('13:50:10.000'), ''].join('\n')
+      const result = verify(clickManifest(), text)
+      expect(result.dispatcher.playFailedCount).toBe(1)
+      expect(result.health.verdict).toBe('FAIL')
+    })
+
+    it('fails without needing provenance — the app reported the failure itself', () => {
+      const text = [T0_LINE, clipMissingAt('13:50:10.000'), ''].join('\n')
+      expect(verify(clickManifest(), text).health.hardFail).toBe(true)
+    })
+
+    it('ignores a failure outside the round this manifest describes', () => {
+      // 28 s before t0 — the walkout. Real, but not this round's to judge.
+      const text = [VERIFIED, clipMissingAt('13:49:19.500'), T0_LINE, ''].join('\n')
+      const result = verify(clickManifest(), text)
+      expect(result.health.playbackFailures).toBe(0)
+      expect(result.health.verdict).toBe('PASS')
+    })
+  })
+
+  describe('per-bar loop calls', () => {
+    const run = (dispatched, expected = 10) =>
+      verify(
+        clickManifest({ expectedCallBars: expected }),
+        [VERIFIED, T0_LINE, ...calls(dispatched), ''].join('\n'),
+      ).health
+
+    it('fails when the manifest expects calls and none was dispatched', () => {
+      const health = run(0)
+      expect(health.noCalls).toBe(true)
+      expect(health.verdict).toBe('FAIL')
+    })
+
+    it("warns, without failing, when coverage is under the report's LOW line", () => {
+      const health = run(8)
+      expect(health.callCoveragePct).toBe(80)
+      expect(health.lowCalls).toBe(true)
+      expect(health.hardFail).toBe(false)
+      expect(health.verdict).toBe('WARN')
+    })
+
+    it('passes at the line — a skipped call is routine, a busy lane yields', () => {
+      const health = run(9)
+      expect(health.callCoveragePct).toBe(90)
+      expect(health.lowCalls).toBe(false)
+      expect(health.verdict).toBe('PASS')
+    })
+
+    it('passes with every bar called', () => {
+      expect(run(10).verdict).toBe('PASS')
+    })
+
+    it('judges nothing when the manifest expects no loop calls', () => {
+      const health = run(0, 0)
+      expect(health.noCalls).toBe(false)
+      expect(health.callCoveragePct).toBeNull()
+      expect(health.verdict).toBe('PASS')
+    })
   })
 })

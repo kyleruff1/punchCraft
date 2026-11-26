@@ -143,13 +143,16 @@ export function compose(def: ComposedWorkoutDef): GeneratedWorkout {
 
   return {
     id: def.id,
+    // A click-track set: its authored lead-ins and per-bar calls are the
+    // punch calls (see `CoachPath`). How much of that the athlete hears is
+    // their own Voice Coach mode, not something this workout decides.
+    coachPath: 'click-script',
     recipe: {
       ...defaultRecipe(),
       durationMinutes,
       totalPunchGoal: totalGoal,
       defaultStance: 'orthodox',
       cadenceProfile: 'steady',
-      voiceMode: 'minimal',
       coachTempo: clickTempoFor(def.bpm),
       metronome: { enabled: true, volume: 0.6 },
       generatorVersion: GENERATOR_VERSION,

@@ -103,9 +103,9 @@ async function captureProbeLog() {
 
   // Wait for the probe's own completion line rather than a fixed duration, so
   // a slower device is not cut off mid-run and reported as a thin sample.
-  for (let i = 0; i < 240 && !out.includes('puncheokie.ruler.done'); i += 1) await sleep(1_000)
+  for (let i = 0; i < 240 && !out.includes('workout.ruler.done'); i += 1) await sleep(1_000)
   logcat.kill()
-  if (!out.includes('puncheokie.ruler.done')) console.log('[preflight] WARNING: probe never reported done')
+  if (!out.includes('workout.ruler.done')) console.log('[preflight] WARNING: probe never reported done')
   return out
 }
 

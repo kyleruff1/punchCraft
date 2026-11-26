@@ -1,6 +1,6 @@
-# CLAUDE.md — working conventions for punchCraft · Puncheokie
+# CLAUDE.md — working conventions for punchCraft · punchCraft workouts
 
-Read [docs/design-spec.md](docs/design-spec.md) — and, for anything Puncheokie (workout model, generator, cue lifecycle, live screen, Voice Coach, persistence), [docs/puncheokie-ux-workout-engine.md](docs/puncheokie-ux-workout-engine.md), which supersedes spec §13 in part — before changing architecture, protocol, metrics, calibration, Spotify, or Puncheokie behavior. Section numbers below (§) refer to the spec; "doc §n" refers to the Puncheokie document.
+Read [docs/design-spec.md](docs/design-spec.md) — and, for anything punchCraft workouts (workout model, generator, cue lifecycle, live screen, Voice Coach, persistence), [docs/workouts-ux-engine.md](docs/workouts-ux-engine.md), which supersedes spec §13 in part — before changing architecture, protocol, metrics, calibration, Spotify, or punchCraft workouts behavior. Section numbers below (§) refer to the spec; "doc §n" refers to the punchCraft workouts document.
 
 ## Non-negotiable rules
 
@@ -11,8 +11,8 @@ Read [docs/design-spec.md](docs/design-spec.md) — and, for anything Puncheokie
 5. **Version lock** (§11.2). Expo, React Native, and the BLE library versions are locked after the Story 1 spike. Do not upgrade the Expo SDK during protocol discovery except on a separate compatibility branch; keep a known-good APK.
 6. **Monotonic time for ordering and timers; wall time only for display/export** (§3.2, §18.3).
 7. **Decoders and calibration profiles are versioned**; stored sessions must be recalculable after a decoder change (§3.2, §8.6).
-8. **Spotify** is optional, PKCE-only, tokens in SecureStore, minimal scopes, no client secret anywhere in the repo, no audio analysis or beat sync (§14). Cadence BPM is authored by the recipe on the monotonic clock — never derived from audio, Audio Features, or track metadata (Puncheokie doc D3).
-9. **Voice Coach never speaks over third-party playback unless the user explicitly opted in** — the toggle defaults to OFF whenever Spotify or another player is active, and is never auto-enabled (§13.5, §14.6, Puncheokie doc D1).
+8. **Spotify** is optional, PKCE-only, tokens in SecureStore, minimal scopes, no client secret anywhere in the repo, no audio analysis or beat sync (§14). Cadence BPM is authored by the recipe on the monotonic clock — never derived from audio, Audio Features, or track metadata (punchCraft workouts doc D3).
+9. **Voice Coach never speaks over third-party playback unless the user explicitly opted in** — the toggle defaults to OFF whenever Spotify or another player is active, and is never auto-enabled (§13.5, §14.6, punchCraft workouts doc D1).
 
 ## Repository layout
 
@@ -23,7 +23,7 @@ Read [docs/design-spec.md](docs/design-spec.md) — and, for anything Puncheokie
 
 ## GitHub conventions
 
-- 38 Milestones = the roadmap (`M01`…`M30` original; `M31`…`M38` Puncheokie v0.2/v0.3 + workout backdrop; `M24`–`M26` superseded). 8 Epics = phases (`[EPIC] Phase N — …`, label `epic`). Every task/story/spike issue has: a milestone, a `phase:N` label, an `area:*` label, a type label, and is a sub-issue of its phase epic.
+- 38 Milestones = the roadmap (`M01`…`M30` original; `M31`…`M38` punchCraft workouts v0.2/v0.3 + workout backdrop; `M24`–`M26` superseded). 8 Epics = phases (`[EPIC] Phase N — …`, label `epic`). Every task/story/spike issue has: a milestone, a `phase:N` label, an `area:*` label, a type label, and is a sub-issue of its phase epic.
 - Project board: https://github.com/users/kyleruff1/projects/5 — fields Phase, Area, Priority, Size, Sprint (2-week iterations from 2026-08-24).
 - New work items: add them to the right phase fragment in `tools/backlog/backlog-issues.json` (milestones in `backlog-static.json`) and run `node tools/backlog/seed.mjs --dry-run`, then `seed.mjs`. It is idempotent by **exact title** and never updates an existing issue — retitle or close superseded ones with `gh issue edit` / `gh issue close`.
 - Branch per issue (`feat/M05-02-tracker-connection`), PR title `<type>: <summary> (#issue)`, PR body `Closes #N`.
@@ -35,6 +35,24 @@ Read [docs/design-spec.md](docs/design-spec.md) — and, for anything Puncheokie
 - Every confirmed capture becomes a replay fixture; the replay harness must run on Windows without Bluetooth hardware.
 - Physical BLE behavior is verified on the tablet, never on the emulator.
 
-## Toolchain facts (2026-08-22)
+## Toolchain facts (verified 2026-11-25)
 
-Windows 11, Node 24, npm 11, JDK 17, Android SDK at `C:/Users/kyler/android-sdk` (platform 35, build-tools 34.0.0, NDK 27.2 — Story 1 installs what the locked Expo SDK requests), `gh` authenticated as `kyleruff1`. Details in [docs/dev-setup.md](docs/dev-setup.md).
+Repo lives at **`F:\punchCraft`**. (`C:\Users\kyler\punchlab` is the retired location — it is no longer a git repo and holds only stray schematics.)
+
+Windows 11, Node 24, npm 11, JDK 17, `gh` authenticated as `kyleruff1`. Stack is pinned exactly (`.npmrc` `save-exact=true`): Expo 57.0.15, React Native 0.86.2, React 19.2.3, and **`@sfourdrinier/react-native-ble-plx` 3.9.3** — a fork, chosen because upstream was unverified on the New Architecture. Details in [docs/dev-setup.md](docs/dev-setup.md).
+
+Three environment facts that cost real time if unknown:
+
+1. **Metro cannot watch `F:`.** Fast refresh never fires. Every edit batch needs a Metro restart *and* a cold app restart; a `(1 module)` delta in the Metro log means you are testing OLD code.
+2. **`adb shell wm size` lies** — it reports portrait while the app runs landscape. Taps use the current frame with no rotation math; `uiautomator dump` bounds are authoritative. Prefix adb with `MSYS_NO_PATHCONV=1` in Git Bash.
+3. **`.claude/` is gitignored except `.claude/skills/`**, which holds the `cadence-lab` and `qa-audio-verify` runbooks — the only written record of the verification loop. They are tracked as of 2026-11-25; before that a fresh clone had neither. Everything else under `.claude/` (worktrees, local settings) stays out.
+
+## Start here for a new session
+
+[docs/handoff/00-START-HERE.md](docs/handoff/00-START-HERE.md) — orientation, architecture map, the coach-vocabulary and beat-mapping references, the verification runbook, ranked review targets, and the roadmap for non-boxing workout types. It also lists the four sources in this repo that are known-stale and will mislead you (this file's own GitHub section among them — see below).
+
+## Known drift (2026-11-25)
+
+- The **PR-per-change workflow below was abandoned mid-September**: the last 15 commits on `main` went in directly, with no PR. An open issue is therefore *not* evidence of unbuilt work — verify against the code.
+- `tools/voice/README.md`, `docs/audio-corpus.md` and `docs/audio-validation-rulebook.md` all describe the per-punch phrase-clip pipeline as the live path. (`README.md` does not mention it; what is stale there is the status line — "planning complete", 30 milestones.) It was **retired** in V2 Phase 5-iv (`369a2c6`). `src/domain/coach/callPlacement.ts`'s doc comments are the current, mic-measured record.
+- The **bonding requirement** — trackers must be paired as "FightCam" or every link dies at ~37 s — is the most important operational fact about the hardware. It is **H13** in `docs/protocol/hypotheses.md`; the tablet timing there is reported, not re-measured.

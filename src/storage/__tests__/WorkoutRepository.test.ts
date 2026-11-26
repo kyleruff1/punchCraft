@@ -141,6 +141,38 @@ describe('generated workouts', () => {
     expect(found?.realized).toEqual(realized)
   })
 
+  it('keeps the coach path with the plan, and writes no marker for the score path', () => {
+    // A stored workout is rebuilt from its saved plan. The click-script
+    // marker used to ride along inside the recipe (`voiceMode: 'minimal'`);
+    // as its own field it has to be saved on purpose or a library workout
+    // read back from storage would claim to be a score-path one.
+    const { coachPath: _marker, ...unmarked } = threeRoundFundamentals
+    const scoreWorkout = { ...unmarked, id: 'score-path-plan' }
+    sessions.create({ id: 'ses-click', mode: 'puncheokie' })
+    sessions.create({ id: 'ses-score', mode: 'puncheokie' })
+    repo.saveGeneratedWorkout(threeRoundFundamentals, plannedStream(threeRoundFundamentals), 'ses-click')
+    repo.saveGeneratedWorkout(scoreWorkout, plannedStream(scoreWorkout), 'ses-score')
+
+    expect(threeRoundFundamentals.coachPath).toBe('click-script')
+    expect(repo.getWorkoutBySession('ses-click')?.workout.coachPath).toBe('click-script')
+    const score = repo.getWorkoutBySession('ses-score')?.workout
+    expect(score).toEqual(scoreWorkout)
+    expect(score && 'coachPath' in score).toBe(false)
+  })
+
+  it('reads a plan saved before the coach path existed as unmarked', () => {
+    sessions.create({ id: 'ses-old', mode: 'puncheokie' })
+    repo.saveGeneratedWorkout(threeRoundFundamentals, plannedStream(threeRoundFundamentals), 'ses-old')
+    const stored = db.query<{ blocks_json: string }>('SELECT blocks_json FROM generated_workouts')[0]
+    const { coachPath: saved, ...legacy } = JSON.parse(stored?.blocks_json ?? '{}') as Record<string, unknown>
+    expect(saved).toBe('click-script')
+    db.prepareSync('UPDATE generated_workouts SET blocks_json = ?').executeSync([JSON.stringify(legacy)])
+
+    const found = repo.getWorkoutBySession('ses-old')?.workout
+    expect(found && 'coachPath' in found).toBe(false)
+    expect(found?.schedule).toEqual(threeRoundFundamentals.schedule)
+  })
+
   it('returns null for a session that ran no generated workout', () => {
     sessions.create({ id: 'ses-empty', mode: 'punchcraft' })
     expect(repo.getWorkoutBySession('ses-empty')).toBeNull()

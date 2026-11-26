@@ -61,6 +61,10 @@ const expectedTechniqueDistribution = Object.fromEntries(
 
 export const speedCombos: GeneratedWorkout = {
   id: 'speed-combos',
+  // A click-track set: its authored lead-ins and per-bar calls are the
+  // punch calls (see `CoachPath`). How much of that the athlete hears is
+  // their own Voice Coach mode, not something this workout decides.
+  coachPath: 'click-script',
   recipe: {
     ...defaultRecipe(),
     durationMinutes: 20,
@@ -69,9 +73,6 @@ export const speedCombos: GeneratedWorkout = {
     bias: 'lead',
     defaultStance: 'orthodox',
     cadenceProfile: 'sprint',
-    // MVP v2: the click IS the audio. Minimal caps the coach at bells +
-    // stance + countdown; punch calls belong to the visuals.
-    voiceMode: 'minimal',
     // Loop-asset contract (metronomeAssets.ts): every wav is 1000ms = one
     // 60-BPM base pulse; TEMPO SCALES BY DIVISION, never baseBpm. Getting
     // this wrong told the transport 240 BPM against a 1s loop — a

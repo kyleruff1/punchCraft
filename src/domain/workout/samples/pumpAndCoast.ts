@@ -61,6 +61,10 @@ const expectedTechniqueDistribution = Object.fromEntries(
 
 export const pumpAndCoast: GeneratedWorkout = {
   id: 'pump-and-coast',
+  // A click-track set: its authored lead-ins and per-bar calls are the
+  // punch calls (see `CoachPath`). How much of that the athlete hears is
+  // their own Voice Coach mode, not something this workout decides.
+  coachPath: 'click-script',
   recipe: {
     ...defaultRecipe(),
     durationMinutes: 20,
@@ -69,9 +73,6 @@ export const pumpAndCoast: GeneratedWorkout = {
     bias: 'balanced',
     defaultStance: 'orthodox',
     cadenceProfile: 'steady',
-    // MVP v2: the click IS the audio. Minimal caps the coach at bells +
-    // stance + countdown; punch calls belong to the visuals.
-    voiceMode: 'minimal',
     // W2 audible grid (Kyle 2026-09-04 "roll into the grid"): the click
     // is ON. Loops now exist at this tempo (metronomeAssets b85/b100
     // d1-d3); the runner swaps the subdivision per section so each rate

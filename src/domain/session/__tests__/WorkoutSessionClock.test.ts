@@ -12,6 +12,7 @@ import {
   type SessionTransition,
 } from '../WorkoutSessionClock'
 import { createFakeClock, type FakeClock } from '@testing/fakeClock'
+import { sharedWorkElapsedMs, type SharedWorkClock } from '../../timing/SharedWorkClock'
 
 const ROUNDS: SessionRoundSpec[] = [
   { workDurationMs: 10_000, restAfterMs: 5_000 },
@@ -232,3 +233,145 @@ describe('snapshot', () => {
     expect(h.session.snapshot().roundIndex).toBe(-1)
   })
 })
+
+// ---------------------------------------------------------------------------
+// workElapsedAt — the one conversion between the monotonic and work clocks
+// ---------------------------------------------------------------------------
+
+/**
+ * Every case runs at four clock origins.
+ *
+ * The origin stands in for the device's uptime when the app launched. It is
+ * arbitrary by contract (`MonotonicClock.now()` is "milliseconds from an
+ * arbitrary origin"), and it is exactly what a suite pinned to origin 0 can
+ * never see: at 0 the monotonic clock and the first round's work clock are
+ * the same number line, so code that confuses the two passes every test and
+ * is wrong on every device.
+ */
+describe.each([0, 1_000, 3_600_000, 86_400_000])(
+  'workElapsedAt with the clock starting at %i ms',
+  (originMs) => {
+    function at(countdownMs = 0) {
+      const clock: FakeClock = createFakeClock(originMs)
+      const session = new WorkoutSessionClock(ROUNDS, { clock, countdownMs })
+      const run = (ms: number, stepMs = 100): void => {
+        for (let i = 0; i < Math.ceil(ms / stepMs); i++) {
+          clock.advance(stepMs)
+          session.advance()
+        }
+      }
+      return { clock, session, run }
+    }
+
+    it('reads zero before the workout starts', () => {
+      const h = at()
+      expect(h.session.workElapsedAt(h.clock.now())).toBe(0)
+    })
+
+    it('reads the work clock at the instant of the last advance', () => {
+      const h = at()
+      h.session.start()
+      h.run(2_500)
+      expect(h.session.workElapsedAt(h.clock.now())).toBe(2_500)
+      expect(h.session.workElapsedAt(h.clock.now())).toBe(h.session.snapshot().workElapsedMs)
+    })
+
+    it('places an instant that falls between two ticks', () => {
+      // A punch lands 37 ms after the last tick and is handled before the
+      // next one — the usual case, since the tick is 50 ms and a punch is not
+      // synchronised to it.
+      const h = at()
+      h.session.start()
+      h.run(2_000)
+      expect(h.session.workElapsedAt(h.clock.now() + 37)).toBe(2_037)
+    })
+
+    it('places an instant stamped just before the tick that preceded it', () => {
+      const h = at()
+      h.session.start()
+      h.run(2_000)
+      expect(h.session.workElapsedAt(h.clock.now() - 12)).toBe(1_988)
+    })
+
+    it('is frozen for as long as the session is paused', () => {
+      const h = at()
+      h.session.start()
+      h.run(3_000)
+      h.session.pause()
+      h.run(60_000)
+      expect(h.session.workElapsedAt(h.clock.now())).toBe(3_000)
+      // Even an instant "in the future" reads the frozen value: the work
+      // clock is not running, so there is nothing to project.
+      expect(h.session.workElapsedAt(h.clock.now() + 500)).toBe(3_000)
+
+      h.session.resume()
+      h.run(500)
+      expect(h.session.workElapsedAt(h.clock.now())).toBe(3_500)
+    })
+
+    it('restarts from zero in the next round', () => {
+      const h = at()
+      h.session.start()
+      h.run(10_000 + 5_000 + 1_200)
+      expect(h.session.snapshot().roundIndex).toBe(1)
+      expect(h.session.workElapsedAt(h.clock.now())).toBe(1_200)
+    })
+
+    it('holds the last work reading through a rest', () => {
+      const h = at()
+      h.session.start()
+      h.run(10_000 + 2_000)
+      expect(h.session.snapshot().phase).toBe('rest')
+      expect(h.session.workElapsedAt(h.clock.now())).toBe(h.session.snapshot().workElapsedMs)
+      expect(h.session.workElapsedAt(h.clock.now() + 900)).toBe(h.session.snapshot().workElapsedMs)
+    })
+
+    it('carries a countdown overflow into the round it opens', () => {
+      // 700 ms steps cross a 3 000 ms countdown at 3 500: the round is
+      // already 500 ms old when it is entered.
+      const h = at(3_000)
+      h.session.start()
+      h.run(3_500, 700)
+      expect(h.session.snapshot().phase).toBe('work')
+      expect(h.session.workElapsedAt(h.clock.now())).toBe(500)
+    })
+
+    it('opens the round at zero when the countdown is skipped', () => {
+      const h = at(3_000)
+      h.session.start()
+      h.run(1_000)
+      h.session.skipCountdown()
+      expect(h.session.snapshot().phase).toBe('work')
+      expect(h.session.workElapsedAt(h.clock.now())).toBe(0)
+      expect(h.session.workElapsedAt(h.clock.now() + 40)).toBe(40)
+    })
+
+    it('opens the next round at zero when the rest is skipped', () => {
+      const h = at()
+      h.session.start()
+      h.run(10_000 + 1_000)
+      h.session.skipRest()
+      expect(h.session.snapshot().roundIndex).toBe(1)
+      expect(h.session.workElapsedAt(h.clock.now())).toBe(0)
+    })
+
+    it('agrees with the ring projection, so scoring and the rings share one rule', () => {
+      // `SharedWorkClock` is the UI thread's copy of this clock. The two are
+      // written separately (one is a worklet), so this pins them together.
+      const h = at()
+      h.session.start()
+      h.run(2_000)
+      const snapshot = h.session.snapshot()
+      const shared: SharedWorkClock = {
+        roundIndex: snapshot.roundIndex,
+        workElapsedAtPublishMs: snapshot.workElapsedMs,
+        publishFrameTimestampMs: h.clock.now(),
+        running: snapshot.phase === 'work',
+      }
+      for (const deltaMs of [-20, 0, 17, 250]) {
+        const instant = h.clock.now() + deltaMs
+        expect(h.session.workElapsedAt(instant)).toBe(sharedWorkElapsedMs(shared, instant))
+      }
+    })
+  },
+)

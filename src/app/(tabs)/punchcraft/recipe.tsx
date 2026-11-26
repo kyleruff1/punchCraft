@@ -14,7 +14,7 @@
  * keeps the whole recipe on one screen without scrolling in landscape
  * or portrait (the fit target Kyle set).
  */
-import React, { useMemo } from 'react'
+import React, { useDeferredValue, useMemo } from 'react'
 import { ScrollView, StyleSheet, Text, View } from 'react-native'
 import { Link, Stack } from 'expo-router'
 
@@ -38,12 +38,18 @@ import {
   useWorkoutStore,
 } from '@state/useWorkoutStore'
 import {
+  GOAL_MAX,
+  GOAL_STEP,
   GOAL_TIERS,
   TIER_LABELS,
   intensityLabel,
+  rescaleGoalForDuration,
   suggestGoal,
   type IntensityTier,
 } from '@domain/workout/punchGoals'
+import { coverageConflict } from '@domain/workout/coverageConflict'
+import { generateWorkout } from '@domain/workout/generateWorkout'
+import { fillOptionsForRecipe } from '@audio/fillOptionsForRecipe'
 import { listSampleWorkouts, type SampleWorkoutKey } from '@domain/workout/samples'
 import { tierFor } from '@domain/workout/WorkoutRecipe'
 import type { WorkoutRecipe } from '@domain/workout/WorkoutRecipe'
@@ -103,9 +109,18 @@ const BIAS_OPTIONS: ReadonlyArray<PickerOption<WorkoutRecipe['bias']>> = [
 
 const VOICE_MODE_OPTIONS: ReadonlyArray<PickerOption<WorkoutRecipe['voiceMode']>> = [
   { value: 'off', label: 'Off' },
-  { value: 'minimal', label: 'Minimal', description: 'Cue calls only.' },
-  { value: 'standard', label: 'Standard', description: 'Cues plus round transitions.' },
-  { value: 'full', label: 'Full', description: 'Cues, transitions, encouragement.' },
+  // What each mode does, per `shouldSpeak` in VoiceCoachPolicy. Minimal used
+  // to read "Cue calls only." — the exact opposite: punch calls are the one
+  // thing it drops.
+  {
+    value: 'minimal',
+    label: 'Minimal',
+    description: 'Bells, stance changes and the countdown. No punch calls.',
+  },
+  { value: 'standard', label: 'Standard', description: 'Punch calls, bells and round summaries.' },
+  // Full adds coaching reminders over Standard. No workout schedules one
+  // yet, so today the two sound the same — say so rather than promise more.
+  { value: 'full', label: 'Full', description: 'Standard, plus coaching reminders (none yet).' },
 ]
 
 const VOICE_VOCABULARY_OPTIONS: ReadonlyArray<PickerOption<WorkoutRecipe['voiceVocabulary']>> = [
@@ -125,9 +140,6 @@ const INTENSITY_TIER_OPTIONS: ReadonlyArray<PickerOption<IntensityTier>> = TIER_
   value: tier,
   label: TIER_LABELS[tier],
 }))
-
-/** Goals are authored in multiples of 50, so the stepper moves the same way. */
-const GOAL_STEP = 50
 
 function stanceChoiceFor(recipe: WorkoutRecipe): StanceChoice {
   if (recipe.stanceMode === 'switch-by-round') return 'switch-by-round'
@@ -157,9 +169,35 @@ export default function RecipeScreen(): React.JSX.Element {
   const intensity = intensityLabel(recipe.totalPunchGoal, recipe.durationMinutes)
   const suggested = suggestGoal(recipe.durationMinutes, 'steady', recipe.focus)
 
+  // Does the workout this recipe would GENERATE actually fill its rounds?
+  // `validateRecipe` cannot say — that takes the generator, run with the same
+  // device-side options the live screen runs it with. With too narrow a set
+  // of punches, or combinations capped very short, the answer is no: the
+  // coach goes quiet for the last stretch of a round, and until now the
+  // athlete found that out on the bag.
+  //
+  // Deferred, so a run of stepper taps is never held up by a generation; and
+  // skipped when a library workout is picked, since the recipe is not what
+  // runs then. A generator fault must not take the recipe screen with it.
+  const deferredRecipe = useDeferredValue(recipe)
+  const dryRounds = useMemo(() => {
+    if (selectedSampleKey) return null
+    try {
+      return coverageConflict(
+        generateWorkout(deferredRecipe, fillOptionsForRecipe(deferredRecipe)),
+      )
+    } catch {
+      return null
+    }
+  }, [deferredRecipe, selectedSampleKey])
+  const allConflicts = useMemo(
+    () => (dryRounds ? [...conflicts, dryRounds] : conflicts),
+    [conflicts, dryRounds],
+  )
+
   // Conflicts already shown next to a control are not repeated in the card,
   // so the athlete reads each problem once, where they can act on it.
-  const goalConflicts = conflictsForField(conflicts, 'totalPunchGoal')
+  const goalConflicts = conflictsForField(allConflicts, 'totalPunchGoal')
 
   const sampleOptions: ReadonlyArray<PickerOption<string | 'none'>> = useMemo(
     () => [
@@ -189,9 +227,21 @@ export default function RecipeScreen(): React.JSX.Element {
           label="Duration"
           value={`${recipe.durationMinutes}` as `${WorkoutDurationMinutes}`}
           options={DURATION_OPTIONS}
-          onChange={(value) =>
-            setRecipe({ durationMinutes: Number(value) as WorkoutDurationMinutes })
-          }
+          onChange={(value) => {
+            // Carry the intensity across, not the number. A goal only means
+            // something against a duration; keeping 900 punches while going
+            // from 20 to 60 minutes silently drops the athlete from Steady to
+            // below Technique, and leaves rounds the generator cannot fill.
+            const durationMinutes = Number(value) as WorkoutDurationMinutes
+            setRecipe({
+              durationMinutes,
+              totalPunchGoal: rescaleGoalForDuration(
+                recipe.totalPunchGoal,
+                recipe.durationMinutes,
+                durationMinutes,
+              ),
+            })
+          }}
         />
 
         {/* 2 — Punch goal (tier band picker + fine stepper in the popout) */}
@@ -213,7 +263,7 @@ export default function RecipeScreen(): React.JSX.Element {
                 value={recipe.totalPunchGoal}
                 step={GOAL_STEP}
                 min={GOAL_STEP}
-                max={20_000}
+                max={GOAL_MAX}
                 format={(v) => v.toLocaleString('en-US')}
                 onChange={(totalPunchGoal) => setRecipe({ totalPunchGoal })}
               />
@@ -316,7 +366,7 @@ export default function RecipeScreen(): React.JSX.Element {
           label="Advanced"
           caption="Which punches, defense, footwork and coaching calls the workout may use."
         >
-          <EnablementMenu recipe={recipe} conflicts={conflicts} onChange={setRecipe} />
+          <EnablementMenu recipe={recipe} conflicts={allConflicts} onChange={setRecipe} />
         </CollapsibleSection>
 
         {/* Sample — as a picker row so it stays one line by default. */}
@@ -329,7 +379,7 @@ export default function RecipeScreen(): React.JSX.Element {
           onChange={(key) => selectSample(key === 'none' ? undefined : (key as SampleWorkoutKey))}
         />
 
-        <RecipeSummaryCard summary={summary} conflicts={conflicts} />
+        <RecipeSummaryCard summary={summary} conflicts={allConflicts} />
 
         <View style={styles.actions}>
           <Link href="/(tabs)/punchcraft/live" asChild>

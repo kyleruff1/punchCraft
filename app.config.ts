@@ -14,10 +14,10 @@ function gitSha(): string {
 
 const config: ExpoConfig = {
   name: 'punchCraft',
-  slug: 'punchcraft-puncheokie',
+  slug: 'punchcraft-workouts',
   version: '0.1.0',
   scheme: 'punchcraft',
-  // D7: Puncheokie's live screen is landscape-first on the tablet, a
+  // D7: punchCraft workouts's live screen is landscape-first on the tablet, a
   // recorded inversion of spec §19.4's phone-first rule for that one route.
   // The global setting is 'default' so the OS follows the device, and the
   // live route locks landscape on focus and releases it on blur — every

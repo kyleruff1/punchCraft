@@ -215,7 +215,7 @@ function enoughForTail(stats) {
 // ---------------------------------------------------------------------------
 
 export function parsePlays(text) {
-  return recordsWithTag(text, 'puncheokie.voice.play').map(({ ts, body }) => ({
+  return recordsWithTag(text, 'workout.voice.play').map(({ ts, body }) => ({
     ts,
     playId: extractField(body, 'playId'),
     kind: extractField(body, 'kind'),
@@ -233,7 +233,7 @@ export function parsePlays(text) {
 }
 
 export function parseClickDispatches(text) {
-  return recordsWithTag(text, 'puncheokie.clickScript.dispatch').map(({ ts, body }) => ({
+  return recordsWithTag(text, 'workout.clickScript.dispatch').map(({ ts, body }) => ({
     ts,
     kind: extractField(body, 'kind'),
     slot: extractField(body, 'slot'),
@@ -276,7 +276,7 @@ export function audibleEndMs(obs, play) {
 }
 
 export function parseAnnounceDispatches(text) {
-  return recordsWithTag(text, 'puncheokie.comboAnnounce.dispatch').map(({ ts, body }) => ({
+  return recordsWithTag(text, 'workout.comboAnnounce.dispatch').map(({ ts, body }) => ({
     ts,
     slotId: extractField(body, 'slotId'),
     assetId: extractField(body, 'assetId'),
@@ -288,7 +288,7 @@ export function parseAnnounceDispatches(text) {
 }
 
 export function parseTokenDue(text) {
-  return recordsWithTag(text, 'puncheokie.cue.tokenDue').map(({ ts, body }) => ({
+  return recordsWithTag(text, 'workout.cue.tokenDue').map(({ ts, body }) => ({
     ts,
     roundIndex: numField(body, 'roundIndex'),
     cueId: extractField(body, 'cueId'),
@@ -302,7 +302,7 @@ export function parseTokenDue(text) {
 }
 
 export function parseBoundaries(text) {
-  return recordsWithTag(text, 'puncheokie.round.boundary').map(({ ts, body }) => ({
+  return recordsWithTag(text, 'workout.round.boundary').map(({ ts, body }) => ({
     ts,
     transition: extractField(body, 'transition'),
     roundIndex: numField(body, 'roundIndex'),
@@ -312,7 +312,7 @@ export function parseBoundaries(text) {
 }
 
 export function parseBuild(text) {
-  const run = recordsWithTag(text, 'puncheokie.qa.run').at(-1)
+  const run = recordsWithTag(text, 'workout.qa.run').at(-1)
   if (!run) return { dev: null, gitSha: null, workout: null, vocab: null }
   return {
     dev: boolField(run.body, 'dev'),
@@ -457,7 +457,7 @@ export function analyze(text, constants = null) {
   const tokenDue = parseTokenDue(text)
   const boundaries = parseBoundaries(text)
   const build = parseBuild(text)
-  const statsRecord = recordsWithTag(text, 'puncheokie.observer.stats').at(-1)
+  const statsRecord = recordsWithTag(text, 'workout.observer.stats').at(-1)
   const observer = statsRecord
     ? { watched: numField(statsRecord.body, 'watched') ?? null, openAtRelease: numField(statsRecord.body, 'openAtRelease') ?? null, maxHandlerMs: numField(statsRecord.body, 'maxHandlerMs') ?? null }
     : null

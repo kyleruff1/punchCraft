@@ -73,7 +73,7 @@ function writeWav(path, durationS, clickAtS, { amp = 0.8 } = {}) {
 
 const repLine = (rep, playheadEpochMs, asset = 'call cc-1 (48k)') =>
   [
-    `08-31 12:00:00.000 I/ReactNativeJS( 100): '[INFO] puncheokie.ruler.rep', 'rep timing', { asset: '${asset}',`,
+    `08-31 12:00:00.000 I/ReactNativeJS( 100): '[INFO] workout.ruler.rep', 'rep timing', { asset: '${asset}',`,
     `08-31 12:00:00.000 I/ReactNativeJS( 100):   rep: ${rep},`,
     `08-31 12:00:00.000 I/ReactNativeJS( 100):   startedEpochMs: ${playheadEpochMs - 120},`,
     `08-31 12:00:00.000 I/ReactNativeJS( 100):   statusEpochMs: ${playheadEpochMs - 95},`,

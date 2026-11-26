@@ -1,6 +1,6 @@
 {
   "schemaVersion": "1.0.0",
-  "title": "Puncheokie Pure-Punch Combination Corpus",
+  "title": "punchCraft workouts Pure-Punch Combination Corpus",
   "notation": {
     "stanceSemantics": "Odd numbers are lead-hand punches; even numbers are rear-hand punches. This remains stance-relative for orthodox and southpaw users.",
     "bodySuffix": "Append B to a punch token for the body variation, for example 1B, 2B, or 3B.",

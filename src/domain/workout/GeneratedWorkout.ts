@@ -15,9 +15,34 @@
 import type { ProgramRound, WorkoutBlock } from './WorkoutTokens'
 import type { WorkoutRecipe } from './WorkoutRecipe'
 
+/**
+ * Which machinery calls the punches.
+ *
+ * - `score` — the compiled workout score: `CueAnnouncer` plus the
+ *   `SlotDispatcher`'s combination announces.
+ * - `click-script` — an authored click-track set (Script Bible v2). Its
+ *   pre-rendered section lead-ins and per-bar calls ARE the punch calls, so
+ *   the score dispatcher is never armed and the announcer keeps to round
+ *   events (bells, stance changes, the countdown).
+ *
+ * This is a fact about how a workout was AUTHORED. It used to be inferred
+ * from `recipe.voiceMode === 'minimal'`, which made one field mean two
+ * things: "the athlete wants a quiet coach" and "this is a click-track
+ * workout". The 22 library workouts set the mode to say the second, and an
+ * athlete who picked Minimal on a generated workout got the first plus, by
+ * accident, the click-track's rendering choices.
+ */
+export type CoachPath = 'score' | 'click-script'
+
 export interface GeneratedWorkout {
   id: string
   recipe: WorkoutRecipe
+  /**
+   * Set by an authored click-track workout; absent means `score`. Read it
+   * through `coachPathOf`. Saved with the plan (`blocks_json`), so a stored
+   * workout still says which path ran it.
+   */
+  coachPath?: 'click-script'
   schedule: ProgramRound[]
   /** One entry per scored round, in order. Warm-up/cooldown are excluded. */
   roundPunchTargets: number[]
@@ -31,6 +56,11 @@ export interface WorkoutValidationError {
   /** Dotted path to the offending value, e.g. `schedule[2].blocks[0].durationMs`. */
   path: string
   message: string
+}
+
+/** The coach path a workout runs on (`score` unless it says otherwise). */
+export function coachPathOf(workout: Pick<GeneratedWorkout, 'coachPath'>): CoachPath {
+  return workout.coachPath ?? 'score'
 }
 
 /** Rounds that carry punch goals — everything except warm-up and cooldown (doc §9). */

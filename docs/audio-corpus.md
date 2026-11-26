@@ -3,7 +3,7 @@
 The one document a contributor reads before farming out new voice clips. Every clip category that ships in the app is listed once, with its id pattern, manifest, render command, and pronunciation rules. If a rule or a directory is not written here, it does not exist.
 
 Companion: `docs/audio-validation-rulebook.md` — the checklist a validator walks after a render batch.
-Roadmap: [M39 #278](https://github.com/kyleruff1/punchCraft-Puncheokie/issues/278) — the corpus re-render milestone this doc gates on.
+Roadmap: [M39 #278](https://github.com/kyleruff1/punchCraft-punchCraft workouts/issues/278) — the corpus re-render milestone this doc gates on.
 
 ## Doctrine
 

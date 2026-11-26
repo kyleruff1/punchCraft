@@ -2,9 +2,9 @@
  * Summarize the silent timing observers' records in one capture
  * (GH #291/#292, plan B3 — the seed of the C5 analyzer).
  *
- * Reads `puncheokie.voice.observed` (the coach playhead observer, C1/C2),
- * `puncheokie.instrument.observed` (the Oboe onset tap, C3) and
- * `puncheokie.observer.stats`, and reports coverage, onset latency per
+ * Reads `workout.voice.observed` (the coach playhead observer, C1/C2),
+ * `workout.instrument.observed` (the Oboe onset tap, C3) and
+ * `workout.observer.stats`, and reports coverage, onset latency per
  * family (median / p95 / jitter) and the outcome tallies. Non-gating: a
  * capture with no observer records at all (flag off) summarizes to
  * `present: false` and exits 0 — the suite prints it, the verifier judges.
@@ -55,7 +55,7 @@ function tally(items, key) {
 }
 
 export function parseVoiceObserved(logcatText) {
-  return recordsWithTag(logcatText, 'puncheokie.voice.observed').map(({ ts, body }) => ({
+  return recordsWithTag(logcatText, 'workout.voice.observed').map(({ ts, body }) => ({
     ts,
     playId: extractField(body, 'playId'),
     kind: extractField(body, 'kind'),
@@ -77,7 +77,7 @@ export function parseVoiceObserved(logcatText) {
 }
 
 export function parseInstrumentObserved(logcatText) {
-  return recordsWithTag(logcatText, 'puncheokie.instrument.observed').map(({ ts, body }) => ({
+  return recordsWithTag(logcatText, 'workout.instrument.observed').map(({ ts, body }) => ({
     ts,
     eventId: extractField(body, 'eventId'),
     hand: extractField(body, 'hand'),
@@ -91,7 +91,7 @@ export function parseInstrumentObserved(logcatText) {
 export function summarizeObserved(logcatText) {
   const voice = parseVoiceObserved(logcatText)
   const instrument = parseInstrumentObserved(logcatText)
-  const statsRecords = recordsWithTag(logcatText, 'puncheokie.observer.stats')
+  const statsRecords = recordsWithTag(logcatText, 'workout.observer.stats')
   const lastStats = statsRecords.at(-1)
   const observer = lastStats
     ? {
@@ -107,7 +107,7 @@ export function summarizeObserved(logcatText) {
   // counting them in the numerator produced "1/0 plays" on the first real
   // capture. They are reported separately as `ceremonyObserved`.
   const playIds = new Set(
-    recordsWithTag(logcatText, 'puncheokie.voice.play')
+    recordsWithTag(logcatText, 'workout.voice.play')
       .map((r) => extractField(r.body, 'playId'))
       .filter((id) => id !== undefined),
   )

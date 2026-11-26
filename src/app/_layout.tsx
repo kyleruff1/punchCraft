@@ -76,7 +76,7 @@ export default function RootLayout() {
   // sleep.
   useEffect(() => {
     if (!fontsLoaded) return
-    logger.info('puncheokie.app.ready', 'root layout mounted; deep links accepted', {
+    logger.info('workout.app.ready', 'root layout mounted; deep links accepted', {
       dev: safe(__DEV__),
     })
   }, [fontsLoaded])

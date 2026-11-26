@@ -1,4 +1,4 @@
-# punchCraft · Puncheokie
+# punchCraft · punchCraft workouts
 
 Android-first mobile app that restores useful life to a pair of unsupported **FightCamp first-generation Bluetooth punch trackers**. It connects to the left- and right-hand trackers over Bluetooth Low Energy, preserves every raw frame, decodes punch events, calculates session metrics, and powers three training workflows.
 
@@ -10,7 +10,7 @@ Android-first mobile app that restores useful life to a pair of unsupported **Fi
 |---|---|
 | **Velocity Lab** | Device connection, protocol diagnostics, live Bluetooth listening, calibration, and data export. The engineering surface and the first milestone. |
 | **punchCraft** | Configurable timed or free-form bag sessions with left/right punch counts, tracker-reported velocity, round metrics, and session history. |
-| **Puncheokie** | Recipe-generated punch workouts using numbered boxing combinations, orthodox/southpaw/switch stance, an optional Voice Coach, and an optional user-connected Spotify playlist for background listening. Designed in [docs/puncheokie-ux-workout-engine.md](docs/puncheokie-ux-workout-engine.md). |
+| **punchCraft workouts** | Recipe-generated punch workouts using numbered boxing combinations, orthodox/southpaw/switch stance, an optional Voice Coach, and an optional user-connected Spotify playlist for background listening. Designed in [docs/workouts-ux-engine.md](docs/workouts-ux-engine.md). |
 
 ## Principles
 
@@ -24,7 +24,7 @@ Android-first mobile app that restores useful life to a pair of unsupported **Fi
 ## Roadmap and tracking
 
 - **Project board:** https://github.com/users/kyleruff1/projects/5
-- **Milestones (the 30-step roadmap):** https://github.com/kyleruff1/punchCraft-Puncheokie/milestones
+- **Milestones (the 30-step roadmap):** https://github.com/kyleruff1/punchCraft/milestones
 - **Epics (one per phase, 8):** issues labeled `epic`; every task is a sub-issue of its phase epic.
 - Definitions of done for every milestone: [docs/roadmap.md](docs/roadmap.md).
 
@@ -33,7 +33,7 @@ Labels: type `epic` / `story` / `task` / `spike`; `phase:0`–`phase:7`; `area:*
 ## Documents
 
 - [Design specification](docs/design-spec.md) — the full product and engineering spec (sections 1–31).
-- [Puncheokie UX and Workout Engine](docs/puncheokie-ux-workout-engine.md) — canonical design for Puncheokie (supersedes spec §13 in part).
+- [punchCraft workouts UX and Workout Engine](docs/workouts-ux-engine.md) — canonical design for punchCraft workouts (supersedes spec §13 in part).
 - [Roadmap](docs/roadmap.md) — phases, milestones, definitions of done.
 - [Sprint 1](docs/sprint-1.md) — goal, stories, exit criteria, hardware prerequisites.
 - [Development setup](docs/dev-setup.md) — Windows workstation and Android tablet toolchain.

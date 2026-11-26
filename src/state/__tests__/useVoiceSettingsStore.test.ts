@@ -17,7 +17,7 @@ import {
   __resetVoiceSettingsForTests,
   useVoiceSettingsStore,
 } from '../useVoiceSettingsStore'
-import { defaultVoiceCoachPolicy } from '@domain/coach/VoiceCoachPolicy'
+import { defaultVoiceCoachPolicy, voiceAllowed } from '@domain/coach/VoiceCoachPolicy'
 
 function harness() {
   const db = createMigratedDb()
@@ -274,5 +274,103 @@ describe('writes reach the database immediately', () => {
       .prepare('SELECT COUNT(*) AS n FROM app_settings WHERE key = ?')
       .get(SETTINGS_KEYS.voicePolicy) as { n: number }
     expect(count.n).toBe(1)
+  })
+})
+
+describe('a stored value is checked, not trusted (D1, CLAUDE.md rule 9)', () => {
+  // `load` used to take whatever object was in the row. JSON carries no
+  // types, and `voiceAllowed` asks `!policy.overlayOptIn` — so any truthy
+  // value there, including the STRING "false", read as an opt-in and let the
+  // coach speak over someone else's music. The row is normally written by
+  // this store, as a boolean; but a saved setting outlives the build that
+  // wrote it, and this is the one field where "normally" is not enough.
+
+  const storePolicyRow = (h: ReturnType<typeof harness>, value: unknown): void => {
+    h.db.raw
+      .prepare('INSERT OR REPLACE INTO app_settings (key, value_json, updated_at) VALUES (?, ?, ?)')
+      .run(SETTINGS_KEYS.voicePolicy, JSON.stringify(value), '2026-11-25T00:00:00.000Z')
+    __resetVoiceSettingsForTests()
+    useVoiceSettingsStore.getState().load(h.repo)
+  }
+  const storeVolumesRow = (h: ReturnType<typeof harness>, value: unknown): void => {
+    h.db.raw
+      .prepare('INSERT OR REPLACE INTO app_settings (key, value_json, updated_at) VALUES (?, ?, ?)')
+      .run(SETTINGS_KEYS.voiceVolumes, JSON.stringify(value), '2026-11-25T00:00:00.000Z')
+    __resetVoiceSettingsForTests()
+    useVoiceSettingsStore.getState().load(h.repo)
+  }
+
+  it.each([
+    ['the string "false"', 'false'],
+    ['the string "true"', 'true'],
+    ['the number 1', 1],
+    ['an object', {}],
+    ['an array', []],
+    ['null', null],
+  ])('does not treat %s as an opt-in', (_label, stored) => {
+    const h = harness()
+    storePolicyRow(h, { ...defaultVoiceCoachPolicy(), overlayOptIn: stored })
+
+    const policy = h.store().policy
+    expect(policy.overlayOptIn).toBe(false)
+    // The gate itself, with someone else's audio playing.
+    expect(voiceAllowed(policy, true)).toBe(false)
+  })
+
+  it('keeps a real opt-in — literal true is the athlete’s own choice', () => {
+    const h = harness()
+    storePolicyRow(h, { ...defaultVoiceCoachPolicy(), overlayOptIn: true })
+    expect(h.store().policy.overlayOptIn).toBe(true)
+    expect(voiceAllowed(h.store().policy, true)).toBe(true)
+  })
+
+  it('heals the row it corrected, and only ever toward off', () => {
+    const h = harness()
+    storePolicyRow(h, { ...defaultVoiceCoachPolicy(), overlayOptIn: 'false' })
+    const row = h.db.raw
+      .prepare('SELECT value_json FROM app_settings WHERE key = ?')
+      .get(SETTINGS_KEYS.voicePolicy) as { value_json: string }
+    expect(JSON.parse(row.value_json)).toEqual(defaultVoiceCoachPolicy())
+  })
+
+  it('replaces a mode, vocabulary or metric setting it does not know with the default', () => {
+    const h = harness()
+    storePolicyRow(h, {
+      ...defaultVoiceCoachPolicy(),
+      mode: 'shouty',
+      vocabulary: 'klingon',
+      metricAnnouncements: 'constantly',
+      finalTenSecondWarning: 'yes',
+    })
+    expect(h.store().policy).toEqual(defaultVoiceCoachPolicy())
+  })
+
+  it('keeps every valid stored choice exactly as it was', () => {
+    const h = harness()
+    const chosen = {
+      mode: 'minimal',
+      style: 'follow-the-call',
+      vocabulary: 'numbers',
+      overlayOptIn: true,
+      metricAnnouncements: 'periodic',
+      finalTenSecondWarning: false,
+    } as const
+    storePolicyRow(h, chosen)
+    expect(h.store().policy).toEqual(chosen)
+  })
+
+  it('drops keys the policy does not have', () => {
+    const h = harness()
+    storePolicyRow(h, { ...defaultVoiceCoachPolicy(), speakOverEverything: true })
+    expect(h.store().policy).toEqual(defaultVoiceCoachPolicy())
+  })
+
+  it('clamps volumes to 0-1 and defaults the ones that are not numbers', () => {
+    const h = harness()
+    storeVolumesRow(h, { voice: 7, bells: -3, haptics: 'loud', metronome: 0.25 })
+    expect(h.store().volumes).toEqual({ voice: 1, bells: 0, haptics: 1, metronome: 0.25 })
+
+    storeVolumesRow(h, { voice: Number.NaN, bells: null, metronome: 0.6 })
+    expect(h.store().volumes).toEqual({ voice: 1, bells: 1, haptics: 1, metronome: 0.6 })
   })
 })

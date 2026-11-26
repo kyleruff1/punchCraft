@@ -241,3 +241,67 @@ describe('IntroPlayer resume-in-place', () => {
     expect(onComplete).not.toHaveBeenCalled()
   })
 })
+
+describe('RecoveryPlayer — a different script arriving mid-rest', () => {
+  // The athlete flips numbers ⇄ techniques during a rest, and the screen
+  // hands the player the other vocabulary's script for the same rest.
+  // `prepare` used to accept it. Building a playlist frees the previous one
+  // first, so the voice stopped mid-word; and the replacement could never
+  // start, because `started` was already latched for this rest.
+  const other = { ...script, scriptId: 'R-test.techniques' } as RecoveryScript
+
+  it('leaves a sounding walkthrough alone', () => {
+    const player = new RecoveryPlayer()
+    player.prepare(script)
+    player.playIfDue(2_000, 0.8)
+
+    player.prepare(other)
+    expect(playlists).toHaveLength(1)
+    expect(playlists[0]!.destroy).not.toHaveBeenCalled()
+    expect(playlists[0]!.playing).toBe(true)
+  })
+
+  it('leaves a paused walkthrough alone, and resumes the same one', () => {
+    const player = new RecoveryPlayer()
+    player.prepare(script)
+    player.playIfDue(2_000, 0.8)
+    player.pause()
+
+    player.prepare(other)
+    player.playIfDue(9_000, 0.8)
+    expect(playlists).toHaveLength(1)
+    expect(playlists[0]!.destroy).not.toHaveBeenCalled()
+    expect(playlists[0]!.play).toHaveBeenCalledTimes(2)
+  })
+
+  it('takes the new script at the next rest', () => {
+    const player = new RecoveryPlayer()
+    player.prepare(script)
+    player.playIfDue(2_000, 0.8)
+    player.prepare(other)
+
+    // The bell: the rest is over. The next rest prepares again.
+    player.stop()
+    player.prepare(other)
+    player.playIfDue(2_000, 0.8)
+
+    expect(playlists).toHaveLength(2)
+    expect(playlists[1]!.play).toHaveBeenCalledTimes(1)
+  })
+
+  it('still swaps freely before the walkthrough has started', () => {
+    // Inside the bell clearance nothing is sounding, so there is nothing to
+    // protect — the flip should simply win.
+    const player = new RecoveryPlayer()
+    player.prepare(script)
+    player.playIfDue(200, 0.8)
+    expect(playlists[0]!.play).not.toHaveBeenCalled()
+
+    player.prepare(other)
+    expect(playlists).toHaveLength(2)
+    expect(playlists[0]!.destroy).toHaveBeenCalledTimes(1)
+
+    player.playIfDue(2_000, 0.8)
+    expect(playlists[1]!.play).toHaveBeenCalledTimes(1)
+  })
+})

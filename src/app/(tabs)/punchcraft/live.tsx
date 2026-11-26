@@ -24,7 +24,7 @@
  * (spec §13.5, D1).
  */
 import React, { useCallback, useMemo, useRef, useState } from 'react'
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
+import { BackHandler, Image, Pressable, StyleSheet, Text, View } from 'react-native'
 import { Stack, useFocusEffect, useIsFocused, useNavigation, useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as ScreenOrientation from 'expo-screen-orientation'
@@ -46,8 +46,16 @@ import { fonts, sizes, weights } from '@/theme/typography'
 import { nextRoundPreview } from '@domain/session/restPhases'
 import { systemMonotonicClock } from '@domain/time/MonotonicClock'
 import { getSampleWorkout } from '@domain/workout/samples'
+import { coachPathOf } from '@domain/workout/GeneratedWorkout'
 import { generateWorkout } from '@domain/workout/generateWorkout'
-import { resetLive, setLive, useLive, useRecipe, useSelectedSampleKey } from '@state/useWorkoutStore'
+import {
+  getLive,
+  resetLive,
+  setLive,
+  useLive,
+  useRecipe,
+  useSelectedSampleKey,
+} from '@state/useWorkoutStore'
 import { useBackdropQuality } from '@state/useBackdropSettingsStore'
 import { useQaStore } from '@state/useQaStore'
 import { logger, safe } from '@diagnostics/logger'
@@ -60,11 +68,11 @@ import {
   type SharedWorkClock,
 } from '@domain/timing/SharedWorkClock'
 import { VoiceOutputExpo } from '@audio/VoiceOutputExpo'
-import { shouldHoldAudio } from './_audioHold'
-import { findComboAnnounce } from '@audio/voiceAssets/comboAnnounceManifest'
+import { isWorkoutActive, shouldHoldAudio } from './_audioHold'
+import { fillOptionsForRecipe } from '@audio/fillOptionsForRecipe'
 import { IntroPlayer } from '@audio/IntroPlayer'
 import { RecoveryPlayer } from '@audio/RecoveryPlayer'
-import { CALLOUT_CLIPS, themeClipFor } from '@audio/voiceAssets/calloutManifest'
+import { themeClipFor } from '@audio/voiceAssets/calloutManifest'
 import { INTRO_SEGMENTS } from '@audio/voiceAssets/introManifest'
 import { RECOVERY_SCRIPTS, type RecoveryScript } from '@audio/voiceAssets/recoveryManifest'
 import { findClickScript } from '@audio/voiceAssets/clickScriptManifest'
@@ -204,14 +212,15 @@ export default function LiveScreen(): React.JSX.Element {
   // exactly right and stays stable across flips.
   const startClickVocabulary = recipe.voiceVocabulary === 'names' ? ('techniques' as const) : ('numbers' as const)
 
-  // Click-minimal workouts never speak per-word clips — warming 20 word
-  // players for them was a third of the 44-live-session pile-up that
+  // A workout that never speaks per-word clips does not warm them — 20 word
+  // players for nothing was a third of the 44-live-session pile-up that
   // starved round-4 audio (leak hunt 2026-09-05). Light preload keeps just
-  // bells + tones warm.
-  const preloadLight =
-    (selectedSampleKey
-      ? getSampleWorkout(selectedSampleKey).workout.recipe.voiceMode
-      : recipe.voiceMode) === 'minimal'
+  // bells + tones warm. Two different reasons get a workout there: a
+  // click-track set, whose announcer is capped below punch calls whatever
+  // the athlete chose; and a generated workout whose athlete chose Minimal.
+  const preloadLight = selectedSampleKey
+    ? coachPathOf(getSampleWorkout(selectedSampleKey).workout) === 'click-script'
+    : recipe.voiceMode === 'minimal'
 
   React.useEffect(() => {
     // Preload during the countdown, not at the first cue: M34-01 measured a
@@ -292,52 +301,10 @@ export default function LiveScreen(): React.JSX.Element {
   // memoized on the recipe so it stays stable for the length of a run and only
   // rebuilds when the recipe changes. Either way the workout carries its own
   // stance, so a switch-by-round sample opens in the stance it prescribes.
-  // The clip gate (M1/M3): the generator's build-up ladders only emit
-  // notations the phrase library can actually say. A notation with no
-  // rendered clip drops that ladder from selection rather than sending the
-  // coach to the per-word fallback for a whole round.
-  const generated = useMemo(() => {
-    const vocabulary = recipe.voiceVocabulary === 'names' ? 'techniques' : 'numbers'
-    return generateWorkout(recipe, {
-      // M39-V2 Phase 5-iv: the per-punch phrase corpus retired; the
-      // gate now reads from the combo-announce library, which is the
-      // V2 source of truth for "coach can speak this combination."
-      voiceReady: (notation) => findComboAnnounce(notation, vocabulary) !== undefined,
-      // Set Ceremonies: price a pre-set call-out from MEASURED clip
-      // lengths so the fill can reserve exactly the lead-in the coach
-      // needs. Any missing clip prices to undefined — the ceremony is
-      // skipped, never guessed.
-      ...(recipe.voiceMode === 'off'
-        ? {}
-        : {
-            setupCallouts: {
-              reserveMsFor: (asset: string, notation?: string, tail?: string) => {
-                const sentence = (
-                  CALLOUT_CLIPS as Record<string, { durationMs: number }>
-                )[asset]?.durationMs
-                if (sentence === undefined) return undefined
-                let total = sentence
-                if (notation !== undefined) {
-                  // Phase 5-iv: read the announce clip's measured length
-                  // instead of the retired per-punch phrase clip.
-                  const recite = findComboAnnounce(notation, vocabulary)?.durationMs
-                  if (recite === undefined) return undefined
-                  total += recite + 250
-                }
-                if (tail !== undefined) {
-                  const tailMs = (
-                    CALLOUT_CLIPS as Record<string, { durationMs: number }>
-                  )[tail]?.durationMs
-                  if (tailMs === undefined) return undefined
-                  total += tailMs + 250
-                }
-                // Finish-quiet margin plus start slack.
-                return total + 800
-              },
-            },
-          }),
-    })
-  }, [recipe])
+  // The generator options (which ladders have clips, what a ceremony costs)
+  // come from the one shared builder, so the recipe screen warns about the
+  // workout this screen actually runs.
+  const generated = useMemo(() => generateWorkout(recipe, fillOptionsForRecipe(recipe)), [recipe])
   const sample = selectedSampleKey ? getSampleWorkout(selectedSampleKey) : undefined
   const workout = sample ? sample.workout : generated
 
@@ -665,10 +632,43 @@ export default function LiveScreen(): React.JSX.Element {
 
   const startedRef = useRef(false)
 
+  // The latest runner, for a callback that must not be rebuilt when the
+  // runner's identity changes — see `stopForExit`.
+  const runnerRef = useRef(runner)
+  runnerRef.current = runner
+
+  /**
+   * The one way out of a live workout: stop it — which writes the session —
+   * then ask about it. Returns whether there was a workout to stop.
+   *
+   * Shared by the Exit button and Android's back button, so the two cannot
+   * drift apart. The phase is read from the store at call time rather than
+   * from a render: the back handler is registered once per focus and would
+   * otherwise act on whatever phase the screen had when it gained focus.
+   * For the same reason this takes the runner through a ref and has no
+   * dependencies — the focus effect below owns the orientation lock and the
+   * tab bar, and re-running it mid-workout would flicker both.
+   */
+  const stopForExit = useCallback((): boolean => {
+    if (!isWorkoutActive(getLive().phase)) return false
+    runnerRef.current.emergencyStop()
+    setConfirmingStop(true)
+    return true
+  }, [])
+
   useFocusEffect(
     useCallback(() => {
       void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE)
       void activateKeepAwakeAsync(LIVE_KEEP_AWAKE_TAG)
+
+      // Android's back button (or back gesture) was the one exit this screen
+      // did not own. The tab bar is hidden and there is no header, but back
+      // still popped the route — and the runner's cleanup is deliberately
+      // passive, so the workout vanished: no session written, no summary,
+      // nothing logged as lost. Send it down the same stop-then-confirm path
+      // as Exit. With no workout running there is nothing to protect, and
+      // returning false lets the route pop as it always did.
+      const backPress = BackHandler.addEventListener('hardwareBackPress', stopForExit)
 
       // Hide the tab bar: doc §19 requires settings and recipe navigation to
       // be unreachable during a workout, and a visible tab bar is a one-tap
@@ -678,6 +678,7 @@ export default function LiveScreen(): React.JSX.Element {
       parent?.setOptions({ tabBarStyle: { display: 'none' } })
 
       return () => {
+        backPress.remove()
         // Restore the shared style object, not `undefined`: an explicit
         // undefined overrides the navigator-level tabBarStyle in the
         // options merge and leaves the bar unstyled (it collapses to a
@@ -693,7 +694,7 @@ export default function LiveScreen(): React.JSX.Element {
           // Already released; nothing to do.
         }
       }
-    }, [navigation]),
+    }, [navigation, stopForExit]),
   )
 
   const cues = runner.readCues()
@@ -722,7 +723,7 @@ export default function LiveScreen(): React.JSX.Element {
     const delayMs = qaRun.autostartDelayMs ?? QA_AUTOSTART_SETTLE_MS
     const timer = setTimeout(() => {
       useQaStore.getState().consumeAutostart()
-      logger.info('puncheokie.qa.autostart', 'QA autostart pressed Hit It', {
+      logger.info('workout.qa.autostart', 'QA autostart pressed Hit It', {
         workout: safe(workout.id),
         nonce: safe(qaRun.nonce ?? null),
         delayMs: safe(delayMs),
@@ -743,7 +744,7 @@ export default function LiveScreen(): React.JSX.Element {
     const script = qaRun.sim
     const bpm = qaRun.simBpm ?? simBpmForWorkout(script, workout)
     sim.playScript(script, bpm)
-    logger.info('puncheokie.qa.sim', 'auto sim script started', {
+    logger.info('workout.qa.sim', 'auto sim script started', {
       script: safe(script),
       bpm: safe(bpm),
       roundIndex: safe(live.roundIndex),
@@ -800,11 +801,13 @@ export default function LiveScreen(): React.JSX.Element {
         {/* EXPERIMENT (GH #305): the walk census shows ~20 UI-thread frame
             gaps per round (max ~0.9s) swallowing walk steps, and the Skia
             membrane repaints every frame on that same thread. Click sets
-            (voiceMode minimal — the walk IS the product) run without the
-            reactive layer for one verdict round: multi-jumps -> ~0
-            convicts the backdrop; unchanged exonerates it. Static art +
-            scrim remain either way. */}
-        {workout.recipe.voiceMode === 'minimal' ? null : (
+            (the walk IS the product) run without the reactive layer for
+            one verdict round: multi-jumps -> ~0 convicts the backdrop;
+            unchanged exonerates it. Static art + scrim remain either way.
+            Keyed on the workout being a click set — it used to read
+            `voiceMode === 'minimal'`, so choosing a quiet coach on a
+            generated workout also switched its backdrop off. */}
+        {coachPathOf(workout) === 'click-script' ? null : (
           <BackdropRenderer
             bus={backdropBus}
             quality={backdropQuality}
@@ -990,8 +993,10 @@ export default function LiveScreen(): React.JSX.Element {
       </View>
 
       {/* Discard is destructive, so it is confirmed rather than immediate
-          (spec §19.4). The stop itself already happened — only the fate of
-          the session is still open. */}
+          (spec §19.4). The stop itself already happened, and the session is
+          already written — a crash before this dialog must not lose it — so
+          Save simply leaves, and Discard deletes that row on the way out.
+          (The two used to be one handler: both just left.) */}
       {confirmingStop ? (
         <View style={styles.confirm} testID="stop-confirm">
           <Text style={styles.confirmText}>Workout stopped. Keep this session?</Text>
@@ -1006,7 +1011,10 @@ export default function LiveScreen(): React.JSX.Element {
             </Pressable>
             <Pressable
               accessibilityRole="button"
-              onPress={() => router.back()}
+              onPress={() => {
+                runner.discardSession()
+                router.back()
+              }}
               style={[styles.control, styles.stopControl]}
               testID="confirm-discard"
             >
@@ -1048,12 +1056,7 @@ export default function LiveScreen(): React.JSX.Element {
           // `cancelled` — leave directly. On a running/paused workout the
           // same confirm the Stop button uses runs, so a mid-session tap
           // does not silently lose the athlete's work.
-          if (live.phase === 'idle' || isOver) {
-            router.back()
-            return
-          }
-          runner.emergencyStop()
-          setConfirmingStop(true)
+          if (!stopForExit()) router.back()
         }}
         style={styles.exitButton}
         hitSlop={{ top: 10, bottom: 10, left: 10, right: 8 }}

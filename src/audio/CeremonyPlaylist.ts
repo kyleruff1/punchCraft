@@ -66,7 +66,7 @@ export class CeremonyPlaylist {
   private playlist: AudioPlaylist | null = null
   /** The silent timing observer (GH #291, C2), or null. Shared with the coach output. */
   private readonly timing: PlaybackObserver | null
-  /** Logger tag — `puncheokie.intro` and friends — so the log reads as before. */
+  /** Logger tag — `workout.intro` and friends — so the log reads as before. */
   private readonly tag: string
   /** Sum of the planned clip + silence milliseconds, as the caller computed it. */
   private plannedMsValue = 0

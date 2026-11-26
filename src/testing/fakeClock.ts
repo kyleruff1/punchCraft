@@ -27,7 +27,27 @@ export interface FakeClock extends MonotonicClock {
   pendingCount(): number
 }
 
-export function createFakeClock(startMs = 0): FakeClock {
+/**
+ * Where a fake clock starts unless a test says otherwise: an hour, two
+ * minutes and 3.004 seconds of "app uptime".
+ *
+ * Deliberately not zero. `MonotonicClock.now()` is milliseconds from an
+ * arbitrary origin — `performance.now()`, app uptime, on the device — while
+ * a round's work clock, a cue's schedule and a session's elapsed time all
+ * count from their own starts. At origin 0 those are close to one number
+ * line, so code that subtracts a monotonic stamp from a work-clock moment
+ * passes every test and is wrong on every device. That is exactly how
+ * `cue_results.offset_ms` came to hold the app's uptime for every punch.
+ *
+ * Deliberately not round either, so it cannot satisfy a tick-alignment or
+ * `% 1000` assumption by accident.
+ *
+ * A test that needs a particular reading should pass its own `startMs`, or
+ * better, measure from `clock.now()` at the moment it starts.
+ */
+export const DEFAULT_FAKE_CLOCK_ORIGIN_MS = 3_723_004
+
+export function createFakeClock(startMs = DEFAULT_FAKE_CLOCK_ORIGIN_MS): FakeClock {
   let current = startMs
   let nextId = 0
   let scheduled: Scheduled[] = []

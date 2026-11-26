@@ -77,7 +77,7 @@ beforeEach(() => {
 
 describe('silenceTrack', () => {
   it('returns nothing for a zero gap, silently', () => {
-    const pl = new CeremonyPlaylist(null, 'puncheokie.test')
+    const pl = new CeremonyPlaylist(null, 'workout.test')
     expect(pl.silenceTrack(0, {})).toBeUndefined()
     expect(logger.warn).not.toHaveBeenCalled()
   })
@@ -86,15 +86,15 @@ describe('silenceTrack', () => {
     // Two of the three players logged this and one did not — the round
     // warning would silently drop its breath. The lookup logs now, so no
     // caller can forget to.
-    const pl = new CeremonyPlaylist(null, 'puncheokie.test')
+    const pl = new CeremonyPlaylist(null, 'workout.test')
     expect(pl.silenceTrack(123, { round: 4 })).toBeUndefined()
-    expect(logger.warn).toHaveBeenCalledWith('puncheokie.test', 'no silence track for planned gap', { round: 4, gapMs: 123 })
+    expect(logger.warn).toHaveBeenCalledWith('workout.test', 'no silence track for planned gap', { round: 4, gapMs: 123 })
   })
 })
 
 describe('build', () => {
   it('an empty source list builds nothing and says so with its return value', () => {
-    const pl = new CeremonyPlaylist(null, 'puncheokie.test')
+    const pl = new CeremonyPlaylist(null, 'workout.test')
     expect(pl.build([], 0, 'x loaded', {})).toBe(false)
     expect(pl.loaded).toBe(false)
     expect(createAudioPlaylist).not.toHaveBeenCalled()
@@ -107,20 +107,20 @@ describe('build', () => {
     ;(createAudioPlaylist as jest.Mock).mockImplementationOnce(() => {
       throw new Error('transient native failure')
     })
-    const pl = new CeremonyPlaylist(null, 'puncheokie.test')
+    const pl = new CeremonyPlaylist(null, 'workout.test')
     expect(pl.build([1, 2], 500, 'x loaded', { round: 2 })).toBe(false)
     expect(pl.loaded).toBe(false)
     expect(pl.plannedMs).toBe(0)
-    expect(logger.warn).toHaveBeenCalledWith('puncheokie.test', 'playlist creation failed', expect.objectContaining({ round: 2 }))
+    expect(logger.warn).toHaveBeenCalledWith('workout.test', 'playlist creation failed', expect.objectContaining({ round: 2 }))
   })
 
   it('logs the ceremony’s own message with the track and boundary counts', () => {
-    const pl = new CeremonyPlaylist(null, 'puncheokie.test')
+    const pl = new CeremonyPlaylist(null, 'workout.test')
     expect(pl.build([1, 9, 2, 9, 3], 4_000, 'round warning prepared', { round: 2 })).toBe(true)
     expect(pl.loaded).toBe(true)
     expect(pl.plannedMs).toBe(4_000)
     expect(pl.tracks).toBe(5)
-    expect(logger.info).toHaveBeenCalledWith('puncheokie.test', 'round warning prepared', {
+    expect(logger.info).toHaveBeenCalledWith('workout.test', 'round warning prepared', {
       round: 2,
       plannedMs: 4_000,
       tracks: 5,
@@ -136,7 +136,7 @@ describe('build', () => {
   })
 
   it('rebuilding frees the previous playlist first', () => {
-    const pl = new CeremonyPlaylist(null, 'puncheokie.test')
+    const pl = new CeremonyPlaylist(null, 'workout.test')
     pl.build([1], 100, 'm', {})
     pl.build([2], 200, 'm', {})
     expect(playlists).toHaveLength(2)
@@ -153,7 +153,7 @@ describe('start', () => {
     // a JSI hop — which put that ceremony's onset latency in a slightly
     // different domain from the other two. One order now.
     const { observer } = rig()
-    const pl = new CeremonyPlaylist(observer, 'puncheokie.test')
+    const pl = new CeremonyPlaylist(observer, 'workout.test')
     pl.build([1], 1_000, 'm', {})
     const playId = pl.start(0.7, { kind: 'intro', label: 'intro', playIdPrefix: 'intro' })
     expect(playId).toBe('intro-1')
@@ -163,7 +163,7 @@ describe('start', () => {
   })
 
   it('unobserved: plays, returns no playId, attaches no listener', () => {
-    const pl = new CeremonyPlaylist(null, 'puncheokie.test')
+    const pl = new CeremonyPlaylist(null, 'workout.test')
     pl.build([1], 1_000, 'm', {})
     expect(pl.start(0.5, { kind: 'recovery', label: 'r', playIdPrefix: 'recovery' })).toBeNull()
     expect(playlists[0]!.play).toHaveBeenCalledTimes(1)
@@ -171,7 +171,7 @@ describe('start', () => {
   })
 
   it('a native throw propagates — what a failed start means is the caller’s to decide', () => {
-    const pl = new CeremonyPlaylist(null, 'puncheokie.test')
+    const pl = new CeremonyPlaylist(null, 'workout.test')
     pl.build([1], 1_000, 'm', {})
     playlists[0]!.play.mockImplementationOnce(() => {
       throw new Error('boom')
@@ -183,7 +183,7 @@ describe('start', () => {
 describe('pause / resume / playing', () => {
   it('a pause and resume in place is one observation — no re-watch', () => {
     const { observer } = rig()
-    const pl = new CeremonyPlaylist(observer, 'puncheokie.test')
+    const pl = new CeremonyPlaylist(observer, 'workout.test')
     pl.build([1], 1_000, 'm', {})
     pl.start(0.7, { kind: 'recovery', label: 'r', playIdPrefix: 'recovery' })
     expect(pl.playing).toBe(true)
@@ -197,7 +197,7 @@ describe('pause / resume / playing', () => {
   })
 
   it('pause never throws, and playing is false with nothing built', () => {
-    const pl = new CeremonyPlaylist(null, 'puncheokie.test')
+    const pl = new CeremonyPlaylist(null, 'workout.test')
     expect(() => pl.pause()).not.toThrow()
     expect(pl.playing).toBe(false)
   })
@@ -206,7 +206,7 @@ describe('pause / resume / playing', () => {
 describe('dispose', () => {
   it('the observer lets go BEFORE the native teardown, and the open observation closes as released', () => {
     const { observer, records } = rig()
-    const pl = new CeremonyPlaylist(observer, 'puncheokie.test')
+    const pl = new CeremonyPlaylist(observer, 'workout.test')
     pl.build([1], 1_000, 'm', {})
     pl.start(0.7, { kind: 'intro', label: 'intro', playIdPrefix: 'intro' })
     pl.dispose()
@@ -222,7 +222,7 @@ describe('dispose', () => {
   })
 
   it('is safe repeatedly and on a handle that never built', () => {
-    const pl = new CeremonyPlaylist(null, 'puncheokie.test')
+    const pl = new CeremonyPlaylist(null, 'workout.test')
     expect(() => {
       pl.dispose()
       pl.dispose()

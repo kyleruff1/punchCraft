@@ -58,7 +58,7 @@ export class IntroPlayer {
   private pump: ReturnType<typeof setInterval> | null = null
 
   constructor(opts: { observer?: PlaybackObserver | null } = {}) {
-    this.pl = new CeremonyPlaylist(opts.observer ?? null, 'puncheokie.intro')
+    this.pl = new CeremonyPlaylist(opts.observer ?? null, 'workout.intro')
   }
   private started = false
   private doneAt: number | null = null
@@ -116,13 +116,13 @@ export class IntroPlayer {
         try {
           this.pl.resume(volume)
         } catch (error) {
-          logger.warn('puncheokie.intro', 'playlist resume failed', {
+          logger.warn('workout.intro', 'playlist resume failed', {
             error: safe(String(error)),
           })
           this.finish('resume-failed')
           return
         }
-        logger.info('puncheokie.intro', 'intro resumed in place', {
+        logger.info('workout.intro', 'intro resumed in place', {
           pausedForMs: safe(pausedForMs),
         })
         this.startPump()
@@ -135,7 +135,7 @@ export class IntroPlayer {
         // fresh callback now that the countdown is live again — never
         // play() a finished playlist (it would restart from the top).
         if (opts.onComplete) {
-          logger.info('puncheokie.intro', 'intro completion re-delivered after pause', {})
+          logger.info('workout.intro', 'intro completion re-delivered after pause', {})
           opts.onComplete()
         }
         return
@@ -149,14 +149,14 @@ export class IntroPlayer {
     try {
       playId = this.pl.start(volume, { kind: 'intro', label: 'intro', playIdPrefix: 'intro' })
     } catch (error) {
-      logger.warn('puncheokie.intro', 'playlist play failed', {
+      logger.warn('workout.intro', 'playlist play failed', {
         error: safe(String(error)),
       })
       // No audio will come; complete immediately so the bell isn't held.
       this.finish('play-failed')
       return
     }
-    logger.info('puncheokie.intro', 'intro playing', {
+    logger.info('workout.intro', 'intro playing', {
       plannedMs: safe(this.pl.plannedMs),
       playId: safe(playId),
     })
@@ -186,7 +186,7 @@ export class IntroPlayer {
       this.pump = null
     }
     this.pl.pause()
-    logger.info('puncheokie.intro', 'intro paused in place', {})
+    logger.info('workout.intro', 'intro paused in place', {})
   }
 
   private startPump(): void {
@@ -211,7 +211,7 @@ export class IntroPlayer {
     }
     this.doneAt = null
     if (this.onComplete === null) return
-    logger.info('puncheokie.intro', 'intro complete', { reason: safe(reason) })
+    logger.info('workout.intro', 'intro complete', { reason: safe(reason) })
     const callback = this.onComplete
     this.onComplete = null
     callback()
@@ -220,7 +220,7 @@ export class IntroPlayer {
   /** The bell ends the speech. Frees the playlist. Safe to call repeatedly. */
   stop(): void {
     if (this.pl.loaded) {
-      logger.info('puncheokie.intro', 'intro stopped', {
+      logger.info('workout.intro', 'intro stopped', {
         wasPlaying: safe(this.started),
       })
     }

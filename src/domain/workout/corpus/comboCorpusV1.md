@@ -1,4 +1,4 @@
-# Puncheokie Pure-Punch Combination Corpus v1
+# punchCraft workouts Pure-Punch Combination Corpus v1
 
 This corpus is designed for a handwork-heavy boxing-bag application. It contains 60 unique exact combinations—20 beginner, 20 intermediate, and 20 advanced—plus 18 additive build-up sets and optional footwork wrappers.
 
@@ -31,7 +31,7 @@ The content is intentionally jab-heavy: 56 of 60 combinations begin with a lead 
 
 Short 2–3-punch work forms the beginner foundation. Intermediate work introduces 3–6-punch combinations, body shots, power finishes, and angle changes. Advanced combinations use spoken phase groups so long calls remain rhythmic and memorable.
 
-The name **Square** for `1-4-2-3` is a Puncheokie mnemonic used to support recall; it is not asserted as a universal boxing-coaching term.
+The name **Square** for `1-4-2-3` is a punchCraft workouts mnemonic used to support recall; it is not asserted as a universal boxing-coaching term.
 
 ## Tier summary
 
@@ -192,5 +192,5 @@ A three-minute round should normally revolve around three to six motifs rather t
 
 ## Source basis
 
-The construction method was informed by Boxing Canada's beginner-coach progression; England Boxing's official shadow-boxing drills; FightCamp's numbered two- and three-punch instruction and body-shot drills; published activity-profile research on lead-hand punching and combinations; and peer-reviewed boxing biomechanics research. The individual 60-combination corpus is an original synthesis for Puncheokie rather than a copied list.
+The construction method was informed by Boxing Canada's beginner-coach progression; England Boxing's official shadow-boxing drills; FightCamp's numbered two- and three-punch instruction and body-shot drills; published activity-profile research on lead-hand punching and combinations; and peer-reviewed boxing biomechanics research. The individual 60-combination corpus is an original synthesis for punchCraft workouts rather than a copied list.
 

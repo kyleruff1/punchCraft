@@ -10,7 +10,7 @@
  * dropped, that a window is used verbatim rather than recomputed, and that
  * no technique claim survives a tier that cannot support it.
  */
-import { CueMatcher, matchedCount, type CueMatchResult } from '../CueMatcher'
+import { CueMatcher, matchedCount, type CueMatchResult, type PlacedPunch } from '../CueMatcher'
 import { expandTimeline, type CueInstance } from '../CueTimeline'
 import { CADENCE_PROFILES } from '../../workout/cadence'
 import { legacyThreeRoundFundamentals as threeRoundFundamentals } from '../../workout/samples/__fixtures__'
@@ -29,33 +29,56 @@ const TIMELINE = expandTimeline(threeRoundFundamentals, 'orthodox', STEADY_BPM)
  */
 const CUE: CueInstance = TIMELINE[0]!.cues[1]!
 
+/**
+ * How long the app had been running when the round's bell rang.
+ *
+ * Every fixture's monotonic receive stamp sits this far from its work-clock
+ * time, because that is what a device does: `MonotonicClock.now()` counts
+ * from an arbitrary origin, the cue counts from the bell. These fixtures
+ * used to set `receivedMonotonicTimeMs` to `CUE.scheduledStartMs` — deriving
+ * the input's clock from the expected output's — so the suite checked
+ * `(base + d) - base === d`, true for any base, and passed for as long as
+ * the matcher subtracted one clock from the other. An hour is unmissable: a
+ * matcher that reads the receive stamp as round time now fails by 3 600 000.
+ */
+const UPTIME_AT_BELL_MS = 3_600_000
+
+type PunchOverrides = Partial<TrackerPunchEvent> & {
+  /** Where the punch landed on the round's work clock; `null` = unplaceable. */
+  atMs?: number | null
+}
+
 let nextId = 0
 
-function event(over: Partial<TrackerPunchEvent> = {}): TrackerPunchEvent {
+function punch(over: PunchOverrides = {}): PlacedPunch {
   nextId += 1
+  const { atMs = CUE.scheduledStartMs, ...eventOver } = over
   return {
-    id: `e${nextId}`,
-    sourceFrameId: `f${nextId}`,
-    deviceId: 'D7:34:B4:27:D5:84',
-    hand: 'left',
-    receivedMonotonicTimeMs: CUE.scheduledStartMs,
-    receivedWallTimeIso: '2026-08-23T00:00:00.000Z',
-    recovered: false,
-    decoderId: 'fightcamp-v1',
-    decoderVersion: '1',
-    velocityUnit: 'tracker-unit',
-    velocityRaw: 9,
-    qualityFlags: [],
-    ...over,
+    workElapsedMs: atMs,
+    event: {
+      id: `e${nextId}`,
+      sourceFrameId: `f${nextId}`,
+      deviceId: 'D7:34:B4:27:D5:84',
+      hand: 'left',
+      receivedMonotonicTimeMs: UPTIME_AT_BELL_MS + (atMs ?? 0),
+      receivedWallTimeIso: '2026-08-23T00:00:00.000Z',
+      recovered: false,
+      decoderId: 'fightcamp-v1',
+      decoderVersion: '1',
+      velocityUnit: 'tracker-unit',
+      velocityRaw: 9,
+      qualityFlags: [],
+      ...eventOver,
+    },
   }
 }
 
 /** A punch landing exactly on the nth expected token of the cue. */
-function onToken(n: number, over: Partial<TrackerPunchEvent> = {}): TrackerPunchEvent {
+function onToken(n: number, over: PunchOverrides = {}): PlacedPunch {
   const expected = CUE.expectedPunches[n]!
-  return event({
+  return punch({
     hand: expected.hand,
-    receivedMonotonicTimeMs: CUE.scheduledStartMs + (CUE.tokenOffsetsMs[expected.tokenIndex] ?? 0),
+    atMs: CUE.scheduledStartMs + (CUE.tokenOffsetsMs[expected.tokenIndex] ?? 0),
     ...over,
   })
 }
@@ -90,10 +113,10 @@ describe('a clean run', () => {
   })
 
   it('signs the offset — negative early, positive late', () => {
-    const early = matcher().match(CUE, [onToken(0, { receivedMonotonicTimeMs: CUE.scheduledStartMs - 100 })])
+    const early = matcher().match(CUE, [onToken(0, { atMs: CUE.scheduledStartMs - 100 })])
     expect(early.assignments[0]?.offsetMs).toBe(-100)
 
-    const late = matcher().match(CUE, [onToken(0, { receivedMonotonicTimeMs: CUE.scheduledStartMs + 120 })])
+    const late = matcher().match(CUE, [onToken(0, { atMs: CUE.scheduledStartMs + 120 })])
     expect(late.assignments[0]?.offsetMs).toBe(120)
   })
 
@@ -114,19 +137,19 @@ describe('a clean run', () => {
 
 describe('windows are used verbatim (spec §18.2)', () => {
   it('accepts a punch at the very edges of the window', () => {
-    const atStart = event({ receivedMonotonicTimeMs: CUE.windowStartMs })
-    const atEnd = event({ hand: 'right', receivedMonotonicTimeMs: CUE.windowEndMs })
+    const atStart = punch({ atMs: CUE.windowStartMs })
+    const atEnd = punch({ hand: 'right', atMs: CUE.windowEndMs })
     const result = matcher().match(CUE, [atStart, atEnd])
     expect(result.assignments).toHaveLength(2)
     expect(result.extras).toEqual([])
   })
 
   it('rejects a punch one millisecond outside either edge', () => {
-    const before = event({ receivedMonotonicTimeMs: CUE.windowStartMs - 1 })
-    const after = event({ hand: 'right', receivedMonotonicTimeMs: CUE.windowEndMs + 1 })
+    const before = punch({ atMs: CUE.windowStartMs - 1 })
+    const after = punch({ hand: 'right', atMs: CUE.windowEndMs + 1 })
     const result = matcher().match(CUE, [before, after])
     expect(result.assignments).toEqual([])
-    expect(result.extras.map((e) => e.eventId)).toEqual([before.id, after.id])
+    expect(result.extras.map((e) => e.eventId)).toEqual([before.event.id, after.event.id])
   })
 
   it('applies no grace of its own — a wider window is the timeline\'s job', () => {
@@ -136,7 +159,7 @@ describe('windows are used verbatim (spec §18.2)', () => {
       graceBeforeMs: 5_000,
       graceAfterMs: 5_000,
     })[0]!.cues[1]!
-    const early = event({ receivedMonotonicTimeMs: CUE.windowStartMs - 1 })
+    const early = punch({ atMs: CUE.windowStartMs - 1 })
 
     expect(matcher().match(CUE, [early]).assignments).toEqual([])
     expect(matcher().match(wide, [early]).assignments).toHaveLength(1)
@@ -160,8 +183,8 @@ describe('one event fills at most one slot', () => {
     const first = onToken(0)
     const second = onToken(1)
     const result = matcher().match(CUE, [second, first])
-    expect(result.assignments[0]?.eventId).toBe(first.id)
-    expect(result.assignments[1]?.eventId).toBe(second.id)
+    expect(result.assignments[0]?.eventId).toBe(first.event.id)
+    expect(result.assignments[1]?.eventId).toBe(second.event.id)
   })
 })
 
@@ -169,19 +192,25 @@ describe('extras are never dropped (doc §21, spec §13.6)', () => {
   it('surfaces a punch thrown after every slot is filled', () => {
     // Three punches, two slots. Slots fill in event-time order, so the
     // LAST punch is the surplus one — not whichever was appended last.
-    const first = onToken(0, { receivedMonotonicTimeMs: CUE.scheduledStartMs })
-    const second = onToken(1, { receivedMonotonicTimeMs: CUE.scheduledStartMs + 50 })
-    const third = onToken(1, { receivedMonotonicTimeMs: CUE.scheduledStartMs + 100 })
+    const first = onToken(0, { atMs: CUE.scheduledStartMs })
+    const second = onToken(1, { atMs: CUE.scheduledStartMs + 50 })
+    const third = onToken(1, { atMs: CUE.scheduledStartMs + 100 })
     const result = matcher().match(CUE, [first, second, third])
     expect(result.assignments).toHaveLength(2)
-    expect(result.assignments.map((a) => a.eventId)).toEqual([first.id, second.id])
-    expect(result.extras.map((e) => e.eventId)).toEqual([third.id])
+    expect(result.assignments.map((a) => a.eventId)).toEqual([first.event.id, second.event.id])
+    expect(result.extras.map((e) => e.eventId)).toEqual([third.event.id])
   })
 
-  it('surfaces a punch outside the window with its event time', () => {
-    const stray = event({ receivedMonotonicTimeMs: CUE.windowEndMs + 500 })
+  it('surfaces a punch outside the window with its receive time', () => {
+    // An extra carries the monotonic receive stamp, not the round time it was
+    // rejected on — so a value that leaves the matcher can never be mistaken
+    // for a work-clock time by whoever reads it next.
+    const stray = punch({ atMs: CUE.windowEndMs + 500 })
     const result = matcher().match(CUE, [stray])
-    expect(result.extras).toEqual([{ eventId: stray.id, eventTimeMs: CUE.windowEndMs + 500 }])
+    expect(result.extras).toEqual([
+      { eventId: stray.event.id, eventTimeMs: stray.event.receivedMonotonicTimeMs },
+    ])
+    expect(result.extras[0]?.eventTimeMs).toBe(UPTIME_AT_BELL_MS + CUE.windowEndMs + 500)
   })
 
   it('accounts for every event exactly once, as an assignment or an extra', () => {
@@ -189,16 +218,16 @@ describe('extras are never dropped (doc §21, spec §13.6)', () => {
     const events = [
       onToken(0),
       onToken(1),
-      event({ receivedMonotonicTimeMs: CUE.windowEndMs + 10 }),
-      event({ hand: 'right', receivedMonotonicTimeMs: CUE.scheduledStartMs + 20 }),
-      event({ receivedMonotonicTimeMs: CUE.windowStartMs - 10 }),
+      punch({ atMs: CUE.windowEndMs + 10 }),
+      punch({ hand: 'right', atMs: CUE.scheduledStartMs + 20 }),
+      punch({ atMs: CUE.windowStartMs - 10 }),
     ]
     const result = matcher().match(CUE, events)
     const accounted = [
       ...result.assignments.map((a) => a.eventId),
       ...result.extras.map((e) => e.eventId),
     ]
-    expect(accounted.sort()).toEqual(events.map((e) => e.id).sort())
+    expect(accounted.sort()).toEqual(events.map((e) => e.event.id).sort())
   })
 })
 
@@ -208,7 +237,7 @@ describe('hand mismatch is not type mismatch (doc §6)', () => {
     // wrong glove. Since D18 that does not fill the slot — but the punch is
     // still reported, with the reason, so it stays distinguishable from a
     // punch that simply had no slot left.
-    const wrong = event({ hand: 'right', receivedMonotonicTimeMs: CUE.scheduledStartMs })
+    const wrong = punch({ hand: 'right', atMs: CUE.scheduledStartMs })
     const result = matcher().match(CUE, [wrong])
     expect(result.assignments).toEqual([])
     expect(result.extras).toHaveLength(1)
@@ -218,14 +247,14 @@ describe('hand mismatch is not type mismatch (doc §6)', () => {
   it('leaves the ordinal open, so the correct hand can still answer it', () => {
     // The whole point of D18: a hand error is recoverable. The right hand
     // arriving next fills expectation 0, not expectation 1.
-    const wrong = event({ hand: 'right', receivedMonotonicTimeMs: CUE.scheduledStartMs })
+    const wrong = punch({ hand: 'right', atMs: CUE.scheduledStartMs })
     const result = matcher().match(CUE, [wrong, onToken(0)])
     expect(result.assignments.map((a) => a.expectedIndex)).toEqual([0])
     expect(result.assignments[0]?.outcome).toBe('matched')
   })
 
   it('treats an unknown hand as a mismatch, never as a match', () => {
-    const unknown = event({ hand: 'unknown', receivedMonotonicTimeMs: CUE.scheduledStartMs })
+    const unknown = punch({ hand: 'unknown', atMs: CUE.scheduledStartMs })
     const result = matcher().match(CUE, [unknown])
     expect(result.assignments).toEqual([])
     expect(result.extras[0]?.reason).toBe('hand-mismatch')
@@ -233,7 +262,7 @@ describe('hand mismatch is not type mismatch (doc §6)', () => {
 })
 
 describe('technique claims are gated by the tier (D12)', () => {
-  const withType = (type: PunchType): TrackerPunchEvent =>
+  const withType = (type: PunchType): PlacedPunch =>
     onToken(0, { punchType: type })
 
   it.each(['hand-only', 'hand-timestamp'] as const)(
@@ -286,44 +315,81 @@ describe('technique claims are gated by the tier (D12)', () => {
   })
 })
 
-describe('recovered events (H12, doc §6)', () => {
-  it('is assignable when its tracker timestamp orders reliably', () => {
-    // Delivered long after the fact, but the tracker says when it happened.
-    const recovered = event({
-      recovered: true,
-      trackerTimestampMs: CUE.scheduledStartMs,
-      receivedMonotonicTimeMs: CUE.windowEndMs + 60_000,
-    })
-    const result = matcher().match(CUE, [recovered])
-    expect(result.assignments[0]?.outcome).toBe('matched')
-    expect(result.assignments[0]?.offsetMs).toBe(0)
+describe('the work clock is the only clock', () => {
+  it('measures the offset on the work clock, whatever the receive stamp says', () => {
+    // The same punch at three different app uptimes. The offset describes
+    // when the punch landed in the round, so it must not move.
+    for (const uptimeMs of [0, 3_600_000, 86_400_000]) {
+      const landed = onToken(0, {
+        atMs: CUE.scheduledStartMs + 40,
+        receivedMonotonicTimeMs: uptimeMs,
+      })
+      expect(matcher().match(CUE, [landed]).assignments[0]?.offsetMs).toBe(40)
+    }
   })
 
-  it('becomes an extra when it carries no usable timestamp', () => {
-    // Without a tracker timestamp there is nothing to order it by, and
-    // guessing from arrival time would place it wherever the radio happened
-    // to deliver it.
-    const recovered = event({
-      recovered: true,
+  it('applies the window to the work-clock time, not the receive stamp', () => {
+    // A receive stamp whose digits happen to fall inside the window must not
+    // rescue a punch that landed outside it — nor the other way round.
+    const outside = punch({
+      atMs: CUE.windowEndMs + 1,
       receivedMonotonicTimeMs: CUE.scheduledStartMs,
     })
-    const result = matcher().match(CUE, [recovered])
-    expect(result.assignments).toEqual([])
-    expect(result.extras.map((e) => e.eventId)).toEqual([recovered.id])
+    const inside = punch({
+      atMs: CUE.scheduledStartMs,
+      receivedMonotonicTimeMs: CUE.windowEndMs + 60_000,
+    })
+    expect(matcher().match(CUE, [outside]).assignments).toEqual([])
+    expect(matcher().match(CUE, [inside]).assignments).toHaveLength(1)
   })
 
-  it('is ordered by its tracker timestamp, not its arrival', () => {
-    const late = event({
-      hand: 'right',
+  it('orders by work-clock time, not by receive stamp', () => {
+    const first = onToken(0, { receivedMonotonicTimeMs: 9_999_999 })
+    const second = onToken(1, { receivedMonotonicTimeMs: 1 })
+    const result = matcher().match(CUE, [second, first])
+    expect(result.assignments.map((a) => a.eventId)).toEqual([first.event.id, second.event.id])
+  })
+})
+
+describe('unplaceable punches (H12, doc §6)', () => {
+  it('sets a punch with no work-clock placement aside as an extra', () => {
+    // A recovered event: drained after a reconnect, so nothing says when in
+    // the round it was thrown. Guessing would place it wherever the radio
+    // happened to deliver it.
+    const drained = punch({ recovered: true, atMs: null })
+    const result = matcher().match(CUE, [drained])
+    expect(result.assignments).toEqual([])
+    expect(result.extras).toEqual([
+      { eventId: drained.event.id, eventTimeMs: drained.event.receivedMonotonicTimeMs },
+    ])
+    expect(result.missedExpectedIndexes).toEqual([0, 1])
+  })
+
+  it('never lets an unplaceable punch take a slot, even with the window gate off', () => {
+    // The settled pass runs with `gate: 'open'`. That skip must not become a
+    // way in: a punch thrown a minute ago and drained into an open window
+    // used to fill whatever slot was left.
+    const drained = punch({ hand: 'right', recovered: true, atMs: null })
+    const result = matcher().match(CUE, [onToken(0), drained], { gate: 'open' })
+    expect(result.assignments.map((a) => a.expectedIndex)).toEqual([0])
+    expect(result.missedExpectedIndexes).toEqual([1])
+    expect(result.extras.map((e) => e.eventId)).toEqual([drained.event.id])
+  })
+
+  it('places nothing by the tracker timestamp, which is device epoch time', () => {
+    // About 1.79e12 on real hardware. It used to be read as a work-clock time
+    // for recovered events.
+    const epoch = punch({
       recovered: true,
-      trackerTimestampMs: CUE.scheduledStartMs + 400,
-      receivedMonotonicTimeMs: CUE.scheduledStartMs + 1,
+      trackerTimestampMs: 1_790_000_000_000,
+      atMs: null,
     })
-    const onTime = onToken(0, { receivedMonotonicTimeMs: CUE.scheduledStartMs + 5 })
-    const result = matcher().match(CUE, [late, onTime])
-    // The on-time left punch takes slot 0 even though the recovered event
-    // arrived first.
-    expect(result.assignments[0]?.eventId).toBe(onTime.id)
+    expect(matcher().match(CUE, [epoch], { gate: 'open' }).assignments).toEqual([])
+  })
+
+  it('still records the decoder that produced it', () => {
+    const drained = punch({ recovered: true, atMs: null, decoderVersion: '7' })
+    expect(matcher().match(CUE, [drained]).decoderVersions).toEqual(['7'])
   })
 })
 
@@ -341,7 +407,7 @@ describe('missed expectations', () => {
     // It used to be counted as filled. Under D18 the ordinal stays open, so an
     // unretried hand error leaves the expectation genuinely missed — which is
     // the honest reading of a punch that was never landed correctly.
-    const wrong = event({ hand: 'right', receivedMonotonicTimeMs: CUE.scheduledStartMs })
+    const wrong = punch({ hand: 'right', atMs: CUE.scheduledStartMs })
     const result = matcher().match(CUE, [wrong])
     expect(result.missedExpectedIndexes).toEqual([0, 1])
     expect(matchedCount(result)).toBe(0)
@@ -350,7 +416,7 @@ describe('missed expectations', () => {
 
 describe('determinism (spec §13.6)', () => {
   it('produces a deep-equal result for the same inputs', () => {
-    const events = [onToken(0), onToken(1), event({ receivedMonotonicTimeMs: CUE.windowEndMs + 5 })]
+    const events = [onToken(0), onToken(1), punch({ atMs: CUE.windowEndMs + 5 })]
     const a = matcher().match(CUE, events)
     const b = matcher().match(CUE, events)
     expect(b).toEqual(a)
@@ -365,8 +431,8 @@ describe('determinism (spec §13.6)', () => {
 
   it('breaks a timestamp tie deterministically', () => {
     // Two punches at the identical instant must not depend on arrival order.
-    const a = event({ id: 'zzz', receivedMonotonicTimeMs: CUE.scheduledStartMs })
-    const b = event({ id: 'aaa', hand: 'right', receivedMonotonicTimeMs: CUE.scheduledStartMs })
+    const a = punch({ id: 'zzz', atMs: CUE.scheduledStartMs })
+    const b = punch({ id: 'aaa', hand: 'right', atMs: CUE.scheduledStartMs })
     const forward = matcher().match(CUE, [a, b])
     const reversed = matcher().match(CUE, [b, a])
     expect(reversed).toEqual(forward)

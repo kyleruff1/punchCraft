@@ -179,10 +179,10 @@ beforeEach(() => {
   jest.clearAllMocks()
 })
 
-/** Every `puncheokie.instrument.observed` record logged so far, oldest first. */
+/** Every `workout.instrument.observed` record logged so far, oldest first. */
 function observed(): Record<string, unknown>[] {
   return (logger.info as jest.Mock).mock.calls
-    .filter((call) => call[0] === 'puncheokie.instrument.observed')
+    .filter((call) => call[0] === 'workout.instrument.observed')
     .map((call) => call[2] as Record<string, unknown>)
 }
 

@@ -65,12 +65,12 @@ const mad = (v) => {
 }
 const r1 = (v) => (v === null || !Number.isFinite(v) ? null : Math.round(v * 10) / 10)
 
-/** One `puncheokie.plruler.rep` block per play, gathered across continuation lines. */
+/** One `workout.plruler.rep` block per play, gathered across continuation lines. */
 export function parseRepBlocks(text) {
   const reps = []
   const lines = String(text).split(/\r?\n/)
   for (let i = 0; i < lines.length; i += 1) {
-    if (!lines[i].includes('puncheokie.plruler.rep')) continue
+    if (!lines[i].includes('workout.plruler.rep')) continue
     let block = lines[i]
     for (let j = i + 1; j < lines.length && !block.includes('}') && j - i < 24; j += 1) block += ' ' + lines[j]
     // Word-anchored: `rep` must not match inside `reps`, and a bare `arm` must
@@ -128,7 +128,7 @@ export function analyze(logText) {
   const problems = []
   const notes = []
   if (reps.length === 0) {
-    return { ok: false, problems: ['no puncheokie.plruler.rep records — did the probe run?'], arms: {}, verdicts: [] }
+    return { ok: false, problems: ['no workout.plruler.rep records — did the probe run?'], arms: {}, verdicts: [] }
   }
 
   // One run only. Two overlapping runs interleave in the log and their stamps

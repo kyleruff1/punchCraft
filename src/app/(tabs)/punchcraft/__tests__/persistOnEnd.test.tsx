@@ -27,6 +27,8 @@ import { createMigratedDb } from '@storage/__tests__/helpers/memoryDb'
 import { SessionRepository } from '@storage/repositories/SessionRepository'
 import { WorkoutRepository } from '@storage/repositories/WorkoutRepository'
 import { defaultRecipe } from '@domain/workout/WorkoutRecipe'
+import { bpmForRecipe } from '@domain/workout/cadence'
+import { expandTimeline } from '@domain/programs/CueTimeline'
 import { resetLive, useLiveStore } from '@state/useWorkoutStore'
 import type { WorkoutPersistence } from '@storage/getWorkoutPersistence'
 import type { GeneratedWorkout } from '@domain/workout/GeneratedWorkout'
@@ -292,6 +294,39 @@ describe('a completed workout lands in the database', () => {
     h.unmount()
   })
 
+  it('still saves when one glove lands two punches the database cannot tell apart', () => {
+    // `punch_events` drops a row that matches one already stored on device,
+    // tracker timestamp, type byte and reading — and this source reports no
+    // tracker timestamp, so two left punches with the same reading collide.
+    // Each answered a different combination, so two cue results name them.
+    // The second one named a punch that was never written; the foreign key
+    // failed and the whole workout rolled back.
+    const second = expandTimeline(WORKOUT, 'orthodox', bpmForRecipe(WORKOUT.recipe))[0]!.cues[1]!
+    const p = realPersistence()
+    const h = mount(p)
+    h.begin()
+    h.emit('left')
+    // Into the second combination's window, then the same punch again.
+    h.step(second.scheduledStartMs)
+    h.emit('left')
+    h.step(WORK_MS + REST_MS + WORK_MS)
+
+    expect(h.outcomes[0]?.status).toBe('persisted')
+    expect(p.count('punch_events')).toBe(1)
+
+    const credited = p.raw
+      .prepare(
+        `SELECT observed_event_id AS id FROM cue_results
+          WHERE outcome = 'matched' ORDER BY repeat_index`,
+      )
+      .all() as Array<{ id: string | null }>
+    // Both combinations keep their credit, each pointing at the stored punch.
+    expect(credited).toHaveLength(2)
+    expect(new Set(credited.map((row) => row.id)).size).toBe(1)
+    expect(credited[0]?.id).not.toBeNull()
+    h.unmount()
+  })
+
   it('records a row for every punch called, not only the ones thrown', () => {
     // The athlete answered two of the punches they were shown. The ones they
     // did not answer are exactly what a summary needs in order to say so.
@@ -405,6 +440,192 @@ describe('persistence is optional', () => {
     const h = mount(null)
     runToEnd(h)
     expect(h.outcomes[0]).toMatchObject({ status: 'skipped', cancelled: false })
+    h.unmount()
+  })
+})
+
+describe("punches outside a running workout are not the workout's", () => {
+  // The gloves keep reporting whatever the session is doing. The runner used
+  // to treat every one of those punches as part of the workout: counters
+  // climbed under the "Paused" overlay and under "Workout complete", the
+  // tablet buzzed, and a punch thrown during a pause could be credited to a
+  // combination when the round resumed.
+
+  const total = (): number => useLiveStore.getState().live.counts.total
+
+  it('counts nothing while paused, and picks up again on resume', () => {
+    const h = mount(null)
+    h.begin()
+    h.emit('left')
+    expect(total()).toBe(1)
+
+    act(() => {
+      h.runner.pause()
+    })
+    h.emit('left')
+    h.emit('right')
+    expect(total()).toBe(1)
+
+    act(() => {
+      h.runner.resume()
+    })
+    h.emit('right')
+    expect(total()).toBe(2)
+    h.unmount()
+  })
+
+  it('does not credit a punch thrown during a pause when the round resumes', () => {
+    // The first combination's window is open when the athlete pauses, and
+    // the punch thrown in the pause is exactly the one it is waiting for.
+    const p = realPersistence()
+    const h = mount(p)
+    h.begin()
+    act(() => {
+      h.runner.pause()
+    })
+    h.emit('left')
+    act(() => {
+      h.runner.resume()
+    })
+    h.step(WORK_MS + REST_MS + WORK_MS)
+
+    expect(h.outcomes[0]?.status).toBe('persisted')
+    const matched = p.raw
+      .prepare("SELECT COUNT(*) AS n FROM cue_results WHERE outcome = 'matched'")
+      .get() as { n: number }
+    expect(matched.n).toBe(0)
+    h.unmount()
+  })
+
+  it('counts nothing after the workout is stopped', () => {
+    const h = mount(null)
+    h.begin()
+    h.emit('left')
+    act(() => {
+      h.runner.emergencyStop()
+    })
+    const atStop = total()
+
+    h.emit('left')
+    h.emit('right')
+    expect(total()).toBe(atStop)
+    h.unmount()
+  })
+
+  it('counts nothing after the workout finishes on its own', () => {
+    const h = mount(null)
+    runToEnd(h)
+    const atBell = total()
+
+    h.emit('left')
+    expect(total()).toBe(atBell)
+    h.unmount()
+  })
+
+  it('still counts a punch thrown in the rest between rounds', () => {
+    // Deliberately unchanged: the session is running, and those punches have
+    // always counted toward it.
+    const h = mount(null)
+    h.begin()
+    h.step(WORK_MS)
+    expect(useLiveStore.getState().live.phase).toBe('rest')
+    const before = total()
+
+    h.emit('left')
+    expect(total()).toBe(before + 1)
+    h.unmount()
+  })
+})
+
+describe('discarding a stopped session', () => {
+  // After a stop the screen asks "Keep this session?". The session is
+  // already written by then — a crash before the dialog must not lose it —
+  // and the two answers used to be one handler: both just left the screen.
+  // Discard now removes the row it is talking about.
+
+  /** A workout stopped after its first combination was answered and settled. */
+  function stopped(p: TestPersistence): Harness {
+    const second = expandTimeline(WORKOUT, 'orthodox', bpmForRecipe(WORKOUT.recipe))[0]!.cues[1]!
+    const h = mount(p)
+    h.begin()
+    h.emit('left')
+    h.step(400)
+    h.emit('right')
+    // On into the second combination's window, which settles the first — a
+    // combination cut off by the stop itself is cancelled, never graded.
+    h.step(second.scheduledStartMs)
+    act(() => {
+      h.runner.emergencyStop()
+    })
+    return h
+  }
+
+  it('removes the session and everything written with it', () => {
+    const p = realPersistence()
+    const h = stopped(p)
+    expect(h.outcomes[0]).toMatchObject({ status: 'persisted', cancelled: true })
+    expect(p.count('sessions')).toBe(1)
+    expect(p.count('cue_results')).toBeGreaterThan(0)
+    expect(p.count('punch_events')).toBeGreaterThan(0)
+
+    let removed = false
+    act(() => {
+      removed = h.runner.discardSession()
+    })
+
+    expect(removed).toBe(true)
+    expect(p.count('sessions')).toBe(0)
+    expect(p.count('cue_results')).toBe(0)
+    expect(p.count('punch_events')).toBe(0)
+    h.unmount()
+  })
+
+  it('keeps the session when the athlete does not discard it', () => {
+    const p = realPersistence()
+    const h = stopped(p)
+    h.unmount()
+    expect(p.count('sessions')).toBe(1)
+  })
+
+  it('is safe to press twice', () => {
+    const p = realPersistence()
+    const h = stopped(p)
+    expect(h.runner.discardSession()).toBe(true)
+    expect(h.runner.discardSession()).toBe(false)
+    h.unmount()
+  })
+
+  it('removes only its own session', () => {
+    const p = realPersistence()
+    const earlier = stopped(p)
+    earlier.unmount()
+    const later = stopped(p)
+    expect(p.count('sessions')).toBe(2)
+
+    later.runner.discardSession()
+    expect(p.count('sessions')).toBe(1)
+    later.unmount()
+  })
+
+  it('has nothing to remove when nothing was written', () => {
+    // Stopped before a single cue reached the stage: no session exists.
+    const p = realPersistence()
+    const h = mount(p)
+    act(() => {
+      h.runner.emergencyStop()
+    })
+    expect(h.runner.discardSession()).toBe(false)
+    expect(p.count('sessions')).toBe(0)
+    h.unmount()
+  })
+
+  it('has nothing to remove when persistence is switched off', () => {
+    const h = mount(null)
+    h.begin()
+    act(() => {
+      h.runner.emergencyStop()
+    })
+    expect(h.runner.discardSession()).toBe(false)
     h.unmount()
   })
 })

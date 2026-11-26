@@ -1,5 +1,5 @@
 /**
- * Migration 004 — the four Puncheokie workout tables, their CHECK enums, the
+ * Migration 004 — the four punchCraft workouts workout tables, their CHECK enums, the
  * D8 NOT NULL on the realized stream, and the foreign keys, verified against a
  * real in-memory SQLite (node:sqlite).
  *

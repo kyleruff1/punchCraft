@@ -11,7 +11,7 @@
  * cannot verify it (D4), and a dimension the tier cannot supply is omitted
  * with an explanation rather than scored zero (D11).
  */
-import { CueMatcher } from '../CueMatcher'
+import { CueMatcher, type PlacedPunch } from '../CueMatcher'
 import { TIMING_TIGHT_MS, scoreCue, scoreRound } from '../cueScoring'
 import { expandTimeline, type CueInstance } from '../CueTimeline'
 import { CADENCE_PROFILES } from '../../workout/cadence'
@@ -24,6 +24,20 @@ const STEADY_BPM = CADENCE_PROFILES.steady.nominalBpm
 const CUE: CueInstance = expandTimeline(threeRoundFundamentals, 'orthodox', STEADY_BPM)[0]!
   .cues[1]!
 
+/**
+ * How long the app had been running when the bell rang. Fixtures stamp each
+ * punch this far from its work-clock time, as a device would; `placed` below
+ * is the fixture's session clock, converting back. Stamping punches with
+ * `CUE.scheduledStartMs` directly — as this suite once did — makes the two
+ * clocks one number line and hides every place they are confused.
+ */
+const UPTIME_AT_BELL_MS = 3_600_000
+
+const placed = (event: TrackerPunchEvent): PlacedPunch => ({
+  event,
+  workElapsedMs: event.receivedMonotonicTimeMs - UPTIME_AT_BELL_MS,
+})
+
 let nextId = 0
 
 function event(over: Partial<TrackerPunchEvent> = {}): TrackerPunchEvent {
@@ -33,7 +47,7 @@ function event(over: Partial<TrackerPunchEvent> = {}): TrackerPunchEvent {
     sourceFrameId: `f${nextId}`,
     deviceId: 'D7:34',
     hand: 'left',
-    receivedMonotonicTimeMs: CUE.scheduledStartMs,
+    receivedMonotonicTimeMs: UPTIME_AT_BELL_MS + CUE.scheduledStartMs,
     receivedWallTimeIso: '2026-08-23T00:00:00.000Z',
     recovered: false,
     decoderId: 'fightcamp-v1',
@@ -49,7 +63,7 @@ function onToken(n: number, over: Partial<TrackerPunchEvent> = {}): TrackerPunch
   const expected = CUE.expectedPunches[n]!
   return event({
     hand: expected.hand,
-    receivedMonotonicTimeMs: CUE.scheduledStartMs + (CUE.tokenOffsetsMs[expected.tokenIndex] ?? 0),
+    receivedMonotonicTimeMs: UPTIME_AT_BELL_MS + CUE.scheduledStartMs + (CUE.tokenOffsetsMs[expected.tokenIndex] ?? 0),
     ...over,
   })
 }
@@ -59,7 +73,7 @@ function score(
   tier: CapabilityTier = 'hand-timestamp',
   options: Parameters<typeof scoreCue>[2] = {},
 ) {
-  const result = new CueMatcher(tier).match(CUE, events)
+  const result = new CueMatcher(tier).match(CUE, events.map(placed))
   return scoreCue(result, tier, options)
 }
 
@@ -103,7 +117,7 @@ describe('completion and correct hand', () => {
     // but since D18 a wrong hand no longer fills the expectation, so nothing
     // completed. Hand accuracy is measured among the punches that answered an
     // expectation, so one wrong glove and nothing else is 0%.
-    const wrong = event({ hand: 'right', receivedMonotonicTimeMs: CUE.scheduledStartMs })
+    const wrong = event({ hand: 'right', receivedMonotonicTimeMs: UPTIME_AT_BELL_MS + CUE.scheduledStartMs })
     const result = score([wrong])
     expect(result.completionPct).toBe(0)
     expect(result.correctHandPct).toBe(0)
@@ -112,7 +126,7 @@ describe('completion and correct hand', () => {
   it('scores hand accuracy against attempts, not against what was called', () => {
     // A set half-thrown, correctly: 100% of what was attempted used the right
     // glove, while completion honestly reports that half the set went unthrown.
-    const right = event({ hand: 'left', receivedMonotonicTimeMs: CUE.scheduledStartMs })
+    const right = event({ hand: 'left', receivedMonotonicTimeMs: UPTIME_AT_BELL_MS + CUE.scheduledStartMs })
     const result = score([right])
     expect(result.completionPct).toBe(50)
     expect(result.correctHandPct).toBe(100)
@@ -133,7 +147,7 @@ describe('timing', () => {
 
   it('counts a punch outside the tight band as late', () => {
     const late = onToken(0, {
-      receivedMonotonicTimeMs: CUE.scheduledStartMs + TIMING_TIGHT_MS + 20,
+      receivedMonotonicTimeMs: UPTIME_AT_BELL_MS + CUE.scheduledStartMs + TIMING_TIGHT_MS + 20,
     })
     expect(score([late]).timingWindowPct).toBe(0)
   })
@@ -213,7 +227,7 @@ describe('extras', () => {
     const events = [
       onToken(0),
       onToken(1),
-      onToken(1, { receivedMonotonicTimeMs: CUE.scheduledStartMs + 100 }),
+      onToken(1, { receivedMonotonicTimeMs: UPTIME_AT_BELL_MS + CUE.scheduledStartMs + 100 }),
     ]
     const result = score(events)
     expect(result.completionPct).toBe(100)

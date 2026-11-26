@@ -36,7 +36,11 @@ import PunchCraftLanding from '../index'
 import PuncheokieLanding from '../../puncheokie/index'
 import { useWorkoutStore } from '@state/useWorkoutStore'
 import { listSampleWorkouts } from '@domain/workout/samples'
-import { GOAL_TIERS } from '@domain/workout/punchGoals'
+import { GOAL_TIERS, intensityLabel } from '@domain/workout/punchGoals'
+import { coverageConflict } from '@domain/workout/coverageConflict'
+import { generateWorkout } from '@domain/workout/generateWorkout'
+import { fillOptionsForRecipe } from '@audio/fillOptionsForRecipe'
+import type { PunchNumber } from '@domain/workout/WorkoutTokens'
 
 const store = () => useWorkoutStore.getState()
 
@@ -131,6 +135,156 @@ describe('primary controls dispatch the right patch', () => {
     expect(store().recipe.totalPunchGoal).toBe(before + 50)
     press(tree, 'goal-stepper-minus')
     expect(store().recipe.totalPunchGoal).toBe(before)
+  })
+})
+
+describe('changing the duration keeps the intensity', () => {
+  // The Duration picker used to change only `durationMinutes`. The goal
+  // stayed where it was — so one tap from 20 to 60 minutes turned a Steady
+  // workout into one far below Technique, at 75 punches a round, which the
+  // generator cannot fill: the coach went quiet for most of the last minute
+  // of every round.
+
+  it('scales the default goal with the duration', () => {
+    const tree = render(<RecipeScreen />)
+    expect(store().recipe.totalPunchGoal).toBe(900)
+
+    pickOption(tree, 'duration', '60')
+    expect(store().recipe.durationMinutes).toBe(60)
+    expect(store().recipe.totalPunchGoal).toBe(2_700)
+  })
+
+  it.each(['technique', 'steady', 'hard', 'high-volume', 'extreme'] as const)(
+    'leaves a %s workout a %s workout at every duration',
+    (tier) => {
+      const tree = render(<RecipeScreen />)
+      pickOption(tree, 'goal', tier)
+
+      for (const minutes of [60, 30, 40, 20] as const) {
+        pickOption(tree, 'duration', minutes)
+        expect(store().recipe.totalPunchGoal).toBe(GOAL_TIERS[tier][minutes])
+        expect(intensityLabel(store().recipe.totalPunchGoal, minutes).tier).toBe(tier)
+      }
+    },
+  )
+
+  it('keeps a goal the athlete fine-tuned in proportion', () => {
+    const tree = render(<RecipeScreen />)
+    press(tree, 'goal-toggle')
+    press(tree, 'goal-stepper-plus')
+    press(tree, 'goal-stepper-plus')
+    expect(store().recipe.totalPunchGoal).toBe(1_000)
+
+    pickOption(tree, 'duration', '40')
+    expect(store().recipe.totalPunchGoal).toBe(2_000)
+  })
+
+  it('comes back to where it started', () => {
+    const tree = render(<RecipeScreen />)
+    pickOption(tree, 'duration', '60')
+    pickOption(tree, 'duration', '20')
+    expect(store().recipe.totalPunchGoal).toBe(900)
+  })
+})
+
+describe('rounds that would run out of combinations', () => {
+  const dryNotice = (tree: ReactTestRenderer): ReactTestInstance[] =>
+    tree.root.findAllByProps({ testID: 'conflict-rounds-run-dry' }, { deep: false })
+
+  /**
+   * A recipe the generator can lay nothing for: the cross on its own is in
+   * no combination the library has, so every round comes out empty.
+   *
+   * This used to be jab-and-cross capped at two, which ran 15 s dry on seed
+   * 'x' — not because the pool was too narrow, but because paying for a
+   * "settle in" announcement dropped a whole block. Generator 1.3.1 fixed
+   * that, and a recipe with any combination at all now fills its rounds.
+   */
+  const NARROW = { enabledPunches: [2] as PunchNumber[] }
+  const narrow = (): void => {
+    act(() => {
+      store().setRecipe(NARROW)
+    })
+  }
+
+  it('the narrow recipe really does run dry, with the options this screen uses', () => {
+    // The premise of every test below, checked against the same generator
+    // and options the screen calls rather than assumed.
+    narrow()
+    const recipe = store().recipe
+    expect(coverageConflict(generateWorkout(recipe, fillOptionsForRecipe(recipe)))).not.toBeNull()
+  })
+
+  it('says nothing for the default recipe', () => {
+    const tree = render(<RecipeScreen />)
+    expect(dryNotice(tree)).toHaveLength(0)
+  })
+
+  it('says nothing after an ordinary duration change', () => {
+    const tree = render(<RecipeScreen />)
+    pickOption(tree, 'duration', '60')
+    expect(dryNotice(tree)).toHaveLength(0)
+  })
+
+  it('says nothing about a low goal — the generator fills the round regardless', () => {
+    // Until generator 1.3.0 this was the common way to get silent rounds.
+    act(() => {
+      store().setRecipe({ durationMinutes: 60, totalPunchGoal: 900 })
+    })
+    const tree = render(<RecipeScreen />)
+    expect(dryNotice(tree)).toHaveLength(0)
+  })
+
+  it('says nothing about a low-variety recipe that can still fill its rounds', () => {
+    // Jab and cross, combinations capped at two: the recipe this suite used
+    // to use as its dry case, through generator 1.3.0.
+    act(() => {
+      store().setRecipe({ enabledPunches: [1, 2], maximumComboPunches: 2, seed: 'x' })
+    })
+    const recipe = store().recipe
+    expect(coverageConflict(generateWorkout(recipe, fillOptionsForRecipe(recipe)))).toBeNull()
+    expect(dryNotice(render(<RecipeScreen />))).toHaveLength(0)
+  })
+
+  it('warns, in the summary, when the punches are too few to fill the rounds', () => {
+    // The generator has always known; now the athlete does too, before the
+    // workout rather than during it.
+    narrow()
+    const tree = render(<RecipeScreen />)
+
+    const text = textOf(tree.root.findByProps({ testID: 'recipe-summary-card' }))
+    expect(text).toContain('Warning')
+    expect(text).toContain('out of combinations before the bell')
+    // Never a dead end: it says what to change.
+    expect(text).toContain('Enable more punches')
+  })
+
+  it('shows it beside the punch controls too, where the athlete can act on it', () => {
+    narrow()
+    const tree = render(<RecipeScreen />)
+    const inSummary = dryNotice(tree).length
+    press(tree, 'advanced-toggle')
+    expect(dryNotice(tree).length).toBeGreaterThan(inSummary)
+  })
+
+  it('clears as soon as the punches are widened again', () => {
+    narrow()
+    const tree = render(<RecipeScreen />)
+    expect(dryNotice(tree).length).toBeGreaterThan(0)
+
+    act(() => {
+      store().setRecipe({ enabledPunches: [1, 2, 3, 4, 5, 6], maximumComboPunches: 5 })
+    })
+    expect(dryNotice(tree)).toHaveLength(0)
+  })
+
+  it('stays quiet when a library workout is selected — the recipe is not what runs', () => {
+    narrow()
+    act(() => {
+      store().selectSample(listSampleWorkouts()[0]!.key)
+    })
+    const tree = render(<RecipeScreen />)
+    expect(dryNotice(tree)).toHaveLength(0)
   })
 })
 
@@ -313,7 +467,7 @@ describe('punchCraft landing — the workout home', () => {
   })
 })
 
-describe('Puncheokie landing — the instrument', () => {
+describe('punchCraft workouts landing — the instrument', () => {
   it('opens the jam and offers no workout routes', () => {
     const tree = render(<PuncheokieLanding />)
     expect(() => tree.root.findByProps({ testID: 'open-jam' })).not.toThrow()

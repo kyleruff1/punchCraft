@@ -57,7 +57,7 @@ export const TAB_BAR_STYLE = {
  * Wordmark tab button. Rendered through `tabBarButton` rather than the
  * label/icon slots: the label slot gave the wordmark images zero size
  * whenever focus moved to a tab that mounted lazily (velocity-lab,
- * puncheokie), collapsing the whole bar to a few pixels. A custom button
+ * workouts), collapsing the whole bar to a few pixels. A custom button
  * owns its own layout, so the bar keeps its height no matter which tab
  * is focused. The Wordmark's fixed accessibilityLabel still names the
  * tab to assistive tech; `accessibilityState` from the navigator carries
@@ -332,10 +332,17 @@ export default function TabsLayout() {
           headerTitle: headerWordmark('punchCraft'),
         }}
       />
+      {/*
+        The instrument surface. Keeps the `puncheokie` identifiers on purpose:
+        expo-router matches `name` to the on-disk directory, and the wordmark
+        key indexes Wordmark.tsx's SOURCES map. This tab leaves with the
+        Puncheoke fork, so it is NOT part of the workouts rename — renaming it
+        would both break the route and mislabel an instrument as a workout.
+      */}
       <Tabs.Screen
         name="puncheokie"
         options={{
-          title: 'Puncheokie',
+          title: 'Puncheoke',
           tabBarButton: wordmarkTabButton('puncheokie'),
           headerTitle: headerWordmark('puncheokie'),
         }}

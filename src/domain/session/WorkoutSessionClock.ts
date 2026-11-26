@@ -206,6 +206,35 @@ export class WorkoutSessionClock {
     }
   }
 
+  /**
+   * The work clock's reading at a monotonic instant.
+   *
+   * **This is the one sanctioned conversion between the two clocks.** A cue
+   * is written in work-elapsed ms (`scheduledStartMs`, `tokenOffsetsMs`, the
+   * window bounds); a punch arrives stamped with `clock.now()`, which is
+   * milliseconds from an arbitrary origin — app uptime, on the device. The two
+   * share no origin, so subtracting one from the other is meaningless, and
+   * anything that needs to ask "when in the round did this punch land" asks
+   * here rather than doing arithmetic of its own.
+   *
+   * Projects from the last `advance()`, by the same accumulated-with-holes
+   * rule `SharedWorkClock` documents for the ring: the work clock is NOT
+   * `now - roundStart` (pauses accumulate nothing, `enterWork` seeds an
+   * overflow), so the only honest anchor is the pair this clock last agreed
+   * on — `(lastAdvanceAtMs, workElapsedMs)`. `monotonicMs` may sit slightly
+   * before that anchor (an event stamped just ahead of the tick that
+   * delivered it) or after it (one that landed between ticks); both project
+   * correctly.
+   *
+   * Outside an unpaused work phase the work clock is not running, so the
+   * frozen reading is returned: a punch thrown while paused happened at the
+   * moment the round was paused, as far as the round is concerned.
+   */
+  workElapsedAt(monotonicMs: number): number {
+    if (this.phase !== 'work' || this.lastAdvanceAtMs === null) return this.workElapsedMs
+    return this.workElapsedMs + (monotonicMs - this.lastAdvanceAtMs)
+  }
+
   // -------------------------------------------------------------------------
 
   private isRunning(): boolean {

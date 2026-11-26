@@ -10,9 +10,9 @@
  * that dominates the rest of the UI.
  *
  * The `accessibilityLabel` is fixed per app so a screen reader still
- * hears the name where a sighted user sees the image. The `puncheokie`
+ * hears the name where a sighted user sees the image. The `workouts`
  * asset visually reads "PunchEoke" as a design flourish, but the a11y
- * label keeps the code-consistent "Puncheokie" so screen-reader users
+ * label keeps the code-consistent "punchCraft workouts" so screen-reader users
  * hear the same name the rest of the app uses.
  *
  * Four sizes cover every current site: `sm` for headers, `tab` for the
@@ -30,6 +30,8 @@ import type { StyleProp, ViewStyle } from 'react-native'
 const SOURCES = {
   punchCraft: require('../../../assets/branding/wordmark.png') as number,
   velocityLab: require('../../../assets/branding/VelocityLab.png') as number,
+  // The forked Puncheoke instrument's wordmark. Keyed `puncheokie` to match
+  // its tab and its asset; it is NOT part of the workouts rename.
   puncheokie: require('../../../assets/branding/PunchEoke.png') as number,
 } as const
 /**
@@ -44,7 +46,7 @@ const PUNCHCRAFT_ISOLATED = require('../../../assets/branding/isolated-wordmark.
 const ACCESSIBILITY_LABELS = {
   punchCraft: 'punchCraft',
   velocityLab: 'Velocity Lab',
-  puncheokie: 'Puncheokie',
+  puncheokie: 'Puncheoke',
 } as const
 
 // Every wordmark PNG is authored at the same 2172×724 canvas, so the

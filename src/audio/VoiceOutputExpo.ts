@@ -219,7 +219,7 @@ export interface VoiceOutputExpoOptions {
   calibratedAudioOutputLatencyMs?: number
   /**
    * Attach the silent timing observer (GH #291, plan C1): every play gets a
-   * `puncheokie.voice.observed` record with its real onset and end, on the
+   * `workout.voice.observed` record with its real onset and end, on the
    * same clock as `dispatchMs`. Defaults to the persisted QA flag. Off, the
    * observer is never constructed and the player factories are untouched.
    */
@@ -998,7 +998,7 @@ export class VoiceOutputExpo implements VoiceOutputPort {
       // The audio stack itself would not initialise. Unclassifiable from
       // here, so policy is: one retry under a new generation, then closed.
       this.fail('unknown')
-      logger.warn('puncheokie.voice.unavailable', 'audio stack failed to initialise', {
+      logger.warn('workout.voice.unavailable', 'audio stack failed to initialise', {
         error: safe(String(err)),
       })
       return
@@ -1049,7 +1049,7 @@ export class VoiceOutputExpo implements VoiceOutputPort {
       // layer, not the device: retrying re-runs the identical failure, so
       // this one does NOT get a second go.
       this.fail('invalid-asset')
-      logger.warn('puncheokie.voice.unavailable', 'no clips loaded; running without voice', {})
+      logger.warn('workout.voice.unavailable', 'no clips loaded; running without voice', {})
       return
     }
     // A warm that actually produced players clears the retry budget, so a
@@ -1140,7 +1140,7 @@ export class VoiceOutputExpo implements VoiceOutputPort {
       this.cacheDuration(key, player)
       return player
     } catch (err) {
-      logger.warn('puncheokie.voice.clipMissing', 'clip did not load', {
+      logger.warn('workout.voice.clipMissing', 'clip did not load', {
         asset: safe(id),
         form: safe(form),
         error: safe(String(err)),
@@ -1172,7 +1172,7 @@ export class VoiceOutputExpo implements VoiceOutputPort {
       player.play()
       this.markBusy(clip.durationMs)
       const playId = this.mintPlayId()
-      logger.info('puncheokie.voice.play', 'instruction playing', {
+      logger.info('workout.voice.play', 'instruction playing', {
         kind: safe('instruction'),
         text: safe(clip.text),
         durationMs: safe(clip.durationMs),
@@ -1191,7 +1191,7 @@ export class VoiceOutputExpo implements VoiceOutputPort {
         traceId: clip.traceId,
       })
     } catch (err) {
-      logger.warn('puncheokie.voice.playFailed', 'instruction did not play', {
+      logger.warn('workout.voice.playFailed', 'instruction did not play', {
         text: safe(clip.text),
         error: safe(String(err)),
       })
@@ -1219,7 +1219,7 @@ export class VoiceOutputExpo implements VoiceOutputPort {
       player.play()
       this.markBusy(clip.durationMs)
       const playId = this.mintPlayId()
-      logger.info('puncheokie.voice.play', 'combo-announce playing', {
+      logger.info('workout.voice.play', 'combo-announce playing', {
         kind: safe('combo-announce'),
         text: safe(clip.text),
         durationMs: safe(clip.durationMs),
@@ -1241,7 +1241,7 @@ export class VoiceOutputExpo implements VoiceOutputPort {
         traceId: clip.traceId,
       })
     } catch (err) {
-      logger.warn('puncheokie.voice.playFailed', 'combo-announce did not play', {
+      logger.warn('workout.voice.playFailed', 'combo-announce did not play', {
         text: safe(clip.text),
         error: safe(String(err)),
       })
@@ -1334,7 +1334,7 @@ export class VoiceOutputExpo implements VoiceOutputPort {
         // this one covers the real tail.
         this.markBusy(clip.durationMs)
         const playId = this.mintPlayId()
-        logger.info('puncheokie.voice.play', 'click-script playing', {
+        logger.info('workout.voice.play', 'click-script playing', {
           kind: safe('click-script'),
           text: safe(clip.text),
           durationMs: safe(clip.durationMs),
@@ -1427,7 +1427,7 @@ export class VoiceOutputExpo implements VoiceOutputPort {
           })
       }
     } catch (err) {
-      logger.warn('puncheokie.voice.playFailed', 'click-script did not play', {
+      logger.warn('workout.voice.playFailed', 'click-script did not play', {
         text: safe(clip.text),
         error: safe(String(err)),
       })
@@ -1853,7 +1853,7 @@ export class VoiceOutputExpo implements VoiceOutputPort {
     if (this.observer !== null) {
       const stats = this.observer.stats()
       this.observer.release()
-      logger.info('puncheokie.observer.stats', 'timing observer released', {
+      logger.info('workout.observer.stats', 'timing observer released', {
         watched: safe(stats.watched),
         openAtRelease: safe(stats.open),
         maxHandlerMs: safe(Math.round(stats.maxHandlerMs * 100) / 100),
@@ -1907,7 +1907,7 @@ export class VoiceOutputExpo implements VoiceOutputPort {
     try {
       this.observer.watch(player, meta)
     } catch (err) {
-      logger.warn('puncheokie.observer.watchFailed', 'timing observer could not attach', {
+      logger.warn('workout.observer.watchFailed', 'timing observer could not attach', {
         playId: safe(meta.playId),
         error: safe(String(err)),
       })
@@ -1915,7 +1915,7 @@ export class VoiceOutputExpo implements VoiceOutputPort {
   }
 
   private logObserved(record: ObservedRecord): void {
-    logger.info('puncheokie.voice.observed', 'coach play observed', {
+    logger.info('workout.voice.observed', 'coach play observed', {
       playId: safe(record.playId),
       kind: safe(record.kind satisfies ObservedKind),
       label: safe(record.label),
@@ -2002,7 +2002,7 @@ export class VoiceOutputExpo implements VoiceOutputPort {
         // while each still logs "playing".
         const remainingMs = Math.max(0, Math.round(this.callsMutedUntil - this.clock()))
         this.muteCallsFor(measured ?? 2_500)
-        logger.info('puncheokie.voice.duck', 'duck armed', {
+        logger.info('workout.voice.duck', 'duck armed', {
           asset: safe(id),
           measuredMs: safe(measured ?? 2_500),
           remainingMs: safe(remainingMs),
@@ -2010,7 +2010,7 @@ export class VoiceOutputExpo implements VoiceOutputPort {
       }
       // Success-path record for the QA loop — see playCombination's note.
       const playId = this.mintPlayId()
-      logger.info('puncheokie.voice.play', 'clip playing', {
+      logger.info('workout.voice.play', 'clip playing', {
         asset: safe(id),
         form: safe(form),
         vocabulary: safe(this.vocabulary),
@@ -2032,7 +2032,7 @@ export class VoiceOutputExpo implements VoiceOutputPort {
         volumeAtDispatch: player.volume,
       })
     } catch (err) {
-      logger.warn('puncheokie.voice.playFailed', 'clip did not play', {
+      logger.warn('workout.voice.playFailed', 'clip did not play', {
         asset: safe(id),
         priority: safe(priority),
         error: safe(String(err)),
@@ -2088,7 +2088,7 @@ export class VoiceOutputExpo implements VoiceOutputPort {
     this.focusHeld = true
     void this.setAudioMode({ playsInSilentMode: true, interruptionMode: 'duckOthers' }).catch(
       (err: unknown) => {
-        logger.warn('puncheokie.voice.focusFailed', 'audio focus request failed', {
+        logger.warn('workout.voice.focusFailed', 'audio focus request failed', {
           error: safe(String(err)),
         })
       },

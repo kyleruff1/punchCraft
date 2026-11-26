@@ -136,7 +136,7 @@ function chooseSource(
   // athlete's gloves sit connected and it must not look like a BLE fault.
   if (qa.forceSim) {
     if (left && right && isLive(left) && isLive(right)) {
-      logger.info('puncheokie.source.forcedSim', 'QA run forced the simulator over live trackers', {})
+      logger.info('workout.source.forcedSim', 'QA run forced the simulator over live trackers', {})
     }
     return simulated(clock, qa.simLoop)
   }
@@ -157,7 +157,7 @@ function chooseSource(
     .list()
     .find((a) => a.id === FIGHTCAMP_V1_ID)
   if (!adapter) {
-    logger.warn('puncheokie.source.adapter.missing', 'no FightCamp v1 adapter registered', {})
+    logger.warn('workout.source.adapter.missing', 'no FightCamp v1 adapter registered', {})
     return simulated(clock, qa.simLoop)
   }
 
@@ -171,7 +171,7 @@ function chooseSource(
     })
     return { kind: 'tracker', source, sim: null }
   } catch (err) {
-    logger.warn('puncheokie.source.tracker.unavailable', 'falling back to the simulator', {
+    logger.warn('workout.source.tracker.unavailable', 'falling back to the simulator', {
       errorMessage: safe(err instanceof Error ? err.message : String(err)),
     })
     return simulated(clock, qa.simLoop)
@@ -222,7 +222,7 @@ export function useLivePunchSource(
   ) {
     const upgraded = chooseSource(clock, left, right, qa)
     if (upgraded.kind === 'tracker') {
-      logger.info('puncheokie.source.upgraded', 'idle-phase upgrade from simulator to trackers', {})
+      logger.info('workout.source.upgraded', 'idle-phase upgrade from simulator to trackers', {})
       chosenRef.current = upgraded
     }
   }

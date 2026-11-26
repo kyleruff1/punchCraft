@@ -50,7 +50,7 @@ const REPO_ROOT = import.meta.url
 export const PACKAGE = 'com.kyleruff.punchcraft'
 const MAIN_ACTIVITY = `${PACKAGE}/.MainActivity`
 /** What every capture streams: JS records, the app's native tag, crashes. */
-export const LOGCAT_FILTER = ['ReactNativeJS:V', 'puncheokie:V', 'AndroidRuntime:E', 'System.err:W', '*:S']
+export const LOGCAT_FILTER = ['ReactNativeJS:V', 'workouts:V', 'AndroidRuntime:E', 'System.err:W', '*:S']
 
 function parseArgs(argv) {
   const args = {
@@ -454,7 +454,7 @@ export async function drive(args) {
 
     // 5. Wait for runner.start marker
     log('waiting for runner.start marker (up to 30s)')
-    const runnerArmed = await waitForLogLine(sessionDir, 'puncheokie.runner.start', 30_000)
+    const runnerArmed = await waitForLogLine(sessionDir, 'workout.runner.start', 30_000)
     if (!runnerArmed) throw new Error('runner.start log line never appeared')
     log(`runner armed at ${runnerArmed.line.split(' ').slice(0, 2).join(' ')}`)
 
@@ -470,18 +470,18 @@ export async function drive(args) {
     //    partway through. Verified against all archived sessions: zero contain
     //    `rest-entered` (GH #305).
     //
-    //    `puncheokie.round.boundary` is emitted by the runner at every
+    //    `workout.round.boundary` is emitted by the runner at every
     //    work/rest transition and carries `transition` + `roundIndex`.
     log(`waiting for round-1 completion (round.boundary rest) — up to ${args.timeoutSec}s`)
     const roundEnded = await waitForLogLine(
       sessionDir,
-      'puncheokie.round.boundary',
+      'workout.round.boundary',
       args.timeoutSec * 1000,
       (line) => line.includes('rest-entered'),
     )
     if (!roundEnded) {
       log('WARN: round boundary never seen — is the bundle older than the')
-      log('      puncheokie.round.boundary instrumentation? Capture may span')
+      log('      workout.round.boundary instrumentation? Capture may span')
       log('      more than one round; treat its verdict as unscoped.')
     } else {
       log(`round 1 complete at ${roundEnded.line.split(' ').slice(0, 2).join(' ')}`)
@@ -572,7 +572,7 @@ export async function drive(args) {
       log(`capture.wav: ${wavSize} bytes`)
       log(`screen.mp4:  ${mp4Size} bytes`)
       const vizBatches = existsSync(logcatFile)
-        ? (readFileSync(logcatFile, 'utf8').match(/puncheokie\.viz\.batch/g) ?? []).length
+        ? (readFileSync(logcatFile, 'utf8').match(/workouts\.viz\.batch/g) ?? []).length
         : 0
       log(`viz.batch lines: ${vizBatches}`)
       if (vizBatches === 0) {

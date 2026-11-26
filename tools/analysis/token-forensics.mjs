@@ -3,7 +3,7 @@
  *
  * Stage 3 of the token-order forensics harness (tracking: GH #305).
  *
- * Reads the `puncheokie.viz.batch` records a forensic drive emitted (see
+ * Reads the `workout.viz.batch` records a forensic drive emitted (see
  * `src/diagnostics/vizForensics.ts`) and answers the question the whole
  * investigation exists for: WHEN does a ring light out of order, and what
  * was happening in the moments before it did.

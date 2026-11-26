@@ -32,7 +32,7 @@ import { bpmForRecipe, CADENCE_PROFILES as CADENCE } from '@domain/workout/caden
 import { metronomeLoopFor, type MetronomeLoop } from '@audio/voiceAssets/metronomeAssets'
 import type { CueMatchResult } from '@domain/programs/CueMatcher'
 import type { CueScore } from '@domain/programs/cueScoring'
-import { expandTimeline, type CueInstance, type ExpectedPunch } from '@domain/programs/CueTimeline'
+import { expandTimeline, type CueInstance } from '@domain/programs/CueTimeline'
 import { beatOrdinalAt } from '@domain/programs/beatProjection'
 import { CALLOUT_CLIPS } from '@audio/voiceAssets/calloutManifest'
 import {
@@ -58,7 +58,7 @@ import { resolveCapabilityTier, sequenceScoreLabel } from '@domain/workout/capab
 import { systemMonotonicClock, type MonotonicClock } from '@domain/time/MonotonicClock'
 import { WorkoutSessionClock, type SessionTransition } from '@domain/session/WorkoutSessionClock'
 import { RoundResultFreeze } from '@domain/session/restPhases'
-import type { GeneratedWorkout } from '@domain/workout/GeneratedWorkout'
+import { coachPathOf, type GeneratedWorkout } from '@domain/workout/GeneratedWorkout'
 import type { PunchEventSource } from '@domain/punch/PunchEventSource'
 import type { TrackerPunchEvent } from '@domain/punch/PunchEvent'
 import type { BackdropImpulsePort } from '@domain/effects/BackdropImpulsePort'
@@ -232,25 +232,6 @@ export const STORE_THROTTLE_MS = 250
 export const RECENT_EVENT_WINDOW = 256
 
 /**
- * Was a matched punch on the beat?
- *
- * Mirrors the matcher's own timing math — the punch's time against the token's
- * scheduled moment (`scheduledStartMs + tokenOffsetsMs[tokenIndex]`) — using
- * the same tight window the score uses (`TIMING_TIGHT_MS`, much tighter than
- * the acceptance window). Gates the "good hit" haptic so a right-hand punch
- * thrown late still counts for the combo but does not earn the reward buzz.
- */
-function onTimeForMatch(
-  cue: CueInstance | undefined,
-  expected: ExpectedPunch,
-  eventTimeMs: number,
-): boolean {
-  if (!cue) return false
-  const dueMs = cue.scheduledStartMs + (cue.tokenOffsetsMs[expected.tokenIndex] ?? 0)
-  return Math.abs(eventTimeMs - dueMs) <= TIMING_TIGHT_MS
-}
-
-/**
  * `SessionTransition` → `SessionPhaseEvent`.
  *
  * Two unions that overlap but do not match: the clock says `completed`, the
@@ -299,6 +280,21 @@ export interface WorkoutRunner {
   readCues(): { current?: CueView; next?: CueView; walkPlan?: RoundWalkPlan; freeWork?: boolean; avatar?: { cue: CueInstance; tokenIndex: number } }
   /** Settled matching so far. Read by M33-03 grading and M33-08 persistence. */
   readResults(): WorkoutRunnerResults
+  /**
+   * Delete the session this run just wrote — the athlete's answer to "Keep
+   * this session?" after a stop.
+   *
+   * A stopped workout is written the moment it stops, on purpose: a crash
+   * between the stop and the dialog must not lose it. So Discard means
+   * removing a row that already exists, and until this existed the dialog's
+   * two buttons did exactly the same thing. The delete cascades to the
+   * session's rounds, punches, cue results and metrics; raw BLE frames are
+   * never part of a session and are untouched.
+   *
+   * Returns whether a session was removed — false when nothing was written
+   * (stopped before a cue, or persistence unavailable) or it is already gone.
+   */
+  discardSession(): boolean
 }
 
 export interface UseWorkoutRunnerArgs {
@@ -802,7 +798,11 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
     maskedCueIdsRef.current = maskedBarIds(
       cues,
       calledIds,
-      !!voice && voice.policy.mode !== 'off',
+      // "Lit = spoken" only holds while the coach is calling punches. With
+      // the coach off, or on Minimal (no punch calls), the visuals are the
+      // workout and nothing may be dimmed waiting for a call that is not
+      // coming.
+      !!voice && shouldSpeak(voice.policy, 'punch-command', false),
       bpm,
     )
   }, [workout.id, voice, bpm])
@@ -894,6 +894,11 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
   const startedAtRef = useRef(0)
   /** The end is written once; a cancel after a completion must not double it. */
   const persistedRef = useRef(false)
+  /** The session `endSession` wrote, kept so the athlete can discard it. */
+  const writtenSessionRef = useRef<{
+    sessionId: string
+    sessions: WorkoutPersistence['sessions']
+  } | null>(null)
   /** Token indexes affirmed in the cue currently on the stage. */
   const affirmedRef = useRef<number[]>([])
   const extrasRef = useRef(0)
@@ -1112,7 +1117,7 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
         // when the coach's voice said the token and when its ring lit. Kyle's
         // ear read the library at ~75 % clean, drift set-dependent — no way
         // to find which combos drift without this signal.
-        logger.info('puncheokie.cue.tokenDue', 'ring token fired', {
+        logger.info('workout.cue.tokenDue', 'ring token fired', {
           roundIndex: safe(sessionRef.current?.snapshot()?.roundIndex ?? -1),
           cueId: safe(event.cue.id),
           // `formatCombo`, NOT `tokens.join('-')`: tokens are objects, so
@@ -1186,6 +1191,21 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
 
   const onPunch = useCallback(
     (event: TrackerPunchEvent): void => {
+      // A punch belongs to the workout only while the workout is running.
+      //
+      // The gloves keep reporting whatever the session is doing, and every
+      // line below used to run regardless. Paused: the counters climbed
+      // under the "Paused" overlay, the tablet buzzed, and a punch that
+      // landed in a cue window still open from before the pause was credited
+      // when the round resumed. Finished or stopped: the same under "Workout
+      // complete", where `source.stop()` cannot help because the app-wide
+      // tracker stream deliberately ignores it.
+      //
+      // Before the first bell and through a rest nothing changes: those
+      // punches count toward the session as they always have.
+      const phase = sessionRef.current?.snapshot().phase
+      if (phase === 'paused' || phase === 'completed' || phase === 'cancelled') return
+
       const counts = countsRef.current
       counts.total += 1
       if (event.hand === 'left') counts.left += 1
@@ -1238,7 +1258,15 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
 
       // The matcher decides what this punch answered; the runner only
       // counts. Its callback drives notifyMatch and the in-cue tally.
-      matcherRef.current?.onPunchEvent(event)
+      //
+      // The punch is stamped on the monotonic clock (app uptime); every cue
+      // is written on the round's work clock. This is the one place the two
+      // meet, and the session clock — the only thing that knows both — does
+      // the conversion. Nothing downstream subtracts one from the other.
+      const landedAtWorkMs =
+        sessionRef.current?.workElapsedAt(event.receivedMonotonicTimeMs) ??
+        workElapsedMsRef.current
+      matcherRef.current?.onPunchEvent(event, landedAtWorkMs)
 
       syncFromEngine()
       // Bypasses the throttle: a punch landing has to feel instant.
@@ -1302,8 +1330,15 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
           }
           // Tiered per-hit haptic: a solid buzz for a right-hand hit on the
           // beat, a stronger one when the strike type also agrees (rare on v1).
+          //
+          // "On the beat" is the matcher's own offset against the same tight
+          // window the score uses (`TIMING_TIGHT_MS`, much tighter than the
+          // acceptance window), so a punch thrown late still counts for the
+          // combo but does not earn the reward buzz. The runner used to redo
+          // that subtraction itself, against a monotonic stamp, and the buzz
+          // never fired.
           if (matched && expected) {
-            const onBeat = onTimeForMatch(currentRef.current?.cue, expected, event.match.eventTimeMs)
+            const onBeat = Math.abs(event.match.offsetMs) <= TIMING_TIGHT_MS
             if (onBeat) hapticsRef.current?.strike(event.match.affirmed ? 'perfect' : 'good')
           }
           break
@@ -1325,30 +1360,32 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
           lastScoreRef.current = event.score
           // One row per expectation, including the unanswered ones — a
           // missing row could not be told from a cue never reached.
-          const settled = cuesById.get(event.result.cueId)
-          if (settled) {
-            const rows = toCueResultRows({
-              cue: settled,
-              result: event.result,
-              events: recentEventsRef.current.values(),
-            })
-            cueRowsRef.current.push(...rows)
-            // `cue_results.observed_event_id` is a real foreign key into
-            // `punch_events`, so every event a row names has to be written
-            // too or the whole session rolls back. Captured here, where the
-            // event is still in the recent window — by the bell it is long
-            // gone, and the row would name a punch nothing can resolve.
-            for (const row of rows) {
-              if (!row.observedEventId) continue
-              const observed = recentEventsRef.current.get(row.observedEventId)
-              if (observed) matchedEventsRef.current.set(observed.id, observed)
-            }
+          //
+          // The cue comes with the event. It used to be looked up in the
+          // static timeline's `cuesById`, where a cue the athlete asked to
+          // repeat does not exist — so that rep's rows were never written,
+          // and nothing said so.
+          const rows = toCueResultRows({
+            cue: event.cue,
+            result: event.result,
+            events: recentEventsRef.current.values(),
+          })
+          cueRowsRef.current.push(...rows)
+          // `cue_results.observed_event_id` is a real foreign key into
+          // `punch_events`, so every event a row names has to be written
+          // too or the whole session rolls back. Captured here, where the
+          // event is still in the recent window — by the bell it is long
+          // gone, and the row would name a punch nothing can resolve.
+          for (const row of rows) {
+            if (!row.observedEventId) continue
+            const observed = recentEventsRef.current.get(row.observedEventId)
+            if (observed) matchedEventsRef.current.set(observed.id, observed)
           }
           if (event.corrections.length > 0) {
             // A late or recovered event reordered a cue the athlete already
             // saw feedback for. Worth a log: it is rare and it means the
             // tokens they watched did not match the recorded result.
-            logger.info('puncheokie.match.corrected', 'settled match differed from live feedback', {
+            logger.info('workout.match.corrected', 'settled match differed from live feedback', {
               cue: safe(event.result.cueId),
               corrections: safe(event.corrections.length),
             })
@@ -1359,7 +1396,7 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
       syncFromEngine()
       pushStore(true)
     },
-    [cuesById, pushStore, syncFromEngine],
+    [pushStore, syncFromEngine],
   )
 
   /**
@@ -1419,9 +1456,10 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
           activeDurationMs: Math.round(activeElapsedSecondsRef.current * 1000),
           cancelled,
         })
+        writtenSessionRef.current = { sessionId: session.sessionId, sessions: repos.sessions }
         report({ status: 'persisted', cancelled, session })
       } catch (error) {
-        logger.error('puncheokie.session.endWriteFailed', 'finished workout was not written', {
+        logger.error('workout.session.endWriteFailed', 'finished workout was not written', {
           error: safe(String(error)),
           cueResults: safe(cueRowsRef.current.length),
         })
@@ -1466,7 +1504,7 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
           workout.recipe.coachTempo.baseBpm,
         )
       if (!loop) {
-        logger.warn('puncheokie.metronome', 'no loop for tempo', {
+        logger.warn('workout.metronome', 'no loop for tempo', {
           division: safe(workout.recipe.coachTempo.division),
           swing: safe(workout.recipe.coachTempo.swing),
           baseBpm: safe(workout.recipe.coachTempo.baseBpm),
@@ -1525,7 +1563,7 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
           running: s?.phase === 'work',
         })
       }
-      logger.info('puncheokie.round.boundary', 'session phase boundary', {
+      logger.info('workout.round.boundary', 'session phase boundary', {
         transition: safe(transition.type),
         roundIndex: safe(
           transition.type === 'work-entered'
@@ -1681,12 +1719,21 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
     // The announcer holds the policy and the gate; the runner only feeds it
     // events. Absent `voice`, nothing is constructed and the workout is
     // silent by construction rather than by a flag (doc §25).
-    // MVP v2 (GH #305): a recipe may cap the coach at 'minimal' — the
-    // click-track sets keep bells + stance + countdown and hand every
-    // punch call to the visuals. The more-restrictive-wins rule inside
-    // shouldSpeak makes this a pure ceiling over the athlete's policy.
+    // MVP v2 (GH #305): on a click-track set the ANNOUNCER is capped at
+    // 'minimal' — bells + stance + countdown — because the click script
+    // owns the punch calls there, and the announcer calling them too would
+    // put two voices on one bar. It is a CEILING over the athlete's own
+    // policy, so the one setting below it has to survive: an athlete who
+    // switched the coach OFF used to have that overwritten to 'minimal'
+    // here, and every shipped sample rang its round bells at full volume
+    // with "Voice coach: Off" selected.
+    //
+    // Keyed on the workout's authored `coachPath`, not on
+    // `recipe.voiceMode`: the mode is the athlete's volume knob and no
+    // longer doubles as "this is a click-track workout".
+    const clickScriptWorkout = coachPathOf(workout) === 'click-script'
     const effectivePolicy =
-      voice && workout.recipe.voiceMode === 'minimal'
+      voice && clickScriptWorkout && voice.policy.mode !== 'off'
         ? { ...voice.policy, mode: 'minimal' as const }
         : voice?.policy
     const announcer = voice
@@ -1756,7 +1803,7 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
     // for 3-a-ii the dispatcher checks at fire time — good enough while
     // slots are only combo-announces).
     let slotDispatcher: SlotDispatcher | null = null
-    const scoreDispatchEnabled = workout.recipe.voiceMode !== 'minimal'
+    const scoreDispatchEnabled = !clickScriptWorkout
     /**
      * Score tick each round's work phase begins at, indexed by round.
      *
@@ -1771,20 +1818,26 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
      * round-relative clock back into the score's axis.
      */
     let roundStartTicks: number[] = []
-    if (announcer && voice && scoreDispatchEnabled) {
-      const compiledScore = compileWorkoutScore(workout, {
+    /** The compiled timeline's identity, when this run compiled one. */
+    let timelineHash: string | null = null
+    const scorePathLive = Boolean(announcer && voice && scoreDispatchEnabled)
+    const compileScore = (): ReturnType<typeof compileWorkoutScore> =>
+      compileWorkoutScore(workout, {
         stance,
         bpm: bpmForRecipe(workout.recipe),
         revision: 1,
         compiledAtEpochMs: Date.now(),
         coachAssets: runtimeCoachAssetResolver,
       })
+    if (announcer && voice && scoreDispatchEnabled) {
+      const compiledScore = compileScore()
+      timelineHash = compiledScore.identity.timelineHash
       slotDispatcher = new SlotDispatcher({
         getCurrentVocabulary: () =>
           voice.policy.vocabulary === 'names' ? 'technique' : 'numeric',
         onSkipped: (slot, reason) => {
           logger.warn(
-            'puncheokie.slotDispatcher.skipped',
+            'workout.slotDispatcher.skipped',
             'coach slot dropped without playing',
             { slotId: safe(slot.slotId), roundIndex: safe(slot.roundIndex), reason: safe(reason) },
           )
@@ -1806,7 +1859,7 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
           const clip = findComboAnnounceById(assetId)
           if (!clip) {
             logger.warn(
-              'puncheokie.slotDispatcher.assetMissing',
+              'workout.slotDispatcher.assetMissing',
               'compiled coach slot references an unknown combo-announce id',
               { assetId: safe(assetId), slotId: safe(slotId) },
             )
@@ -1831,7 +1884,7 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
             // heavy-hands and pace-pusher lost expectation #1 exactly this way,
             // and Kyle heard the block open in silence (GH #305).
             logger.info(
-              'puncheokie.slotDispatcher.deferred',
+              'workout.slotDispatcher.deferred',
               'coach lane busy — combo-announce re-queued for a later tick',
               { slotId: safe(slotId), audibleUntilMs: safe(audibleUntilMs) },
             )
@@ -1840,7 +1893,7 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
           // The score's own dispatch moment, joined to the audio record by
           // slotId. `atTick` was discarded here before, which left the
           // announce path with no scheduled time to measure lateness against.
-          logger.info('puncheokie.comboAnnounce.dispatch', 'combo-announce dispatched', {
+          logger.info('workout.comboAnnounce.dispatch', 'combo-announce dispatched', {
             slotId: safe(slotId),
             assetId: safe(assetId),
             atTick: safe(atTick),
@@ -1900,7 +1953,7 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
       slotDispatcher.enqueueAll(enqueuableSlots)
       announcer.setScoreOwnsCombos(true)
       logger.info(
-        'puncheokie.slotDispatcher.armed',
+        'workout.slotDispatcher.armed',
         'score-authoritative combo-announce dispatcher armed',
         {
           workout: safe(workout.id),
@@ -1910,6 +1963,34 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
           timelineHash: safe(compiledScore.identity.timelineHash),
         },
       )
+    } else if (__DEV__ || isQaEnabled()) {
+      // The click path never compiles the score, so it had no identity to
+      // log — and the verification suite, which only ever drives click-path
+      // workouts, could not tie a capture to its manifest at all. Compile it
+      // here purely for its hash, in dev and QA runs only: an athlete's
+      // ordinary run pays nothing for it and cannot be broken by a compile
+      // fault, and the suite (which runs with QA on) gets its proof.
+      try {
+        timelineHash = compileScore().identity.timelineHash
+      } catch (error) {
+        logger.warn(
+          'workout.timeline.provenanceFailed',
+          'could not compile the timeline for its identity',
+          { workout: safe(workout.id), error: safe(String(error)) },
+        )
+      }
+    }
+    // Which compiled timeline this run is, on EITHER coach path. The armed
+    // record above carries the same hash but exists only when the score
+    // path arms — which no shipped sample does — so on its own it left
+    // every capture the suite takes unverifiable (`verify-first-round`
+    // reads this record first and falls back to that one).
+    if (timelineHash !== null) {
+      logger.info('workout.timeline.provenance', 'compiled timeline identity', {
+        workout: safe(workout.id),
+        timelineHash: safe(timelineHash),
+        path: safe(scorePathLive ? 'score' : 'click'),
+      })
     }
     slotDispatcherRef.current = slotDispatcher
 
@@ -1983,7 +2064,7 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
       enabled: __DEV__ || process.env.EXPO_PUBLIC_VIZ_FORENSICS === '1' || isQaEnabled(),
       now: () => clock.now(),
       emit: (batch: readonly VizRecord[]) => {
-        logger.info('puncheokie.viz.batch', 'visual transition batch', {
+        logger.info('workout.viz.batch', 'visual transition batch', {
           count: safe(batch.length),
           records: safe(JSON.stringify(batch)),
         })
@@ -2048,22 +2129,31 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
         if (schedule && schedule.roundIndex === snapshot.roundIndex && voice) {
           for (const entry of schedule.entries) {
             if (entry.state !== 'pending' || snapshot.workElapsedMs < entry.dispatchAtMs) continue
+            // D1 (coach off / third-party music without opt-in): the whole
+            // guided layer stays silent. And the athlete's mode: a lead-in
+            // and a per-bar call are both punch commands, which Minimal
+            // leaves to the visuals — the same gate the announcer and the
+            // score dispatcher apply, so Minimal means one thing on every
+            // workout. Checked at dispatch, not at build, so a mid-round
+            // change is honoured.
+            const mayCall =
+              voiceAllowed(voice.policy, playbackActiveRef.current) &&
+              shouldSpeak(voice.policy, 'punch-command', false)
             if (snapshot.workElapsedMs > entry.giveUpAtMs) {
               entry.state = 'skipped'
               // A skipped CALL is routine (busy lane, next call seconds
-              // away); a skipped LEAD-IN lost real coaching — warn.
-              if (entry.kind === 'lead-in') {
-                logger.warn('puncheokie.clickScript.skipped', 'lead-in window expired before the lane freed', {
+              // away); a skipped LEAD-IN lost real coaching — warn. Not
+              // when the coach was silent on purpose: nothing was lost,
+              // and "the lane never freed" would be a false report.
+              if (entry.kind === 'lead-in' && mayCall) {
+                logger.warn('workout.clickScript.skipped', 'lead-in window expired before the lane freed', {
                   slot: safe(entry.slot),
                   workElapsedMs: safe(snapshot.workElapsedMs),
                 })
               }
               continue
             }
-            // D1 (coach off / third-party music without opt-in): the whole
-            // guided layer stays silent. Checked at dispatch, not at build,
-            // so a mid-round playback change is honoured.
-            if (!voiceAllowed(voice.policy, playbackActiveRef.current)) continue
+            if (!mayCall) continue
             const audibleUntilMs = voice.output.audibleUntilMs?.() ?? 0
             // A section's rep-0 call OWNS its pad by construction (Variant
             // B: the opener pad fits bell-clear + call + breath; mid-round
@@ -2102,7 +2192,7 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
               // cached.
               { oneShot: entry.kind !== 'call' },
             )
-            logger.info('puncheokie.clickScript.dispatch', 'click script dispatched', {
+            logger.info('workout.clickScript.dispatch', 'click script dispatched', {
               kind: safe(entry.kind),
               slot: safe(entry.slot),
               traceId: safe(traceId),
@@ -2141,7 +2231,7 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
               swap.loop,
               clickAudibleRef.current ? workout.recipe.metronome.volume : 0,
             )
-            logger.info('puncheokie.metronome.swap', 'section subdivision swap', {
+            logger.info('workout.metronome.swap', 'section subdivision swap', {
               dispatchAtMs: safe(swap.dispatchAtMs),
               division: safe(swap.loop.division),
               baseBpm: safe(swap.loop.baseBpm),
@@ -2159,7 +2249,7 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
       vizRef.current?.flush()
     }, TICK_INTERVAL_MS)
 
-    logger.info('puncheokie.runner.start', 'workout runner armed', {
+    logger.info('workout.runner.start', 'workout runner armed', {
       workout: safe(workout.id),
       rounds: safe(workout.schedule.length),
       source: safe(source.id),
@@ -2236,7 +2326,16 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
         pushStore(true)
       },
       repeatCue: () => {
-        engineRef.current?.repeatCue()
+        const outcome = engineRef.current?.repeatCue()
+        // A Repeat with nowhere to go changes nothing on screen, so it has
+        // to say so somewhere — otherwise "I held it and nothing happened"
+        // cannot be told apart from a dead button.
+        if (outcome !== undefined && outcome !== 'placed') {
+          logger.info('workout.cue.repeatNotPlaced', 'repeat had nowhere to go', {
+            reason: safe(outcome),
+            workElapsedMs: safe(Math.round(workElapsedMsRef.current)),
+          })
+        }
         syncFromEngine()
         pushStore(true)
       },
@@ -2305,6 +2404,27 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
         cueResults: matcherRef.current?.results() ?? [],
         ...(lastScoreRef.current ? { lastScore: lastScoreRef.current } : {}),
       }),
+      discardSession: () => {
+        const written = writtenSessionRef.current
+        if (!written) return false
+        // Cleared first: a second press, or a failure below, must not retry
+        // against a row that may already be gone.
+        writtenSessionRef.current = null
+        try {
+          const deleted = written.sessions.delete(written.sessionId)
+          logger.info('workout.session.discarded', 'the athlete discarded the stopped session', {
+            session: safe(written.sessionId),
+            deleted: safe(deleted),
+          })
+          return deleted
+        } catch (error) {
+          logger.error('workout.session.discardFailed', 'could not delete the discarded session', {
+            session: safe(written.sessionId),
+            error: safe(String(error)),
+          })
+          return false
+        }
+      },
     }),
     [applyTransitions, buildLeadInSchedule, clock, pushStore, source, syncFromEngine, cuesById],
   )

@@ -54,8 +54,13 @@ btsnoop_hci.log
 *.pcapng
 *.bugreport.zip
 
-# Local Claude Code session state
-.claude/
+# Local Claude Code session state — everything under .claude/ EXCEPT the
+# project's skills. `.claude/skills/` holds the cadence-lab and
+# qa-audio-verify runbooks, the only written record of the verification
+# loop; ignored, they missed the Puncheokie rename and a fresh clone had
+# neither.
+.claude/*
+!.claude/skills/
 
 # Kokoro model files — ~350MB, downloaded by tools/voice/README, never committed.
 tools/voice/models/

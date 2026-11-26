@@ -1,9 +1,9 @@
 # Roadmap
 
-The roadmap is 38 GitHub Milestones — `M01`…`M30` from the original plan plus `M31`…`M38` added for the Puncheokie v0.2/v0.3 design and the shared workout backdrop (`M24`–`M26` are retained but superseded) — grouped under 8 Phase Epics (`[EPIC] Phase 0` … `[EPIC] Phase 7`). Every task/story/spike issue is a sub-issue of its phase epic and lives on Project #5 with Phase, Area, Priority, Size, and (when scheduled) Sprint set.
+The roadmap is 38 GitHub Milestones — `M01`…`M30` from the original plan plus `M31`…`M38` added for the punchCraft workouts v0.2/v0.3 design and the shared workout backdrop (`M24`–`M26` are retained but superseded) — grouped under 8 Phase Epics (`[EPIC] Phase 0` … `[EPIC] Phase 7`). Every task/story/spike issue is a sub-issue of its phase epic and lives on Project #5 with Phase, Area, Priority, Size, and (when scheduled) Sprint set.
 
 - Board: https://github.com/users/kyleruff1/projects/5
-- Milestones: https://github.com/kyleruff1/punchCraft-Puncheokie/milestones
+- Milestones: https://github.com/kyleruff1/punchCraft-punchCraft workouts/milestones
 - Backlog source: [`tools/backlog/backlog-issues.json`](../tools/backlog/backlog-issues.json) (epics + issues) and [`backlog-static.json`](../tools/backlog/backlog-static.json) (labels, milestones, project) → seeded by [`tools/backlog/seed.mjs`](../tools/backlog/seed.mjs)
 
 ## Phase 0 — Preserve the baseline and establish the repository
@@ -46,9 +46,9 @@ The first functional product milestone; everything below runs in Sprint 1.
 - **M22** — Session persistence & deterministic metrics. `sessions`, `rounds`, `punch_events`, `session_metrics`; MetricsEngine confirmed + velocity-dependent metrics (§9.1, §9.2) with `calculation_version`; in-session reconnect updates completeness and `recovered` counts. (§9, §17, §22 Phase 4 tasks 8–9.)
 - **M23** — Summary, history, recalculation & export. Session summary discloses velocity representation (§8.5), history with filter/detail/compare/delete, recalculation using newer decoder/profile without touching raw, CSV + JSON export. (§8.5, §8.6, §22 Phase 4 tasks 10–11.)
 
-## Phase 5 — Puncheokie workout engine without Spotify
+## Phase 5 — punchCraft workouts workout engine without Spotify
 
-Specified by [puncheokie-ux-workout-engine.md](puncheokie-ux-workout-engine.md) (v0.2, canonical for Puncheokie; decisions D1–D10). Recipe + deterministic seeded generator replace the original program editor; stance is orthodox/southpaw/switch; the live screen is landscape-first on the tablet; defense/footwork/coach tokens are display-only; the Voice Coach is OFF by default whenever third-party playback is active.
+Specified by [workouts-ux-engine.md](workouts-ux-engine.md) (v0.2, canonical for punchCraft workouts; decisions D1–D10). Recipe + deterministic seeded generator replace the original program editor; stance is orthodox/southpaw/switch; the live screen is landscape-first on the tablet; defense/footwork/coach tokens are display-only; the Voice Coach is OFF by default whenever third-party playback is active.
 
 - **M24** — Program model & editor — **superseded** by M31 (milestone closed; its issues were closed as superseded).
 - **M25** — Stance mapping & cue runner — **superseded** by M32; retains only the StanceMapper issues (M25-01, M25-02).

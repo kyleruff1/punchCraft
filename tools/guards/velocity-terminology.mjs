@@ -42,6 +42,13 @@ const FILE_ALLOWLIST = new Set([
    * coaching copy ("power shots") is exempt. Flagging the rule's own
    * explanation is the scanner reading prose, not a mislabelled metric. */
   'src/domain/workout/samples/__tests__/samples.test.ts',
+  /* The handoff package's description of THIS guard: it lists the banned
+   * phrase and tokens so the next session knows what the guard rejects. Same
+   * case as the entry above — the scan is reading the rule's own explanation,
+   * not a label on a value. Rewording it would leave a document that cannot
+   * say what the guard bans. Only this one file; the rest of docs/handoff/
+   * stays scanned. */
+  'docs/handoff/05-toolchain-and-methods.md',
 ])
 
 /** Directory-prefix allowlist. The protocol adapter layer implements the
@@ -70,7 +77,7 @@ const DIR_ALLOWLIST_PREFIXES = [
    * tests rather than under it. The protocol allowlist above already covers
    * "JSDoc + tests" for the same reason. */
   'src/domain/__tests__/instrument.',
-  /* Puncheokie design docs describe the drum model in its own vocabulary —
+  /* punchCraft workouts design docs describe the drum model in its own vocabulary —
    * drum-kit-design.md lists "MIDI velocity" and "groove energy" as two
    * DIFFERENT things, which is precisely the distinction §4.3 protects. */
   'docs/puncheoke/',

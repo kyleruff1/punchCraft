@@ -31,10 +31,10 @@ import {
 import { latencyStats, summarizeObserved } from '../observed-summary.mjs'
 
 describe('run URL', () => {
-  it('carries every QA param, autostart and qa=1, URL-encoded', () => {
+  it('carries every QA param and autostart, URL-encoded — and never asks to enable QA mode', () => {
     const url = buildRunUrl({ workout: 'quick-one-two', vocab: 'techniques', sim: 'captured-jam', simForce: true, simBpm: 120, nonce: 'suite 1' })
     expect(url).toBe(
-      'punchcraft://qa/run?workout=quick-one-two&vocab=techniques&sim=captured-jam&simForce=1&simBpm=120&autostart=1&qa=1&nonce=suite%201',
+      'punchcraft://qa/run?workout=quick-one-two&vocab=techniques&sim=captured-jam&simForce=1&simBpm=120&autostart=1&nonce=suite%201',
     )
   })
 
@@ -269,7 +269,7 @@ describe('args', () => {
 describe('observed summary', () => {
   const PID = '( 8286)'
   // The REAL ConsoleSink shape, copied from a device capture:
-  //   '[INFO] puncheokie.voice.play', 'clip playing', { asset: 'bell',
+  //   '[INFO] workout.voice.play', 'clip playing', { asset: 'bell',
   // The level is what sits in the brackets; the event code follows it. A
   // fixture written as '[<code>] …' passes against a matcher built the same
   // wrong way and finds nothing in the field — that is exactly what happened
@@ -287,7 +287,7 @@ describe('observed summary', () => {
 
   it('parses a line copied verbatim from a device capture', () => {
     const real = [
-      "09-07 15:10:43.596 I/ReactNativeJS(15660): '[INFO] puncheokie.voice.observed', 'clip observed', { playId: 'ab12-1',",
+      "09-07 15:10:43.596 I/ReactNativeJS(15660): '[INFO] workout.voice.observed', 'clip observed', { playId: 'ab12-1',",
       '09-07 15:10:43.596 I/ReactNativeJS(15660):   kind: \'click-script\',',
       '09-07 15:10:43.596 I/ReactNativeJS(15660):   outcome: \'ok\',',
       '09-07 15:10:43.596 I/ReactNativeJS(15660):   onsetLatencyMs: 12,',
@@ -302,25 +302,25 @@ describe('observed summary', () => {
   })
 
   it('does not confuse a code with one that extends it', () => {
-    const blocked = rec('10:00:00.000', 'puncheokie.qa.run.blocked', { workout: 'body-work', nonce: 'n1' })
-    const staged = rec('10:00:01.000', 'puncheokie.qa.run', { workout: 'body-work', dev: false, nonce: 'n1' })
+    const blocked = rec('10:00:00.000', 'workout.qa.run.blocked', { workout: 'body-work', nonce: 'n1' })
+    const staged = rec('10:00:01.000', 'workout.qa.run', { workout: 'body-work', dev: false, nonce: 'n1' })
     const { recordsWithTag } = require('../logcat.mjs')
-    expect(recordsWithTag(`${blocked}\n${staged}`, 'puncheokie.qa.run')).toHaveLength(1)
-    expect(recordsWithTag(`${blocked}\n${staged}`, 'puncheokie.qa.run')[0].body).toContain('dev: false')
-    expect(recordsWithTag(`${blocked}\n${staged}`, 'puncheokie.qa.run.blocked')).toHaveLength(1)
+    expect(recordsWithTag(`${blocked}\n${staged}`, 'workout.qa.run')).toHaveLength(1)
+    expect(recordsWithTag(`${blocked}\n${staged}`, 'workout.qa.run')[0].body).toContain('dev: false')
+    expect(recordsWithTag(`${blocked}\n${staged}`, 'workout.qa.run.blocked')).toHaveLength(1)
   })
 
   it('reports coverage, per-kind onset stats, truncation, silent births and the instrument tap', () => {
     const text = [
-      rec('10:00:01.000', 'puncheokie.voice.play', { asset: 'a', playId: 'ab12-1' }),
-      rec('10:00:01.100', 'puncheokie.voice.observed', { playId: 'ab12-1', kind: 'click-script', path: 'armed', outcome: 'ok', onsetLatencyMs: 12, observedDurationMs: 900, expectedDurationMs: 1000, silentByVolume: false }),
-      rec('10:00:02.000', 'puncheokie.voice.play', { asset: 'b', playId: 'ab12-2' }),
-      rec('10:00:02.100', 'puncheokie.voice.observed', { playId: 'ab12-2', kind: 'click-script', path: 'fresh', outcome: 'ok', onsetLatencyMs: 40, observedDurationMs: 1000, expectedDurationMs: 1000, silentByVolume: true }),
-      rec('10:00:03.000', 'puncheokie.voice.play', { asset: 'c', playId: 'ab12-3' }),
-      rec('10:00:03.100', 'puncheokie.voice.observed', { playId: 'intro-1', kind: 'intro', outcome: 'released', onsetLatencyMs: 30, observedDurationMs: 500, expectedDurationMs: 9000, silentByVolume: false }),
-      rec('10:00:04.000', 'puncheokie.instrument.observed', { eventId: 'e1', outcome: 'ok', latencyMs: 1.1, pipelineMs: 4 }),
-      rec('10:00:04.010', 'puncheokie.instrument.observed', { eventId: 'e2', outcome: 'masked', latencyMs: null, pipelineMs: 4 }),
-      rec('10:00:05.000', 'puncheokie.observer.stats', { watched: 3, openAtRelease: 0, maxHandlerMs: 0.4 }),
+      rec('10:00:01.000', 'workout.voice.play', { asset: 'a', playId: 'ab12-1' }),
+      rec('10:00:01.100', 'workout.voice.observed', { playId: 'ab12-1', kind: 'click-script', path: 'armed', outcome: 'ok', onsetLatencyMs: 12, observedDurationMs: 900, expectedDurationMs: 1000, silentByVolume: false }),
+      rec('10:00:02.000', 'workout.voice.play', { asset: 'b', playId: 'ab12-2' }),
+      rec('10:00:02.100', 'workout.voice.observed', { playId: 'ab12-2', kind: 'click-script', path: 'fresh', outcome: 'ok', onsetLatencyMs: 40, observedDurationMs: 1000, expectedDurationMs: 1000, silentByVolume: true }),
+      rec('10:00:03.000', 'workout.voice.play', { asset: 'c', playId: 'ab12-3' }),
+      rec('10:00:03.100', 'workout.voice.observed', { playId: 'intro-1', kind: 'intro', outcome: 'released', onsetLatencyMs: 30, observedDurationMs: 500, expectedDurationMs: 9000, silentByVolume: false }),
+      rec('10:00:04.000', 'workout.instrument.observed', { eventId: 'e1', outcome: 'ok', latencyMs: 1.1, pipelineMs: 4 }),
+      rec('10:00:04.010', 'workout.instrument.observed', { eventId: 'e2', outcome: 'masked', latencyMs: null, pipelineMs: 4 }),
+      rec('10:00:05.000', 'workout.observer.stats', { watched: 3, openAtRelease: 0, maxHandlerMs: 0.4 }),
     ].join('\n')
     const s = summarizeObserved(text)
     expect(s.present).toBe(true)
@@ -342,12 +342,12 @@ describe('observed summary', () => {
   })
 
   it('counts a play cut short of its planned length as truncated', () => {
-    const text = rec('10:00:01.100', 'puncheokie.voice.observed', { playId: 'x', kind: 'clip', outcome: 'ok', onsetLatencyMs: 5, observedDurationMs: 600, expectedDurationMs: 1000, silentByVolume: false })
+    const text = rec('10:00:01.100', 'workout.voice.observed', { playId: 'x', kind: 'clip', outcome: 'ok', onsetLatencyMs: 5, observedDurationMs: 600, expectedDurationMs: 1000, silentByVolume: false })
     expect(summarizeObserved(text).byKind.clip.truncated).toBe(1)
   })
 
   it('is honest about a capture with no observer records', () => {
-    const s = summarizeObserved('08-31 10:00:00.000 I/ReactNativeJS( 1): \'[puncheokie.voice.play] clip playing\', { asset: \'a\' }')
+    const s = summarizeObserved('08-31 10:00:00.000 I/ReactNativeJS( 1): \'[workout.voice.play] clip playing\', { asset: \'a\' }')
     expect(s).toMatchObject({ present: false, playsWithId: 0, coverage: null, voiceObserved: 0 })
   })
 

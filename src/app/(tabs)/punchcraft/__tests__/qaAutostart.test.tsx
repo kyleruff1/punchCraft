@@ -155,7 +155,7 @@ const stage = (over: Partial<StagedQaRun> = {}): void => {
   })
 }
 
-const autostartLogs = (): LogRecord[] => records.filter((r) => r.code === 'puncheokie.qa.autostart')
+const autostartLogs = (): LogRecord[] => records.filter((r) => r.code === 'workout.qa.autostart')
 
 /** The runner's own "armed, waiting for Hit It" evidence, as pushStore publishes it. */
 const armed = (): void => drive({ phase: 'idle', roundCount: 3 })
@@ -275,7 +275,7 @@ describe('QA auto-sim', () => {
     stopScript.mockRestore()
   })
 
-  const simLogs = (): LogRecord[] => records.filter((r) => r.code === 'puncheokie.qa.sim')
+  const simLogs = (): LogRecord[] => records.filter((r) => r.code === 'workout.qa.sim')
 
   it('plays the staged script at work-entered, paced to the workout, and stops it at rest', () => {
     stage({ sim: 'captured-jam', autostart: false })

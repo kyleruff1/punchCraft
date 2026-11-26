@@ -56,7 +56,7 @@ export const RECOVERY_SCRIPTS: readonly RecoveryScript[] = [
       { module: require('../../../assets/voice/numbers/standalone/rec-r01-s5.wav'), durationMs: 8520, pauseAfterMs: 0 },
     ],
     measuredTotalMs: 43138,
-    corpusVersion: "puncheokie-inter-round-recovery-v1",
+    corpusVersion: "workouts-inter-round-recovery-v1",
   },
   {
     scriptId: "R02",
@@ -73,7 +73,7 @@ export const RECOVERY_SCRIPTS: readonly RecoveryScript[] = [
       { module: require('../../../assets/voice/numbers/standalone/rec-r02-s4.wav'), durationMs: 8438, pauseAfterMs: 0 },
     ],
     measuredTotalMs: 40349,
-    corpusVersion: "puncheokie-inter-round-recovery-v1",
+    corpusVersion: "workouts-inter-round-recovery-v1",
   },
   {
     scriptId: "R03",
@@ -90,7 +90,7 @@ export const RECOVERY_SCRIPTS: readonly RecoveryScript[] = [
       { module: require('../../../assets/voice/numbers/standalone/rec-r03-s4.wav'), durationMs: 9240, pauseAfterMs: 0 },
     ],
     measuredTotalMs: 42352,
-    corpusVersion: "puncheokie-inter-round-recovery-v1",
+    corpusVersion: "workouts-inter-round-recovery-v1",
   },
   {
     scriptId: "R04",
@@ -107,7 +107,7 @@ export const RECOVERY_SCRIPTS: readonly RecoveryScript[] = [
       { module: require('../../../assets/voice/numbers/standalone/rec-r04-s4.wav'), durationMs: 5282, pauseAfterMs: 3000 },
     ],
     measuredTotalMs: 41149,
-    corpusVersion: "puncheokie-inter-round-recovery-v1",
+    corpusVersion: "workouts-inter-round-recovery-v1",
   },
   {
     scriptId: "R05",
@@ -125,7 +125,7 @@ export const RECOVERY_SCRIPTS: readonly RecoveryScript[] = [
       { module: require('../../../assets/voice/numbers/standalone/rec-r05-s5.wav'), durationMs: 5936, pauseAfterMs: 0 },
     ],
     measuredTotalMs: 42370,
-    corpusVersion: "puncheokie-inter-round-recovery-v1",
+    corpusVersion: "workouts-inter-round-recovery-v1",
   },
   {
     scriptId: "R06",
@@ -143,7 +143,7 @@ export const RECOVERY_SCRIPTS: readonly RecoveryScript[] = [
       { module: require('../../../assets/voice/numbers/standalone/rec-r06-s5.wav'), durationMs: 6674, pauseAfterMs: 0 },
     ],
     measuredTotalMs: 41655,
-    corpusVersion: "puncheokie-inter-round-recovery-v1",
+    corpusVersion: "workouts-inter-round-recovery-v1",
   },
   {
     scriptId: "R07",
@@ -161,7 +161,7 @@ export const RECOVERY_SCRIPTS: readonly RecoveryScript[] = [
       { module: require('../../../assets/voice/numbers/standalone/rec-r07-s5.wav'), durationMs: 7586, pauseAfterMs: 0 },
     ],
     measuredTotalMs: 39336,
-    corpusVersion: "puncheokie-inter-round-recovery-v1",
+    corpusVersion: "workouts-inter-round-recovery-v1",
   },
   {
     scriptId: "R08",
@@ -178,7 +178,7 @@ export const RECOVERY_SCRIPTS: readonly RecoveryScript[] = [
       { module: require('../../../assets/voice/numbers/standalone/rec-r08-s4.wav'), durationMs: 9480, pauseAfterMs: 0 },
     ],
     measuredTotalMs: 40735,
-    corpusVersion: "puncheokie-inter-round-recovery-v1",
+    corpusVersion: "workouts-inter-round-recovery-v1",
   },
   {
     scriptId: "R09",
@@ -196,7 +196,7 @@ export const RECOVERY_SCRIPTS: readonly RecoveryScript[] = [
       { module: require('../../../assets/voice/numbers/standalone/rec-r09-s5.wav'), durationMs: 5318, pauseAfterMs: 0 },
     ],
     measuredTotalMs: 41688,
-    corpusVersion: "puncheokie-inter-round-recovery-v1",
+    corpusVersion: "workouts-inter-round-recovery-v1",
   },
   {
     scriptId: "R10",
@@ -213,7 +213,7 @@ export const RECOVERY_SCRIPTS: readonly RecoveryScript[] = [
       { module: require('../../../assets/voice/numbers/standalone/rec-r10-s4.wav'), durationMs: 8780, pauseAfterMs: 0 },
     ],
     measuredTotalMs: 40211,
-    corpusVersion: "puncheokie-inter-round-recovery-v1",
+    corpusVersion: "workouts-inter-round-recovery-v1",
   },
   {
     scriptId: "R11",
@@ -230,7 +230,7 @@ export const RECOVERY_SCRIPTS: readonly RecoveryScript[] = [
       { module: require('../../../assets/voice/numbers/standalone/rec-r11-s4.wav'), durationMs: 9486, pauseAfterMs: 0 },
     ],
     measuredTotalMs: 40329,
-    corpusVersion: "puncheokie-inter-round-recovery-v1",
+    corpusVersion: "workouts-inter-round-recovery-v1",
   },
   {
     scriptId: "R12",
@@ -247,7 +247,7 @@ export const RECOVERY_SCRIPTS: readonly RecoveryScript[] = [
       { module: require('../../../assets/voice/numbers/standalone/rec-r12-s4.wav'), durationMs: 8399, pauseAfterMs: 0 },
     ],
     measuredTotalMs: 41313,
-    corpusVersion: "puncheokie-inter-round-recovery-v1",
+    corpusVersion: "workouts-inter-round-recovery-v1",
   },
   {
     scriptId: "R13",
@@ -264,7 +264,7 @@ export const RECOVERY_SCRIPTS: readonly RecoveryScript[] = [
       { module: require('../../../assets/voice/numbers/standalone/rec-r13-s4.wav'), durationMs: 9080, pauseAfterMs: 0 },
     ],
     measuredTotalMs: 40427,
-    corpusVersion: "puncheokie-inter-round-recovery-v1",
+    corpusVersion: "workouts-inter-round-recovery-v1",
   },
   {
     scriptId: "R14",
@@ -281,7 +281,7 @@ export const RECOVERY_SCRIPTS: readonly RecoveryScript[] = [
       { module: require('../../../assets/voice/numbers/standalone/rec-r14-s4.wav'), durationMs: 10080, pauseAfterMs: 0 },
     ],
     measuredTotalMs: 40618,
-    corpusVersion: "puncheokie-inter-round-recovery-v1",
+    corpusVersion: "workouts-inter-round-recovery-v1",
   },
   {
     scriptId: "R16",
@@ -299,7 +299,7 @@ export const RECOVERY_SCRIPTS: readonly RecoveryScript[] = [
       { module: require('../../../assets/voice/numbers/standalone/rec-r16-s5.wav'), durationMs: 6280, pauseAfterMs: 0 },
     ],
     measuredTotalMs: 41912,
-    corpusVersion: "puncheokie-inter-round-recovery-v1",
+    corpusVersion: "workouts-inter-round-recovery-v1",
   },
   {
     scriptId: "R17",
@@ -317,7 +317,7 @@ export const RECOVERY_SCRIPTS: readonly RecoveryScript[] = [
       { module: require('../../../assets/voice/numbers/standalone/rec-r17-s5.wav'), durationMs: 7600, pauseAfterMs: 0 },
     ],
     measuredTotalMs: 44326,
-    corpusVersion: "puncheokie-inter-round-recovery-v1",
+    corpusVersion: "workouts-inter-round-recovery-v1",
   },
   {
     scriptId: "R18",
@@ -335,7 +335,7 @@ export const RECOVERY_SCRIPTS: readonly RecoveryScript[] = [
       { module: require('../../../assets/voice/numbers/standalone/rec-r18-s5.wav'), durationMs: 4940, pauseAfterMs: 0 },
     ],
     measuredTotalMs: 40771,
-    corpusVersion: "puncheokie-inter-round-recovery-v1",
+    corpusVersion: "workouts-inter-round-recovery-v1",
   },
   {
     scriptId: "R19",
@@ -353,7 +353,7 @@ export const RECOVERY_SCRIPTS: readonly RecoveryScript[] = [
       { module: require('../../../assets/voice/numbers/standalone/rec-r19-s5.wav'), durationMs: 5062, pauseAfterMs: 0 },
     ],
     measuredTotalMs: 40862,
-    corpusVersion: "puncheokie-inter-round-recovery-v1",
+    corpusVersion: "workouts-inter-round-recovery-v1",
   },
   {
     scriptId: "R20",
@@ -371,7 +371,7 @@ export const RECOVERY_SCRIPTS: readonly RecoveryScript[] = [
       { module: require('../../../assets/voice/numbers/standalone/rec-r20-s5.wav'), durationMs: 7480, pauseAfterMs: 0 },
     ],
     measuredTotalMs: 43623,
-    corpusVersion: "puncheokie-inter-round-recovery-v1",
+    corpusVersion: "workouts-inter-round-recovery-v1",
   },
 ]
 
