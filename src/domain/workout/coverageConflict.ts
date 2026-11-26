@@ -16,10 +16,16 @@
  * ## What still causes it
  *
  * One thing, as of generator 1.3.1: **punches that form no combination at
- * all.** A single enabled punch other than the jab, or a pair like the two
- * uppercuts, appears in no motif the library has, so there is no ladder to
- * teach and no fallback to repeat — every round is laid empty. Likewise two
- * punches with combinations capped at one. Hence the advice below.
+ * all.** A single enabled punch other than the jab, or a jab-less pair like
+ * the two uppercuts or the two hooks, appears in no motif the library has,
+ * so there is no ladder to teach and no fallback to repeat — every round is
+ * laid empty. Any set with the jab in it fills, at any combination length;
+ * cross-and-lead-hook fills once combinations may be two long.
+ *
+ * That case is not a round that ends early — it is no workout at all: the
+ * stage shows free work from the first bell to the last and the coach never
+ * speaks. So it is an **error** (`NO_COMBINATIONS`), which the recipe screen
+ * refuses to start, rather than the warning below.
  *
  * Three other causes have come and gone, and each was first mistaken for
  * the one after it:
@@ -49,6 +55,7 @@ import type { GeneratedWorkout } from './GeneratedWorkout'
 import type { RecipeConflict } from './recipeValidation'
 
 export const ROUNDS_RUN_DRY = 'rounds-run-dry'
+export const NO_COMBINATIONS = 'no-combinations'
 
 /** A round must stop at least this far short of its bell to be worth a warning. */
 export const MATERIAL_TAIL_MS = 10_000
@@ -58,6 +65,18 @@ const TAIL_ROUNDING_MS = 5_000
 
 export function coverageConflict(workout: GeneratedWorkout): RecipeConflict | null {
   const scored = workout.schedule.filter((round) => round.countsTowardGoal)
+
+  // Nothing was laid in any scored round: there is no workout to run.
+  if (scored.length > 0 && scored.every((round) => round.blocks.length === 0)) {
+    return {
+      code: NO_COMBINATIONS,
+      fields: ['enabledPunches', 'maximumComboPunches'],
+      severity: 'error',
+      message: 'These punches do not form any combination, so every round would be empty.',
+      resolution: 'Turn the jab on, enable more punches, or allow longer combinations.',
+    }
+  }
+
   let dry = 0
   let longestTailMs = 0
   for (const round of scored) {
