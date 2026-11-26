@@ -12,7 +12,7 @@
  */
 import React from 'react'
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer'
-import { BackHandler, StyleSheet } from 'react-native'
+import { BackHandler, Platform, StyleSheet } from 'react-native'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { readFileSync } from 'node:fs'
 
@@ -129,6 +129,7 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake'
 import LiveScreen from '../live'
 import { TAB_BAR_STYLE } from '../../_layout'
 import { colors } from '@/theme/colors'
+import { replaceSinks } from '@diagnostics/logger'
 import { setLive, useLiveStore, useWorkoutStore } from '@state/useWorkoutStore'
 import { VoiceOutputExpo } from '@audio/VoiceOutputExpo'
 import { useBackdropSettingsStore } from '@state/useBackdropSettingsStore'
@@ -706,5 +707,53 @@ describe('audio hold on blur (GH #356)', () => {
     drive({ phase: 'completed' })
     expect(release).toHaveBeenCalled()
     release.mockRestore()
+  })
+})
+
+// ---------------------------------------------------------------------------
+
+describe('the reconnect control', () => {
+  it('is offered on the tablet while idle', () => {
+    const tree = render()
+    expect(nodes(tree, 'glove-reconnect')).toHaveLength(1)
+  })
+})
+
+describe('in a browser (the PC version)', () => {
+  let restoreOs: { restore: () => void }
+  beforeEach(() => {
+    restoreOs = jest.replaceProperty(Platform, 'OS', 'web')
+  })
+  afterEach(() => {
+    restoreOs.restore()
+    replaceSinks([])
+  })
+
+  it('offers no reconnect control: there is nothing a browser can scan for', () => {
+    const tree = render()
+    expect(nodes(tree, 'glove-reconnect')).toHaveLength(0)
+  })
+
+  it('carries on when the orientation lock and the wake lock are both refused', async () => {
+    const went: string[] = []
+    replaceSinks([
+      {
+        write: (r) => {
+          if (r.code === 'workout.live.unavailable') went.push(String(r.fields.what?.value))
+        },
+      },
+    ])
+    ;(ScreenOrientation.lockAsync as jest.Mock).mockRejectedValueOnce(
+      new Error('screen.orientation.lock() is not available on this device.'),
+    )
+    ;(activateKeepAwakeAsync as jest.Mock).mockRejectedValueOnce(
+      new Error('Wake Lock permission request denied'),
+    )
+    const tree = render()
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(went.sort()).toEqual(['keep awake', 'orientation lock'])
+    expect(nodes(tree, 'live-screen')).toHaveLength(1)
   })
 })

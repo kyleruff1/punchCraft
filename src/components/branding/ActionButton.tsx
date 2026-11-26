@@ -20,6 +20,8 @@ import React from 'react'
 import { Image, Pressable, StyleSheet } from 'react-native'
 import type { StyleProp, ViewStyle } from 'react-native'
 
+import { assetSize } from './assetSize'
+
 /* eslint-disable @typescript-eslint/no-require-imports */
 const SOURCES = {
   buildAWorkout: require('../../../assets/branding/builidAworkout_label.png') as number,
@@ -106,7 +108,7 @@ export function ActionButton({
   testID,
 }: ActionButtonProps): React.JSX.Element {
   const source = SOURCES[action]
-  const resolved = Image.resolveAssetSource(source)
+  const resolved = assetSize(source)
   const aspect = resolved.width / resolved.height
   return (
     <Pressable

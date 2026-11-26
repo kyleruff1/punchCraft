@@ -50,6 +50,7 @@
  */
 
 import { getTrackerCoordinator, type TrackerSlotHand } from '@ble/TrackerCoordinator'
+import { canFindGloves, NO_GLOVE_SEARCH_MESSAGE } from '@ble/gloveSupport'
 import { PermissionService } from '@ble/PermissionService'
 import { findKnownTracker, KNOWN_TRACKERS } from '@ble/knownTrackers'
 import { getTrackerSlots } from '@state/useTrackerStore'
@@ -139,9 +140,19 @@ export interface AutoConnectOptions {
   timeoutMs?: number
 }
 
+/** The answer where no pass can run: nothing found, and the reason. */
+const noGloveSearch = (): AutoConnectResult => ({
+  outcomes: [],
+  connectedCount: 0,
+  scanError: NO_GLOVE_SEARCH_MESSAGE,
+})
+
 export async function autoConnectKnownTrackers(
   options: AutoConnectOptions = {},
 ): Promise<AutoConnectResult> {
+  // A browser cannot scan (`gloveSupport.ts`). Answer before the permission
+  // check and the eviction pass, neither of which means anything there.
+  if (!canFindGloves()) return noGloveSearch()
   if (inFlight) return inFlight
   inFlight = runAutoConnect(options).finally(() => {
     inFlight = null
@@ -473,6 +484,9 @@ function scheduleRetryIfNeeded(result: AutoConnectResult): void {
  * badges and the button's subscription to `subscribeAutoRetry`.
  */
 export async function armAutoRetry(options: AutoConnectOptions = {}): Promise<AutoConnectResult> {
+  // Nothing to arm where no pass can ever succeed: without this the launch
+  // pass "failed" and the scheduler chased it five more times.
+  if (!canFindGloves()) return noGloveSearch()
   clearRetryTimer()
   retryAttemptsLeft = AUTO_RETRY_BUDGET
   retryExhausted = false

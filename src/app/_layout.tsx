@@ -17,6 +17,7 @@ import '@/ble'
 
 import { useEffect } from 'react'
 
+import { prepareBrowserPlayback } from '@audio/browserPlayback'
 import { useAutoConnectOnLaunch } from '@ble/useAutoConnectOnLaunch'
 import { logger, safe } from '@diagnostics/logger'
 import { onKeepaliveBattery, startTrackerKeepalive } from '@protocol/trackerKeepalive'
@@ -29,6 +30,10 @@ import { useQaSettingsOnLaunch } from '@state/loadQaSettings'
 import { useStorageReady } from '@state/useStorageReady'
 import { colors } from '@/theme/colors'
 import { fonts } from '@/theme/typography'
+
+// Nothing on the tablet; in a browser, one rejection the audio code raises
+// there and nowhere else (`src/audio/interruptedPlay.ts`).
+prepareBrowserPlayback()
 
 const stackScreenOptions = {
   headerShown: false,

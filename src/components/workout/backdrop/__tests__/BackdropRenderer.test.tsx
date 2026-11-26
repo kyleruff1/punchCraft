@@ -4,6 +4,7 @@
  * and reanimated are inert mocks — only the §31.4 gating is.
  */
 import React from 'react'
+import { Platform } from 'react-native'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 
 jest.mock('react-native-reanimated', () => ({
@@ -38,7 +39,7 @@ jest.mock('@shopify/react-native-skia', () => {
   }
 })
 
-import { BackdropRenderer, resolveBackdropQuality } from '../BackdropRenderer'
+import { BackdropRenderer, platformDegrade, resolveBackdropQuality } from '../BackdropRenderer'
 import { createBackdropBus } from '../backdropBus'
 
 function mount(quality: 'off' | 'reduced' | 'standard', reducedMotion = false) {
@@ -100,5 +101,33 @@ describe('BackdropRenderer', () => {
     expect(has(tree, 'backdrop-static-glow')).toBe(true)
     expect(has(tree, 'hydro-pulse-canvas')).toBe(false)
     tree.unmount()
+  })
+})
+
+describe('in a browser, where there is no Skia to draw with', () => {
+  let restoreOs: { restore: () => void }
+  beforeEach(() => {
+    restoreOs = jest.replaceProperty(Platform, 'OS', 'web')
+  })
+  afterEach(() => restoreOs.restore())
+
+  it('steps Standard down to the still glow, and never mounts the canvas', () => {
+    expect(platformDegrade()).toBe('reduced')
+    const tree = mount('standard')
+    expect(has(tree, 'backdrop-static-glow')).toBe(true)
+    expect(has(tree, 'hydro-pulse-canvas')).toBe(false)
+    tree.unmount()
+  })
+
+  it('still honours Off', () => {
+    const tree = mount('off')
+    expect(has(tree, 'live-backdrop')).toBe(false)
+    tree.unmount()
+  })
+})
+
+describe('on the tablet', () => {
+  it('steps nothing down', () => {
+    expect(platformDegrade()).toBe('none')
   })
 })

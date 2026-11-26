@@ -22,6 +22,7 @@ import {
   isAutoConnectInFlight,
   subscribeAutoRetry,
 } from '@ble/autoConnectTrackers'
+import { canFindGloves } from '@ble/gloveSupport'
 import { ActionButton } from '@/components/branding/ActionButton'
 import { useTrackerStore } from '@/state/useTrackerStore'
 import { colors } from '@/theme/colors'
@@ -30,7 +31,7 @@ const READY_STATES = new Set(['ready', 'streaming'])
 
 const BUSY_LABEL = 'Scanning…'
 
-export function ConnectTrackersButton(): React.ReactElement {
+export function ConnectTrackersButton(): React.ReactElement | null {
   const left = useTrackerStore((s) => s.slots.left)
   const right = useTrackerStore((s) => s.slots.right)
   const [busy, setBusy] = useState(false)
@@ -84,6 +85,11 @@ export function ConnectTrackersButton(): React.ReactElement {
       : retry.exhausted
         ? 'Auto-retry paused. Tap to try again.'
         : null
+
+  // A browser cannot scan (`gloveSupport.ts`), so there this button could
+  // only ever answer "Scan failed". Rendering nothing is honest — the same
+  // call the Fix button makes off Android.
+  if (!canFindGloves()) return null
 
   return (
     <View style={styles.wrap}>

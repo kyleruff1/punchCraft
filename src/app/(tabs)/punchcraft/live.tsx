@@ -32,6 +32,7 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake'
 
 import { TAB_BAR_STYLE } from '../_layout'
 import { armAutoRetry, setAutoRetrySuspended } from '@ble/autoConnectTrackers'
+import { canFindGloves } from '@ble/gloveSupport'
 import { useReducedMotion, useSharedValue } from 'react-native-reanimated'
 import { ActionButton } from '@components/branding/ActionButton'
 import { BackdropRenderer } from '@components/workout/backdrop/BackdropRenderer'
@@ -662,8 +663,22 @@ export default function LiveScreen(): React.JSX.Element {
 
   useFocusEffect(
     useCallback(() => {
-      void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE)
-      void activateKeepAwakeAsync(LIVE_KEEP_AWAKE_TAG)
+      // On the tablet both succeed. A browser may refuse either — a desktop
+      // has no orientation to lock, and a wake lock needs a visible page —
+      // and the workout runs just the same, so say so and carry on rather
+      // than leave a rejection nobody handles.
+      const unavailable =
+        (what: string) =>
+        (err: unknown): void => {
+          logger.info('workout.live.unavailable', 'the live screen went without a device feature', {
+            what: safe(what),
+            reason: safe(String(err)),
+          })
+        }
+      void ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE).catch(
+        unavailable('orientation lock'),
+      )
+      void activateKeepAwakeAsync(LIVE_KEEP_AWAKE_TAG).catch(unavailable('keep awake'))
 
       // Android's back button (or back gesture) was the one exit this screen
       // did not own. The tab bar is hidden and there is no header, but back
@@ -692,8 +707,10 @@ export default function LiveScreen(): React.JSX.Element {
         // 'default', so unlocking hands control back to the OS.
         void ScreenOrientation.unlockAsync().catch(() => undefined)
         // Explicit, tagged release — see the header note on the spike finding.
+        // "Already released" arrives two ways: thrown, or — in a browser,
+        // where the lock may never have been granted — as a rejection.
         try {
-          deactivateKeepAwake(LIVE_KEEP_AWAKE_TAG)
+          void Promise.resolve(deactivateKeepAwake(LIVE_KEEP_AWAKE_TAG)).catch(() => undefined)
         } catch {
           // Already released; nothing to do.
         }
@@ -836,7 +853,10 @@ export default function LiveScreen(): React.JSX.Element {
           // requires once the budget goes dormant, reachable without
           // leaving the screen. Mid-workout the chips stay display-only
           // (no radio churn while punches stream).
-          {...(live.phase === 'idle'
+          // Only where a chase can run at all: a browser cannot scan
+          // (`gloveSupport.ts`), and a control that can only fail is worse
+          // than none.
+          {...(live.phase === 'idle' && canFindGloves()
             ? {
                 onReconnectPress: () => {
                   void armAutoRetry({ timeoutMs: 10_000 })
