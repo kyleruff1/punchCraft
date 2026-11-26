@@ -174,6 +174,21 @@ describe('choosing a device', () => {
     expect(picked).toEqual({ deviceId: 'opaque-id-1', name: 'FightCam' })
   })
 
+  it('also lists devices by name prefix when asked', async () => {
+    const h = harness()
+    await h.ble.pickDevice({
+      serviceUuids: [SERVICE],
+      namePrefixes: ['FightCam'],
+      optionalServiceUuids: [SERVICE],
+    })
+    expect(h.requests).toEqual([
+      {
+        filters: [{ services: [SERVICE] }, { namePrefix: 'FightCam' }],
+        optionalServices: [SERVICE],
+      },
+    ])
+  })
+
   it('cannot scan, and says what to do instead', async () => {
     const h = harness()
     await expect(h.ble.scan({}, () => undefined)).rejects.toThrow(/pickDevice\(\) from a click/)

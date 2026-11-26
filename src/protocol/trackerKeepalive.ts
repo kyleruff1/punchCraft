@@ -34,34 +34,20 @@ import { deviceSensitive, logger, safe } from '@diagnostics/logger'
 // singleton registry (§16) before it is queried below.
 import './fightcamp-v1'
 import { CHAR, FIGHTCAMP_SERVICE_UUID } from './fightcamp-v1/FightCampV1Commands'
+import {
+  BATTERY_LEVEL_UUID,
+  BATTERY_SERVICE_UUID,
+  HEARTBEAT_INTERVAL_MS,
+  MODE_NORMAL_BASE64,
+} from './fightcamp-v1/FightCampV1Keepalive'
 import { getProtocolRegistry } from './ProtocolRegistry'
 import { TrackerPunchEventSource, type TrackerSlotBinding } from './TrackerPunchEventSource'
 
 const FIGHTCAMP_V1_ID = 'fightcamp-v1'
 
-/**
- * Heartbeat cadence and payload. An armed stream alone was not enough
- * (the glove hung up ~2min after connect+init while still), and
- * neither were periodic device-info READS (it outlived the bare
- * timeout but still hung up ~3-5min in) — the firmware's idle timer
- * evidently wants inbound WRITES, the traffic a session actually
- * produces. So the pulse is a re-assertion of mode-normal: the same
- * single 0x01 byte to COMMAND1 the init plan sends, idempotent, with
- * no timestamp semantics (unlike a clock re-sync, which would skew
- * the stream's epoch mid-workout). A known characteristic our init
- * already writes — rule 4 intact. 20s gives several beats per
- * observed timeout window.
- */
-const HEARTBEAT_INTERVAL_MS = 20_000
-const MODE_NORMAL_BASE64 = 'AQ=='
-
-/**
- * Standard BLE Battery Service, which the trackers expose — Hykso's
- * session reads and subscribes it for its battery display
- * (`j1/g.java`: 0x180F / 0x2A19, one byte = percent).
- */
-const BATTERY_SERVICE_UUID = '0000180f-0000-1000-8000-00805f9b34fb'
-const BATTERY_LEVEL_UUID = '00002a19-0000-1000-8000-00805f9b34fb'
+// The heartbeat's cadence and payload, and the battery service it reads on
+// each beat, live in `fightcamp-v1/FightCampV1Keepalive.ts` with the reasons
+// for them — the PC glove check sends the same beat from the same constants.
 
 export type KeepaliveBatteryListener = (hand: 'left' | 'right', batteryPct: number) => void
 

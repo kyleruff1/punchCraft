@@ -106,8 +106,14 @@ export interface WebBluetooth {
 }
 
 export interface PickDeviceOptions {
-  /** The chooser lists only devices advertising one of these services. */
+  /** The chooser lists devices advertising one of these services… */
   serviceUuids: string[]
+  /**
+   * …or whose advertised name starts with one of these. A device that
+   * matches only by name is reachable only through `optionalServiceUuids`,
+   * so list the services there as well.
+   */
+  namePrefixes?: string[]
   /** Further services the page will read or subscribe to once connected. */
   optionalServiceUuids?: string[]
 }
@@ -204,7 +210,10 @@ export class BleManagerWebBluetoothImpl implements BleManagerFacade {
    */
   async pickDevice(options: PickDeviceOptions): Promise<PickedDevice> {
     const device = await this.bluetooth.requestDevice({
-      filters: [{ services: options.serviceUuids }],
+      filters: [
+        { services: options.serviceUuids },
+        ...(options.namePrefixes ?? []).map((namePrefix) => ({ namePrefix })),
+      ],
       optionalServices: options.optionalServiceUuids ?? [],
     })
     if (!this.devices.has(device.id)) {
