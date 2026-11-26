@@ -45,7 +45,7 @@ Three environment facts that cost real time if unknown:
 
 1. **Metro cannot watch `F:`.** Fast refresh never fires. Every edit batch needs a Metro restart *and* a cold app restart; a `(1 module)` delta in the Metro log means you are testing OLD code.
 2. **`adb shell wm size` lies** — it reports portrait while the app runs landscape. Taps use the current frame with no rotation math; `uiautomator dump` bounds are authoritative. Prefix adb with `MSYS_NO_PATHCONV=1` in Git Bash.
-3. **`.claude/` is gitignored** (line 58), so the `cadence-lab` and `qa-audio-verify` skills — the only written runbooks for the verification loop — are NOT in the repo and a fresh clone has neither.
+3. **`.claude/` is gitignored except `.claude/skills/`**, which holds the `cadence-lab` and `qa-audio-verify` runbooks — the only written record of the verification loop. They are tracked as of 2026-11-25; before that a fresh clone had neither. Everything else under `.claude/` (worktrees, local settings) stays out.
 
 ## Start here for a new session
 

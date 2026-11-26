@@ -126,10 +126,19 @@ is on, so the main file alone looks stale.
 `.claude/skills/cadence-lab/` and `.claude/skills/qa-audio-verify/` hold the
 only written runbooks for the verification loop.
 
-**`.gitignore:58` ignores `.claude/`. `git ls-files .claude` returns zero.**
-They exist only on this machine, are not backed up by the repo, and a fresh
-clone has neither. Parts of `cadence-lab/SKILL.md` are also stale — it names a
-test file that does not exist and points at the retired phrase pipeline.
+**They are tracked as of 2026-11-25** (`.gitignore` now ignores everything
+under `.claude/` except `skills/`). When this page was written
+`git ls-files .claude` returned zero: they existed on one machine, were not
+backed up by the repo, and a fresh clone had neither.
+
+Being untracked is also how they went stale. Corrected when they were
+committed: every log code still carried the pre-rename `puncheokie.` prefix
+(the app logs `workout.*`); `file:line` references had drifted and are now
+symbol references; and the QA runbook told you the deep link's `qa=1` turns
+QA mode on, which it no longer does. **Still stale, and marked so in the
+file:** `cadence-lab`'s "Fixing a clip that reads badly" section describes the
+retired phrase pipeline. (This page also said the skill "names a test file
+that does not exist"; every test it names exists.)
 
 Committing these (or moving the runbooks into `docs/`) is a cheap, high-value
 first task.

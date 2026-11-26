@@ -70,11 +70,12 @@ consult, don't memorize.
 2026-11-25. Nothing is half-finished in the working tree (it is clean). You are
 starting a cycle, not resuming one.
 
-**`.claude/` is gitignored** (`.gitignore:58`). Both in-repo skills —
-`cadence-lab` and `qa-audio-verify` — hold the only written runbooks for the
-verification loop, and `git ls-files .claude` returns **zero**. They exist only
-on this machine. A fresh clone has no runbooks. Treat them as precious and
-consider committing them.
+**`.claude/` is gitignored — except `.claude/skills/`.** The two skills there,
+`cadence-lab` and `qa-audio-verify`, hold the only written runbooks for the
+verification loop. They are tracked as of 2026-11-25. When this page was
+written `git ls-files .claude` returned zero and they existed only on one
+machine, which is also why they missed the rename: every log code in them
+still said `puncheokie.` until they were committed.
 
 **Metro's watcher is blind on `F:`.** Fast refresh never fires. A `(1 module)`
 50 ms delta means you are testing **old code**. Restart Metro and cold-restart
