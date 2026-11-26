@@ -48,7 +48,13 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
 
-import { extractField, numField, parseTimestampMs, stitchLogRecords } from './logcat.mjs'
+import {
+  extractField,
+  numField,
+  parseTimestampMs,
+  stitchLogRecords,
+  withCurrentTag,
+} from './logcat.mjs'
 
 // The announcer's `announce()` path fires the phrase EARLIER than the
 // strike beat (call-ahead), while `onTokenDue` fires AT the strike beat.
@@ -107,8 +113,12 @@ const DEFER_JOIN_WINDOW_MS = 5000
 export function parseLogcat(logcatText) {
   const events = []
   const records = stitchLogRecords(logcatText)
-  for (const { dateStr, timeStr, body } of records) {
+  for (const { dateStr, timeStr, body: recorded } of records) {
     const ts = parseTimestampMs(dateStr, timeStr)
+    // Every check below matches the CURRENT event-code spelling. A capture
+    // from before the rename spells them `puncheokie.*`; read it as written
+    // today, or all ~240 stored captures parse to nothing.
+    const body = withCurrentTag(recorded)
     if (body.includes('workout.runner.start')) {
       events.push({ type: 'runner.start', ts, workout: extractField(body, 'workout'), raw: body })
       continue

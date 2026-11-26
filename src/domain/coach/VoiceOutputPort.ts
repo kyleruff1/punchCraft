@@ -682,6 +682,10 @@ export interface VoiceOutputPort {
    * Preload the given asset in BOTH vocabularies so a mid-cue vocab
    * swap doesn't have to hit disk (M39-V2 Phase 4-v). Optional —
    * backends without a preload pool no-op. Idempotent.
+   *
+   * A caller may pass any token of a combination: an id a vocabulary has
+   * no clip for in that form (a fused body id in `combo` form) is skipped
+   * without a warning. Warming is not playing.
    */
   preloadBothVocabsFor?(id: VoiceAssetId, form?: 'combo' | 'standalone'): void
 }

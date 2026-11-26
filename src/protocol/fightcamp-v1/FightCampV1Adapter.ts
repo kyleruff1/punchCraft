@@ -179,10 +179,11 @@ export class FightCampV1Adapter implements TrackerProtocolAdapter {
             },
           ]
         : []),
-      // Command 17 (`this.f.a(17, …)`): unnamed even in Hykso's own
-      // debug map, but sent every session immediately after the hand
-      // byte — and their trackers hold a still connection indefinitely
-      // where ours dropped in minutes.
+      // Command 17 (`this.f.a(17, …)`): unnamed in Hykso's own debug
+      // map, but its write callback logs "Set new Threshold to 30"
+      // (H14). Sent every session immediately after the hand byte — and
+      // their trackers hold a still connection indefinitely where ours
+      // dropped in minutes.
       {
         kind: 'write',
         serviceUuid: FIGHTCAMP_SERVICE_UUID,

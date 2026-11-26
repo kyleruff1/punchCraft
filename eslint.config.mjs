@@ -70,7 +70,12 @@ export default [
     // on these, and until 2026-11-25 `tools/**` was ignored wholesale: plain
     // JavaScript that neither eslint nor tsc ever read. Linted with the
     // recommended rules above; type-checked by `npm run typecheck:tools`.
-    files: ['tools/analysis/**/*.{mjs,js}', 'tools/guards/**/*.mjs', 'tools/dev/**/*.mjs'],
+    files: [
+      'tools/analysis/**/*.{mjs,js}',
+      'tools/guards/**/*.mjs',
+      'tools/dev/**/*.mjs',
+      'tools/pc/**/*.mjs',
+    ],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',
@@ -100,7 +105,11 @@ export default [
   },
   {
     // The verifiers' own tests: ES modules, transformed and run by jest.
-    files: ['tools/analysis/__tests__/**/*.js', 'tools/dev/__tests__/**/*.js'],
+    files: [
+      'tools/analysis/__tests__/**/*.js',
+      'tools/dev/__tests__/**/*.js',
+      'tools/pc/**/__tests__/**/*.js',
+    ],
     languageOptions: {
       globals: {
         require: 'readonly',
@@ -115,6 +124,49 @@ export default [
         afterEach: 'readonly',
         jest: 'readonly',
       },
+    },
+  },
+  {
+    // The PC glove check (`npm run pc:glove-check`): TypeScript that runs in a
+    // browser page, importing the app's protocol code. Same rules as `src`,
+    // minus React, plus the page's globals.
+    files: ['tools/pc/**/*.ts'],
+    languageOptions: {
+      parser: tsParser,
+      parserOptions: { ecmaVersion: 'latest', sourceType: 'module' },
+      globals: {
+        window: 'readonly',
+        document: 'readonly',
+        navigator: 'readonly',
+        performance: 'readonly',
+        requestAnimationFrame: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly',
+        URL: 'readonly',
+        Blob: 'readonly',
+        HTMLElement: 'readonly',
+        HTMLButtonElement: 'readonly',
+        HTMLTableCellElement: 'readonly',
+        HTMLTemplateElement: 'readonly',
+        HTMLTextAreaElement: 'readonly',
+        DocumentFragment: 'readonly',
+        Navigator: 'readonly',
+        describe: 'readonly',
+        it: 'readonly',
+        expect: 'readonly',
+        beforeEach: 'readonly',
+        afterEach: 'readonly',
+        jest: 'readonly',
+      },
+    },
+    plugins: { '@typescript-eslint': tsPlugin },
+    rules: {
+      ...tsPlugin.configs['recommended'].rules,
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      '@typescript-eslint/consistent-type-imports': ['error', { prefer: 'type-imports' }],
+      'no-console': ['warn', { allow: ['warn', 'error', 'info'] }],
     },
   },
   {

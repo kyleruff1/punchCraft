@@ -49,6 +49,7 @@ import {
 } from '@domain/workout/punchGoals'
 import { coverageConflict } from '@domain/workout/coverageConflict'
 import { generateWorkout } from '@domain/workout/generateWorkout'
+import { canGenerate } from '@domain/workout/recipeValidation'
 import { fillOptionsForRecipe } from '@audio/fillOptionsForRecipe'
 import { listSampleWorkouts, type SampleWorkoutKey } from '@domain/workout/samples'
 import { tierFor } from '@domain/workout/WorkoutRecipe'
@@ -198,6 +199,17 @@ export default function RecipeScreen(): React.JSX.Element {
     () => (dryRounds ? [...conflicts, dryRounds] : conflicts),
     [conflicts, dryRounds],
   )
+
+  // An error is a recipe there is no workout for — no punches enabled, or
+  // punches that form no combination — and until 2026-11-25 Start took the
+  // athlete to the live screen regardless, to stand in front of empty rounds.
+  // Start is now off while one stands, with the reason under it.
+  //
+  // Not when a library workout is picked: the recipe is not what runs then.
+  // `dryRounds` follows a deferred recipe, so for the frame or two after an
+  // edit this reflects the recipe as it was a moment ago.
+  const startBlocked = !selectedSampleKey && !canGenerate(allConflicts)
+  const blockers = startBlocked ? allConflicts.filter((c) => c.severity === 'error') : []
 
   // Conflicts already shown next to a control are not repeated in the card,
   // so the athlete reads each problem once, where they can act on it.
@@ -386,11 +398,22 @@ export default function RecipeScreen(): React.JSX.Element {
         <RecipeSummaryCard summary={summary} conflicts={allConflicts} />
 
         <View style={styles.actions}>
-          <Link href="/(tabs)/punchcraft/live" asChild>
-            {/* The authored art IS the button — pill, icon, chevron and neon
-                rim are baked into the PNG, so no ForgedButton chrome here. */}
-            <ActionButton action="startWorkout" testID="start-button" />
-          </Link>
+          {/* The authored art IS the button — pill, icon, chevron and neon
+              rim are baked into the PNG, so no ForgedButton chrome here. */}
+          {startBlocked ? (
+            // No Link at all while blocked: a disabled child inside one
+            // would depend on the router honouring the child's `disabled`.
+            <ActionButton action="startWorkout" testID="start-button" disabled />
+          ) : (
+            <Link href="/(tabs)/punchcraft/live" asChild>
+              <ActionButton action="startWorkout" testID="start-button" />
+            </Link>
+          )}
+          {startBlocked ? (
+            <Text style={styles.startBlocked} testID="start-blocked" accessibilityRole="alert">
+              {`Start is off until this is fixed: ${blockers.map((c) => c.message).join(' ')}`}
+            </Text>
+          ) : null}
           <Text style={styles.startCaption}>
             Runs on simulated punches until the trackers are wired in (M33-01).
           </Text>
@@ -451,6 +474,13 @@ const styles = StyleSheet.create({
   },
 
   actions: { gap: 8, marginTop: 4 },
+  startBlocked: {
+    fontSize: sizes.label,
+    fontFamily: fonts.body,
+    lineHeight: 18,
+    color: colors.danger,
+    textAlign: 'center',
+  },
   startCaption: {
     fontSize: sizes.label,
     fontFamily: fonts.body,

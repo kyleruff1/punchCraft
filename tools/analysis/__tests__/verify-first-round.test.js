@@ -465,3 +465,48 @@ describe('verify — the click path', () => {
     })
   })
 })
+
+describe('verify — a capture recorded before the event codes were renamed', () => {
+  // Every capture under tools/analysis/{suites,sessions,monitor} is one: the
+  // newest is from 2026-09-11 and the rename is from 2026-11-25. Until this
+  // was fixed the correlator matched `workout.*` only, parsed such a capture
+  // to nothing, and (once the no-calls gate existed) failed all of them.
+  //
+  // The record shapes below are copied from
+  // tools/analysis/suites/1789142947855/body-work/logcat.txt.
+  const capture = (prefix) =>
+    [
+      line('13:49:47.342', `'[INFO] ${prefix}.metronome', 'loop started', { bpm: 240 }`),
+      ...[0, 1, 2].flatMap((i) => [
+        line(
+          `13:49:${48 + i}.000`,
+          `'[INFO] ${prefix}.clickScript.dispatch', 'click script dispatched', { kind: 'call',`,
+        ),
+        line(`13:49:${48 + i}.000`, "  slot: 'call/1-2b-1-2b',"),
+        line(`13:49:${48 + i}.000`, '  dispatchAtMs: 2398 }'),
+      ]),
+      warn(
+        '13:49:52.000',
+        `'[WARN] ${prefix}.voice.clipMissing', 'clip did not load', { asset: '2b',`,
+      ),
+      warn('13:49:52.000', "  form: 'combo' }"),
+      '',
+    ].join('\n')
+  const manifest = manifestWith([], { expectedCallBars: 3 })
+
+  it('finds the same events in it as in its renamed twin', () => {
+    const types = (text) => parseLogcat(text).map((e) => e.type)
+    expect(types(capture('puncheokie'))).toEqual(types(capture('workout')))
+    expect(types(capture('puncheokie')).filter((t) => t === 'clickScript.dispatch')).toHaveLength(3)
+  })
+
+  it('judges it the same way, gate for gate', () => {
+    const legacy = verify(manifest, capture('puncheokie')).health
+    const current = verify(manifest, capture('workout')).health
+    expect(legacy).toEqual(current)
+    // And not vacuously: the calls were counted and the missing clip seen.
+    expect(legacy.callsDispatched).toBe(3)
+    expect(legacy.noCalls).toBe(false)
+    expect(legacy.playbackFailures).toBe(1)
+  })
+})

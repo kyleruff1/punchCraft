@@ -123,6 +123,26 @@ export type ReserveMsFor = (
   tail: CalloutTail | undefined,
 ) => number | undefined
 
+export interface PickCalloutOptions {
+  /** Cap the variant range — see "Tone scaling" below. */
+  variantCeiling?: number
+  /**
+   * The callout is not optional: if the drawn variant cannot be used —
+   * its clip is missing, or it prices over `MAX_CALLOUT_RESERVE_MS` — take
+   * the pattern's next variant that can, instead of skipping.
+   *
+   * For the one ceremony that is a rule rather than a flourish: the
+   * announcement of a same-move stretch longer than
+   * `MANDATORY_SAME_MOVE_MS`. Without this, one long variant in a pattern
+   * silently cancelled the announcement on every draw that landed on it
+   * (N-6: `co-power-coast-03` with a recited 1-2 comes to 12.6 s).
+   *
+   * No extra rng draw is made, so the callout stream — and with it every
+   * other ceremony in the round — is exactly what it was.
+   */
+  mustFit?: boolean
+}
+
 /**
  * Build the callout for a pattern: rng picks the variant (freshness),
  * the injected table prices the reservation. Undefined = skip (missing
@@ -133,7 +153,7 @@ export function pickCallout(
   rng: Rng,
   reserveMsFor: ReserveMsFor,
   notation?: string,
-  opts: { variantCeiling?: number } = {},
+  opts: PickCalloutOptions = {},
 ): SetupCallout | undefined {
   const def = SETUP_PATTERNS[pattern]
   // Retired patterns carry variants: 0 — never emit, no rng draw wasted.
@@ -147,16 +167,22 @@ export function pickCallout(
   // unconditional; only the mapping narrows.
   const ceiling = Math.max(1, Math.min(def.variants, opts.variantCeiling ?? def.variants))
   const variant = 1 + ((drawn - 1) % ceiling)
-  const asset = `${pattern}-${String(variant).padStart(2, '0')}`
   const recite = def.recite ? notation : undefined
-  const reserveMs = reserveMsFor(asset, recite, def.tail)
-  if (reserveMs === undefined || reserveMs > MAX_CALLOUT_RESERVE_MS) return undefined
-  return {
-    asset,
-    ...(recite === undefined ? {} : { notation: recite }),
-    ...(def.tail === undefined ? {} : { tail: def.tail }),
-    reserveMs,
+  // The drawn variant first; with `mustFit`, then the rest in order, wrapping.
+  const attempts = opts.mustFit ? ceiling : 1
+  for (let step = 0; step < attempts; step++) {
+    const candidate = 1 + ((variant - 1 + step) % ceiling)
+    const asset = `${pattern}-${String(candidate).padStart(2, '0')}`
+    const reserveMs = reserveMsFor(asset, recite, def.tail)
+    if (reserveMs === undefined || reserveMs > MAX_CALLOUT_RESERVE_MS) continue
+    return {
+      asset,
+      ...(recite === undefined ? {} : { notation: recite }),
+      ...(def.tail === undefined ? {} : { tail: def.tail }),
+      reserveMs,
+    }
   }
+  return undefined
 }
 
 /**

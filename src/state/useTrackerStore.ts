@@ -18,6 +18,7 @@
  */
 import { create } from 'zustand'
 
+import type { BondVerdict } from '@ble/bondDiagnosis'
 import type { ConnectionState, Hand } from '@ble/bleTypes'
 
 export type SlotHand = Exclude<Hand, 'unknown'>
@@ -52,6 +53,14 @@ interface Slots {
 
 export interface TrackerStoreState {
   slots: Slots
+  /**
+   * Whether each glove looks bonded to this tablet, judged from how its links
+   * have ended (H13, `src/ble/bondDiagnosis.ts`). Kept beside the slots, not
+   * in them: a slot is cleared and re-assigned on every reconnect, and the
+   * verdict is exactly the thing that has to survive that.
+   */
+  bond: Record<SlotHand, BondVerdict>
+  setBond: (hand: SlotHand, verdict: BondVerdict) => void
   assign: (hand: SlotHand, deviceId: string, name?: string) => void
   clear: (hand: SlotHand) => void
   setState: (hand: SlotHand, state: ConnectionState, errorMessage?: string) => void
@@ -63,6 +72,12 @@ export interface TrackerStoreState {
 
 export const useTrackerStore = create<TrackerStoreState>((set) => ({
   slots: { left: null, right: null },
+  bond: { left: 'unknown', right: 'unknown' },
+  setBond: (hand, verdict) => {
+    set((prev) =>
+      prev.bond[hand] === verdict ? prev : { bond: { ...prev.bond, [hand]: verdict } },
+    )
+  },
   assign: (hand, deviceId, name) => {
     set((prev) => {
       const existing = prev.slots[hand]
@@ -144,6 +159,13 @@ export function setSlotState(hand: SlotHand, state: ConnectionState, errorMessag
 export function noteSlotEvent(hand: SlotHand, atMonotonicMs: number): void {
   useTrackerStore.getState().noteEvent(hand, atMonotonicMs)
 }
+
+/** Non-React entry point for the coordinator's bond diagnosis. */
+export function setSlotBondVerdict(hand: SlotHand, verdict: BondVerdict): void {
+  useTrackerStore.getState().setBond(hand, verdict)
+}
+
+export const useBondVerdict = (hand: SlotHand): BondVerdict => useTrackerStore((s) => s.bond[hand])
 
 /** Non-React entry point for the keepalive's battery heartbeat. */
 export function noteSlotBattery(hand: SlotHand, batteryPct: number): void {

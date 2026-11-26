@@ -43,6 +43,7 @@ import { makeRng, type Rng } from './seededRandom'
 import {
   MANDATORY_SAME_MOVE_MS,
   pickCallout,
+  type PickCalloutOptions,
   type ReserveMsFor,
   type SetupPatternId,
 } from './setupCallouts'
@@ -380,7 +381,7 @@ export function fillScoredRound(
   const calloutFor = (
     pattern: SetupPatternId,
     notation?: string,
-    pickOpts: { variantCeiling?: number } = {},
+    pickOpts: PickCalloutOptions = {},
   ): SetupCallout | undefined =>
     opts.setupCallouts
       ? pickCallout(pattern, calloutRng, opts.setupCallouts.reserveMsFor, notation, pickOpts)
@@ -804,7 +805,9 @@ export function fillScoredRound(
         // meant to deliver slow, heavy, deliberate shots.
         const isPowerNotation = /^(1b?|2b?|1-2|2-1)$/.test(notation)
         const patternId = allJab ? 'co-jab-volume' : isPowerNotation ? 'co-power-coast' : 'co-coast'
-        const callout = calloutFor(patternId, first.notation)
+        // `mustFit`: this announcement is a rule, so a variant that is too
+        // long for the reserve cap falls back to one that fits (N-6).
+        const callout = calloutFor(patternId, first.notation, { mustFit: true })
         if (callout !== undefined) {
           first.leadInBeats = (first.leadInBeats ?? 0) + msToBeats(callout.reserveMs, bpm)
           first.setupCallout = callout

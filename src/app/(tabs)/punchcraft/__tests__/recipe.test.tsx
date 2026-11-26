@@ -185,9 +185,23 @@ describe('changing the duration keeps the intensity', () => {
   })
 })
 
-describe('rounds that would run out of combinations', () => {
-  const dryNotice = (tree: ReactTestRenderer): ReactTestInstance[] =>
-    tree.root.findAllByProps({ testID: 'conflict-rounds-run-dry' }, { deep: false })
+describe('a recipe there is no workout for', () => {
+  const notice = (tree: ReactTestRenderer, code: string): ReactTestInstance[] =>
+    tree.root.findAllByProps({ testID: `conflict-${code}` }, { deep: false })
+  const emptyNotice = (tree: ReactTestRenderer): ReactTestInstance[] =>
+    notice(tree, 'no-combinations')
+  const dryNotice = (tree: ReactTestRenderer): ReactTestInstance[] => notice(tree, 'rounds-run-dry')
+  const startButton = (tree: ReactTestRenderer): ReactTestInstance =>
+    tree.root.findByProps({ testID: 'start-button' })
+  const blockedReason = (tree: ReactTestRenderer): ReactTestInstance[] =>
+    tree.root.findAllByProps({ testID: 'start-blocked' }, { deep: false })
+  const startLinks = (tree: ReactTestRenderer): ReactTestInstance[] =>
+    tree.root.findAllByType(jest.requireMock('expo-router').Link)
+  const expectStartOn = (tree: ReactTestRenderer): void => {
+    expect(startButton(tree).props.disabled).toBeUndefined()
+    expect(startLinks(tree)).toHaveLength(1)
+    expect(blockedReason(tree)).toHaveLength(0)
+  }
 
   /**
    * A recipe the generator can lay nothing for: the cross on its own is in
@@ -205,22 +219,28 @@ describe('rounds that would run out of combinations', () => {
     })
   }
 
-  it('the narrow recipe really does run dry, with the options this screen uses', () => {
+  it('the narrow recipe really generates nothing, with the options this screen uses', () => {
     // The premise of every test below, checked against the same generator
     // and options the screen calls rather than assumed.
     narrow()
     const recipe = store().recipe
-    expect(coverageConflict(generateWorkout(recipe, fillOptionsForRecipe(recipe)))).not.toBeNull()
+    expect(coverageConflict(generateWorkout(recipe, fillOptionsForRecipe(recipe)))).toMatchObject({
+      code: 'no-combinations',
+      severity: 'error',
+    })
   })
 
-  it('says nothing for the default recipe', () => {
+  it('says nothing for the default recipe, and Start is on', () => {
     const tree = render(<RecipeScreen />)
+    expect(emptyNotice(tree)).toHaveLength(0)
     expect(dryNotice(tree)).toHaveLength(0)
+    expectStartOn(tree)
   })
 
   it('says nothing after an ordinary duration change', () => {
     const tree = render(<RecipeScreen />)
     pickOption(tree, 'duration', '60')
+    expect(emptyNotice(tree)).toHaveLength(0)
     expect(dryNotice(tree)).toHaveLength(0)
   })
 
@@ -231,9 +251,10 @@ describe('rounds that would run out of combinations', () => {
     })
     const tree = render(<RecipeScreen />)
     expect(dryNotice(tree)).toHaveLength(0)
+    expectStartOn(tree)
   })
 
-  it('says nothing about a low-variety recipe that can still fill its rounds', () => {
+  it('leaves a low-variety recipe that can still fill its rounds alone', () => {
     // Jab and cross, combinations capped at two: the recipe this suite used
     // to use as its dry case, through generator 1.3.0.
     act(() => {
@@ -241,48 +262,92 @@ describe('rounds that would run out of combinations', () => {
     })
     const recipe = store().recipe
     expect(coverageConflict(generateWorkout(recipe, fillOptionsForRecipe(recipe)))).toBeNull()
-    expect(dryNotice(render(<RecipeScreen />))).toHaveLength(0)
+    const tree = render(<RecipeScreen />)
+    expect(dryNotice(tree)).toHaveLength(0)
+    expectStartOn(tree)
   })
 
-  it('warns, in the summary, when the punches are too few to fill the rounds', () => {
-    // The generator has always known; now the athlete does too, before the
-    // workout rather than during it.
+  it('says so in the summary, as an error, with what to change', () => {
     narrow()
     const tree = render(<RecipeScreen />)
 
     const text = textOf(tree.root.findByProps({ testID: 'recipe-summary-card' }))
-    expect(text).toContain('Warning')
-    expect(text).toContain('out of combinations before the bell')
+    expect(text).toContain('Error')
+    expect(text).toContain('These punches do not form any combination')
     // Never a dead end: it says what to change.
-    expect(text).toContain('Enable more punches')
+    expect(text).toContain('Turn the jab on')
   })
 
   it('shows it beside the punch controls too, where the athlete can act on it', () => {
     narrow()
     const tree = render(<RecipeScreen />)
-    const inSummary = dryNotice(tree).length
+    const inSummary = emptyNotice(tree).length
     press(tree, 'advanced-toggle')
-    expect(dryNotice(tree).length).toBeGreaterThan(inSummary)
+    expect(emptyNotice(tree).length).toBeGreaterThan(inSummary)
   })
 
-  it('clears as soon as the punches are widened again', () => {
+  it('turns Start off — no link to the live screen — and says why under it', () => {
     narrow()
     const tree = render(<RecipeScreen />)
-    expect(dryNotice(tree).length).toBeGreaterThan(0)
+    expect(startButton(tree).props.disabled).toBe(true)
+    expect(startLinks(tree)).toHaveLength(0)
+    expect(textOf(blockedReason(tree)[0]!)).toBe(
+      'Start is off until this is fixed: These punches do not form any combination, so every round would be empty.',
+    )
+  })
+
+  it('clears, and Start comes back, as soon as the punches are widened again', () => {
+    narrow()
+    const tree = render(<RecipeScreen />)
+    expect(emptyNotice(tree).length).toBeGreaterThan(0)
 
     act(() => {
       store().setRecipe({ enabledPunches: [1, 2, 3, 4, 5, 6], maximumComboPunches: 5 })
     })
-    expect(dryNotice(tree)).toHaveLength(0)
+    expect(emptyNotice(tree)).toHaveLength(0)
+    expectStartOn(tree)
   })
 
-  it('stays quiet when a library workout is selected — the recipe is not what runs', () => {
+  it('stays quiet, and Start stays on, when a library workout is selected — the recipe is not what runs', () => {
     narrow()
     act(() => {
       store().selectSample(listSampleWorkouts()[0]!.key)
     })
     const tree = render(<RecipeScreen />)
-    expect(dryNotice(tree)).toHaveLength(0)
+    expect(emptyNotice(tree)).toHaveLength(0)
+    expectStartOn(tree)
+  })
+
+  it('turns Start off for the errors the recipe already had, too', () => {
+    // `canGenerate` existed and nothing called it: with no punches enabled,
+    // Start still went to the live screen.
+    act(() => {
+      store().setRecipe({ enabledPunches: [] })
+    })
+    const tree = render(<RecipeScreen />)
+    expect(startButton(tree).props.disabled).toBe(true)
+    expect(textOf(blockedReason(tree)[0]!)).toContain('No punches are enabled')
+  })
+
+  it('leaves Start on for a library workout even when the recipe itself has an error', () => {
+    // The recipe is not what runs, so its errors are not a reason to refuse.
+    act(() => {
+      store().setRecipe({ enabledPunches: [] })
+      store().selectSample(listSampleWorkouts()[0]!.key)
+    })
+    const tree = render(<RecipeScreen />)
+    expect(store().conflicts.some((c) => c.severity === 'error')).toBe(true)
+    expectStartOn(tree)
+  })
+
+  it('leaves Start on for a warning', () => {
+    // Jab off, no lead-hand bias: "variety will be reduced", and it runs.
+    act(() => {
+      store().setRecipe({ enabledPunches: [2, 3] })
+    })
+    const tree = render(<RecipeScreen />)
+    expect(store().conflicts.some((c) => c.severity === 'warning')).toBe(true)
+    expectStartOn(tree)
   })
 })
 

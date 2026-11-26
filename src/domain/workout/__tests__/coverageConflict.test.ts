@@ -6,7 +6,13 @@
  * because the threshold and the counting are exact claims that a generated
  * workout can only illustrate.
  */
-import { MATERIAL_TAIL_MS, ROUNDS_RUN_DRY, coverageConflict } from '../coverageConflict'
+import {
+  MATERIAL_TAIL_MS,
+  NO_COMBINATIONS,
+  ROUNDS_RUN_DRY,
+  coverageConflict,
+} from '../coverageConflict'
+import { canGenerate } from '../recipeValidation'
 import { generateWorkout } from '../generateWorkout'
 import { defaultRecipe, type WorkoutRecipe } from '../WorkoutRecipe'
 import { scoredRounds, type GeneratedWorkout } from '../GeneratedWorkout'
@@ -75,17 +81,38 @@ describe('against the real generator', () => {
     ).toBeNull()
   })
 
-  it('flags a workout whose punches form no combination at all', () => {
-    // A cross on its own is in no motif the library has, so there is no
-    // ladder to teach and no fallback to repeat: every round is laid empty.
-    // The recipe screen calls the missing jab a warning ("variety will be
-    // reduced"); this is the notice that says what that actually costs.
-    const workout = generated({ enabledPunches: [2] })
+  it.each([
+    ['the cross on its own', [2]],
+    ['the two uppercuts', [5, 6]],
+    ['the two hooks', [3, 4]],
+  ] as const)('refuses a workout whose punches form no combination — %s', (_name, punches) => {
+    // In no motif the library has, so there is no ladder to teach and no
+    // fallback to repeat: every round is laid empty. The recipe screen calls
+    // the missing jab a warning ("variety will be reduced"); this is what it
+    // actually costs, and it is an error because there is nothing to run.
+    const workout = generated({ enabledPunches: [...punches] })
     expect(scoredRounds(workout.schedule).every((r) => r.blocks.length === 0)).toBe(true)
 
     const conflict = coverageConflict(workout)
-    expect(conflict?.code).toBe(ROUNDS_RUN_DRY)
-    expect(conflict?.message).toMatch(/^Every round runs out of combinations before the bell/)
+    expect(conflict).toMatchObject({
+      code: NO_COMBINATIONS,
+      severity: 'error',
+      fields: ['enabledPunches', 'maximumComboPunches'],
+      message: 'These punches do not form any combination, so every round would be empty.',
+    })
+    expect(conflict?.resolution).toMatch(/jab/i)
+    expect(canGenerate(conflict ? [conflict] : [])).toBe(false)
+  })
+
+  it.each([
+    ['jab and cross, capped at two', { enabledPunches: [1, 2], maximumComboPunches: 2 }],
+    ['the jab alone, capped at one', { enabledPunches: [1], maximumComboPunches: 1 }],
+    ['cross and lead hook, capped at two', { enabledPunches: [2, 3], maximumComboPunches: 2 }],
+  ] as const)('does not refuse a narrow recipe that still has content — %s', (_name, over) => {
+    const conflict = coverageConflict(
+      generated({ ...over, enabledPunches: [...over.enabledPunches] }),
+    )
+    expect(conflict?.severity).not.toBe('error')
   })
 })
 
@@ -120,12 +147,28 @@ describe('what counts', () => {
   it('ignores warm-up and cooldown, which carry no content contract', () => {
     expect(coverageConflict(laid(round(1, 0), round(2, 120_000, false)))).toBeNull()
   })
+
+  it('is an error only when EVERY scored round is empty', () => {
+    const empty = (order: number, counts = true): ProgramRound => ({
+      ...round(order, 0, counts),
+      blocks: [],
+    })
+    expect(coverageConflict(laid(empty(1), empty(2)))?.code).toBe(NO_COMBINATIONS)
+    // One round with content: the workout runs, so it is the warning.
+    const mixed = coverageConflict(laid(empty(1), round(2, 0)))
+    expect(mixed).toMatchObject({ code: ROUNDS_RUN_DRY, severity: 'warning' })
+    expect(mixed?.message).toContain('1 of 2 rounds run out')
+    // An empty warm-up beside full rounds is nothing at all.
+    expect(coverageConflict(laid(empty(1, false), round(2, 0)))).toBeNull()
+    // And a schedule with no scored round is not this module's business.
+    expect(coverageConflict(laid(empty(1, false)))).toBeNull()
+  })
 })
 
 describe('what it tells the athlete', () => {
   const conflict = coverageConflict(laid(round(1, 30_000)))
 
-  it('is a warning, never an error — the workout still runs to every bell', () => {
+  it('is a warning while any round has content — the workout still runs to every bell', () => {
     expect(conflict?.severity).toBe('warning')
   })
 

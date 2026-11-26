@@ -30,8 +30,13 @@
  *   with the round topped up afterwards, instead of by dropping whole
  *   trailing blocks — which had cost low-variety recipes (a combination cap
  *   of 2 is enough) their last 15-25 s. Same reseeding caveat as above.
+ * - `1.3.2` — a same-move stretch longer than a minute is always announced.
+ *   The announcement's sentence is drawn from a few variants, and one that
+ *   priced over the reserve cap cancelled the whole announcement — about one
+ *   draw in three for a jab-cross stretch in technique names. It now falls
+ *   back to the pattern's next variant that fits. Same reseeding caveat.
  */
-export const GENERATOR_VERSION = '1.3.1'
+export const GENERATOR_VERSION = '1.3.2'
 
 /**
  * Schema of the persisted `WorkoutRecipe` object in `workout_recipes.params_json`.

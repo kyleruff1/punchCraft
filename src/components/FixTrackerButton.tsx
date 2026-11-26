@@ -12,6 +12,15 @@
  * we'll wait, and reconnect the trackers on the way back. The status line
  * says what to do next in every terminal state so nobody gets stuck
  * wondering what the button did.
+ *
+ * ## The other reason a glove will not hold: it is not paired (H13)
+ *
+ * A glove that is not bonded to the tablet drops 30-45 s after every
+ * connect, and no bounce cures that — only pairing it does. When the bond
+ * diagnosis says so (`src/ble/bondDiagnosis.ts`: two such drops in a row),
+ * this button changes job while the glove is down: it says which glove and
+ * why, and a tap opens Bluetooth settings to pair it — without then waiting
+ * for a bounce that is not coming.
  */
 
 import React, { useCallback, useState } from 'react'
@@ -20,6 +29,8 @@ import { Alert, Platform, StyleSheet, Text, View } from 'react-native'
 import { bounceBluetoothAndReconnect, type BounceStatus } from '@ble/bounceBluetooth'
 import { openBluetoothSettings } from '@ble/openBluetoothSettings'
 import { ActionButton } from '@/components/branding/ActionButton'
+import { glovesToPair, pairingHint } from '@components/bondAdvice'
+import { useTrackerStore } from '@/state/useTrackerStore'
 import { colors } from '@/theme/colors'
 
 type Phase = 'idle' | 'waiting' | 'done'
@@ -41,6 +52,8 @@ const HINT_FOR: Record<BounceStatus, string> = {
 
 const WAITING_LABEL = 'Waiting for Bluetooth bounce…'
 const RETRY_LABEL = 'Try again'
+const PAIR_MANUALLY =
+  'Could not open Bluetooth settings automatically. Open Settings → Bluetooth → Pair new device and choose “FightCam”.'
 
 export function FixTrackerButton(): React.ReactElement | null {
   // iOS has no per-panel Bluetooth settings intent and the ble-plx state
@@ -48,9 +61,23 @@ export function FixTrackerButton(): React.ReactElement | null {
   // nothing is honest: the button that promises to bounce Bluetooth cannot
   // deliver that on iOS today.
   const [result, setResult] = useState<Result>({ phase: 'idle' })
+  const bond = useTrackerStore((s) => s.bond)
+  const leftState = useTrackerStore((s) => s.slots.left?.state)
+  const rightState = useTrackerStore((s) => s.slots.right?.state)
+  const toPair = glovesToPair(bond, { left: leftState, right: rightState })
+  const pairing = toPair.length > 0
 
   const onPress = useCallback(async () => {
     if (result.phase === 'waiting') return
+    if (pairing) {
+      // Pairing, not a bounce: open the panel and leave it at that.
+      try {
+        await openBluetoothSettings()
+      } catch {
+        Alert.alert('Pair the glove', PAIR_MANUALLY)
+      }
+      return
+    }
     setResult({ phase: 'waiting' })
     const outcome = await bounceBluetoothAndReconnect({ openSettings: openBluetoothSettings })
     setResult({ phase: 'done', status: outcome.status })
@@ -59,7 +86,7 @@ export function FixTrackerButton(): React.ReactElement | null {
       // button is easy to miss when the athlete is on the bag.
       Alert.alert('Fix tracker connection', HINT_FOR[outcome.status])
     }
-  }, [result.phase])
+  }, [result.phase, pairing])
 
   if (Platform.OS !== 'android') return null
 
@@ -69,6 +96,11 @@ export function FixTrackerButton(): React.ReactElement | null {
       : result.phase === 'done' && result.status !== 'ok'
         ? RETRY_LABEL
         : null
+  // While a glove needs pairing that is the one thing to say; the bounce's
+  // leftover lines would only argue with it.
+  const bounceStatus = pairing ? null : statusLine
+  const bounceHint =
+    !pairing && result.phase === 'done' && result.status ? HINT_FOR[result.status] : null
 
   return (
     <View style={styles.wrap}>
@@ -82,21 +114,30 @@ export function FixTrackerButton(): React.ReactElement | null {
         disabled={result.phase === 'waiting'}
         height={FIX_BUTTON_HEIGHT}
         fit="pill"
-        accessibilityHint="Opens Bluetooth settings so you can toggle it off and on, then reconnects the trackers"
+        accessibilityHint={
+          pairing
+            ? 'Opens Bluetooth settings so you can pair the glove'
+            : 'Opens Bluetooth settings so you can toggle it off and on, then reconnects the trackers'
+        }
         testID="fix-tracker-connection"
       />
       {/* Absolute overlay: hints paint below the button without taking
           layout space, so they can never displace the tracker cluster. */}
-      {statusLine || (result.phase === 'done' && result.status) ? (
+      {pairing || bounceStatus || bounceHint ? (
         <View style={styles.hintOverlay} pointerEvents="none">
-          {statusLine ? (
-            <Text style={styles.hint} testID="fix-tracker-status">
-              {statusLine}
+          {pairing ? (
+            <Text style={[styles.hint, styles.pairHint]} testID="fix-tracker-pair-hint">
+              {pairingHint(toPair)}
             </Text>
           ) : null}
-          {result.phase === 'done' && result.status ? (
+          {bounceStatus ? (
+            <Text style={styles.hint} testID="fix-tracker-status">
+              {bounceStatus}
+            </Text>
+          ) : null}
+          {bounceHint ? (
             <Text style={styles.hint} testID="fix-tracker-hint">
-              {HINT_FOR[result.status]}
+              {bounceHint}
             </Text>
           ) : null}
         </View>
@@ -129,4 +170,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     maxWidth: 300,
   },
+  pairHint: { color: colors.warning },
 })

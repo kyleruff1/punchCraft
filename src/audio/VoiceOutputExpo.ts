@@ -949,15 +949,27 @@ export class VoiceOutputExpo implements VoiceOutputPort {
    *
    * The current vocabulary is preserved across the call; a caller
    * warming clips is not doing a real vocab switch.
+   *
+   * A clip a vocabulary has NO ENTRY for is skipped, silently. The caller
+   * (the announcer, on every previewed cue) asks for each token of the
+   * combination in `combo` form, and the fused body ids (`1b..6b`) ship
+   * only as `numbers/standalone` — so for every body-shot cue this used to
+   * try two clips that cannot exist and log `voice.clipMissing` for each:
+   * 3,237 warnings in the last full suite (2026-09-11), across 12 of the 22
+   * library workouts, for nothing anyone could hear. And `clipMissing`
+   * inside a round is now a hard failure in the verifier, as it should be
+   * for a clip that was going to be PLAYED. Not having a clip to warm is
+   * not a clip failing to load.
    */
   preloadBothVocabsFor(id: VoiceAssetId, form: PhraseForm = 'standalone'): void {
     if (this.failed) return
     const original = this.vocabulary
     try {
-      this.vocabulary = 'numbers'
-      this.playerFor(id, form)
-      this.vocabulary = 'names'
-      this.playerFor(id, form)
+      for (const vocabulary of ['numbers', 'names'] as const) {
+        if (this.manifest.assets[vocabulary][form][id] === undefined) continue
+        this.vocabulary = vocabulary
+        this.playerFor(id, form)
+      }
     } finally {
       this.vocabulary = original
     }
@@ -1128,10 +1140,10 @@ export class VoiceOutputExpo implements VoiceOutputPort {
       if (module === undefined) {
         // Only fused-body ids (`1b..6b`) can be absent from a slot:
         // they ship only in numbers/standalone. Reaching here means
-        // an announcer tried to play a fused-body id under
-        // names/* or numbers/combo, which never happens today —
-        // logging + throw lets the existing "clip did not load"
-        // path handle it uniformly.
+        // something tried to PLAY a fused-body id under names/* or
+        // numbers/combo — the warm-up no longer comes this way (see
+        // `preloadBothVocabsFor`) — and logging + throw lets the
+        // existing "clip did not load" path handle it uniformly.
         throw new Error(`no manifest entry for ${this.vocabulary}/${form}/${id}`)
       }
       const player = this.makePlayer(module)

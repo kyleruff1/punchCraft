@@ -37,13 +37,23 @@ export const NORDIC_LEGACY_DFU_SERVICE_UUID = '00001530-1212-efde-1523-785feabcd
  *                                              H10). This is the ONLY
  *                                              characteristic the decoder
  *                                              accepts frames from.
- *   DEVICE_INFO_READ(ca281070, read)        — fixed device-info blob.
- *   NOTIFY_STATUS   (ca281073, read/notify) — status / heartbeat channel.
+ *   DEVICE_INFO_READ(ca281070, read)        — the vendor reads this as a
+ *                                              16-bit LE punch count; every
+ *                                              read in our captures is 0000.
+ *   NOTIFY_STATUS   (ca281073, read/notify) — status byte. The vendor READS
+ *                                              it at the end of start-up and
+ *                                              gates "ready" on bit 4 (0x10)
+ *                                              plus an OS bond (H14). We
+ *                                              subscribe and discard.
  *   CONFIG_1074/5/6                          — configurable device settings
  *                                              (sample rate / sensitivity /
  *                                              hand / LED / sleep timer,
  *                                              guarded behind dev mode).
- *   COMMAND_ACK     (ca281078, indicate)    — command acknowledgements.
+ *   COMMAND_ACK     (ca281078, indicate)    — NOT acknowledgements, despite
+ *                                              the key: the vendor decodes it
+ *                                              as an error / assertion STRING
+ *                                              (H14). The name is the original
+ *                                              guess, kept for its callers.
  *   LEGACY_COMMAND  (ca281079, write)       — historical "start punch
  *                                              session" channel; H07-REVISED
  *                                              confirmed it is a no-op on
@@ -110,6 +120,15 @@ export function bytesToHex(bytes: Uint8Array): string {
  * `byte[] {16}`, `{17}`, `{18}` constants (fields h/i/j) but not named
  * in the mode-label map — kept here as unnamed16/17/18 so the adapter
  * can still emit them.
+ *
+ * What the vendor's control flow says about two of them (H14):
+ *   - 17 — sent every session; its write callback logs "Set new Threshold
+ *     to 30". Our init plan sends it, as the vendor does.
+ *   - 16 — sent only when the status byte's bit 4 is clear, as the first
+ *     step of the vendor's bonding gate. WE NEVER SEND IT, and must not on
+ *     a guess: what it does to the firmware is unknown, and a glove that
+ *     starts demanding a bond the central cannot give is the H13 failure.
+ *   - 18 — sent by nobody.
  */
 export type ModeCommand1 =
   | 'idle'

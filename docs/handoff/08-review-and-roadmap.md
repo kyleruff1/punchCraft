@@ -907,7 +907,10 @@ for each run (a stale layout passes every sweep; the case it guards is a
 top-up nudging a 59 s run past a minute). And by ear: a round that used to
 trail off now ends on a shortened pressure block plus a rep or two.
 
-#### N-4 · Some recipes generate a workout with nothing in it · **open**
+#### N-4 · Some recipes generate a workout with nothing in it · **fixed** (`43c01c5c`)
+
+*Fixed in the PC-Bluetooth batch (§3d): an all-empty workout is an error and
+Start is off until the recipe changes. As found:*
 
 A single enabled punch other than the jab (`[2]`, `[3]`, `[4]`, `[5]`,
 `[6]`), and pairs like `[3,4]` or `[5,6]`, match no motif in the library:
@@ -982,7 +985,11 @@ pure parts are tested, the device half has not been watched working), the CI
 split, and the APK workflow (neither can run until it is on GitHub; the APK
 job in particular should be expected to need a fix-up).
 
-#### N-6 · A long same-move stretch can go unannounced · **open**
+#### N-6 · A long same-move stretch can go unannounced · **fixed** (`c76fa403`)
+
+*Fixed in the PC-Bluetooth batch (§3d), by the first of the three ways out
+below: the mandatory announcement falls back to a variant that fits.
+Generator 1.3.2. As found:*
 
 Found by the new real-options sweep on its first run. A run of one
 combination longer than a minute must open with a "coast" call. `pickCallout`
@@ -998,6 +1005,158 @@ sentence shorter; or raise the cap for this pattern. It is pinned at its
 cause in `src/audio/__tests__/fillOptionsForRecipe.contract.test.ts`, and the
 sweep's announcement rule is `it.failing` there, so it flips the day this is
 fixed.
+
+---
+
+## 3d. The PC-Bluetooth batch
+
+2026-11-25, branch `feat/pc-web-bluetooth`, cut from `infra/guardrails`
+(PR 392, open when this was written). One commit per item, nothing pushed.
+Chosen by survey: the PC version talks to the gloves through **Web
+Bluetooth** in the browser (superseding the local-bridge idea), its first
+milestone is the real gloves connecting from the PC, and three fixes ride
+along.
+
+| | Commit | What it is |
+|---|---|---|
+| Web Bluetooth transport | `0cb5c17f` | `BleManagerFacade` over `navigator.bluetooth`. Not registered in the app. |
+| Not-bonded recogniser | `4a63cecb` | `src/ble/bondDiagnosis.ts`, pure: the H13 signature as a rule. |
+| PC glove check | `0336f93e` | `npm run pc:glove-check` — the milestone. `tools/pc/glove-check/README.md`. |
+| N-6 fixed | `c76fa403` | A same-move stretch over a minute is always announced. Generator 1.3.2. |
+| N-4 fixed | `43c01c5c` | An all-empty workout is an error; Start is off while a recipe has one. |
+| Bond detection, tablet | `44e25f6a` | "Not paired?" on the badge; the Fix button sends you to pair. |
+
+**Verified at this state:** 205 suites / 4,723 tests / 22 snapshots green;
+`npm run check` passes; the 22 library timeline hashes are unchanged.
+
+**What the glove check is, and is not.** It is the app's real path —
+`startPunchStream`, the FightCamp adapter and decoder, the keepalive's beat —
+run over the new transport in a plain page, with a test that fails if that
+import graph ever stops being browser-safe. It is *not* the app on a PC: the
+web build does not boot yet. That is the next milestone, and it needs three
+things this batch did not touch — SQLite on web (a `.wasm` asset and
+cross-origin isolation headers), the Skia backdrop (CanvasKit, or off), and a
+web BLE factory so `src/app/_layout.tsx`'s `import '@/ble'` stops loading the
+native library.
+
+**Where it departed from its plan, and why.**
+
+- *The page refuses a wrong-hand connect.* The plan had it read the glove's
+  System ID only to report it. A browser hides addresses, so hand comes from
+  which button was clicked — and the init plan *writes* that hand to the
+  glove. So the read happens first, and a glove whose System ID carries the
+  other hand's known address is hung up before anything is written. Whether
+  these trackers' System ID carries the address at all is not known until
+  one is read; a miss changes nothing.
+- *The Fix button changes job instead of gaining a neighbour.* While a glove
+  is down and probably unpaired, a tap opens Bluetooth settings to pair and
+  does not then wait for a bounce. A second button in that row would have
+  displaced the tracker cluster the row's comments go out of their way to
+  protect.
+- *Start is off for every recipe error, but not for a library workout.* With
+  a library workout picked the recipe is not what runs, so its errors are
+  not a reason to refuse. A mutation test found that exemption untested; it
+  is tested now.
+- *N-4's note about combination length was wrong.* The header of
+  `coverageConflict.ts` said two punches with combinations capped at one
+  also come out empty. A probe over 15 punch sets
+  and 4 caps says otherwise: **any set with the jab in it fills at any cap**;
+  without the jab, only cross-and-lead-hook fills, and only at two or more.
+  It was all-or-nothing in every case — 4 of 4 rounds or none.
+- *The heartbeat's constants moved.* Cadence, payload and the battery UUIDs
+  now live in `FightCampV1Keepalive.ts`, so the tablet keepalive and the page
+  cannot send different beats.
+
+**Not proven from the desk — all of it needs hardware.**
+
+- *The glove check against a glove.* The page loads, draws and builds its
+  report in Chromium; nothing Bluetooth has run. The browser's device chooser
+  needs a person. This is the result the whole PC direction waits on.
+- *Whether a browser can answer the glove's security request.* The September
+  spike bonded through a native library, which a page cannot use. If the
+  page reports the 30-45 s drop, pairing "FightCam" in Windows Settings is the
+  thing to try, and whether that cures it for Chrome is unknown.
+- *Bond detection on the tablet.* Tested against the timing rule, not a
+  glove. One assumption in particular: that the BLE library reports the
+  unbonded drop as a clean disconnect. If it reports an error the recogniser
+  never trips. H13's next test settles it and says what to read.
+- *Generator 1.3.2 by ear.* Roughly one long jab-cross stretch in three now
+  opens with a "power coast" call where it had none, in a different variant
+  from the one that was drawn.
+
+---
+
+## 3e. Farming the on-disk evidence
+
+2026-11-25, same branch, after the desk tests with the gloves were put off.
+The question was what the disk already holds that could stand in for them.
+
+**What is there.** 21 GB of monitor captures, 115 session captures and five
+full 22-workout suite runs (the newest from 2026-09-11) under
+`tools/analysis/` — all git-ignored; the decompiled official app under
+`artifacts/reversing/`; one 21-record punch fixture. **What is not:** any raw
+glove payload, a pulled tablet database, a Bluetooth snoop. The app logs no
+per-punch line, and only 9 of 1,239 logged workout runs took their punches
+from the gloves.
+
+**What it settled.**
+
+- *Bonding is in the vendor's own code.* The official app reads the status
+  byte and will not call a tracker ready until Android reports it bonded.
+  Recorded as **H14**; H13 no longer rests on session notes.
+- *Bonded gloves hold.* The app logs contain 76 distinct glove links. 72 were
+  seen alive past 45 s, the longest for 410 s; the other four are short only
+  because the app restarted or the capture ended. None dropped while the app
+  ran.
+- *The upgrade-path test catches a real failure.* The tablet logged migration
+  007 failing with `FOREIGN KEY constraint failed` on 2026-08-29, minutes
+  before `91d77458` fixed it. With the pre-fix migration put back, today's
+  upgrade-path test fails with that same error (8 tests, plus the
+  append-only guard).
+- *Today's manifests still describe what the September build said.* Re-judged
+  with today's verifier, the last full suite's per-bar call counts are within
+  one of the manifest on all 22 workouts.
+- *Real timings, for comparing a PC against.* On the tablet, over ~75 real
+  connects: each init write takes 80-130 ms at the median and up to 2.4 s;
+  the 20 s heartbeat write 105 ms at the median, 400 ms at p90, and once
+  11.6 s.
+
+**What it found, and what became of it.**
+
+| | Commit |
+|---|---|
+| The fullest tracker reference was outside the repo; now `docs/protocol/tracker-schematics.md`, with H14 | `18250d29` |
+| The glove check reads the status byte, before and after start-up | `1d331791` |
+| The first-round verifier could not read any stored capture | `8f9b055e` |
+| The announcer warmed clips that cannot exist; the next suite drive would have failed 8 of 22 workouts on it | `b12763ab` |
+
+**Verified at this state:** 206 suites / 4,746 tests / 22 snapshots green;
+`npm run check` passes.
+
+#### N-7 · A workout persists no raw frames · **open — a decision**
+
+CLAUDE.md rule 1 says every incoming frame is persisted before any decoder
+runs. That holds for the transport's *ordering*, and for the three Velocity
+Lab routes, which are the only callers of `startCapture()`. It does not hold
+for a workout: no frame sink is installed, so the frames the keepalive and
+the live screen decode are never stored, and `persistWorkoutSession` keeps
+only the punches a cue result names. The tracker schematics recorded this on
+2026-09-05; it is still so. It is why the disk holds so little glove data —
+and why a decoder change cannot be replayed over a workout. Fixing it is a
+storage decision: a raw frame is about 400 bytes, and a long session with
+both gloves is a few thousand of them.
+
+#### N-8 · `autoconnect.connected` logs no device · **open, trivial**
+
+It logs `deviceId: deviceSensitive(deviceId)` where `deviceId` is the scan's
+result, undefined whenever the connect fell back to the known address — which
+was every one of the 83 successes logged in the captures.
+
+**Still open after the farming.** How the tablet's BLE library reports an
+unbonded drop (no link dropped in any capture, so there is nothing to read);
+whether a browser can answer the glove's security request; whether System ID
+carries the address (the vendor never reads it — it identifies a tracker by
+Serial Number, which a browser refuses to read). All three need the gloves.
 
 ---
 
@@ -1200,10 +1359,10 @@ residual at sprint cadence (see H-4) and is still a listening question.
 
 **After the second batch.** The sprint residual is fixed (`8538aa40`); what
 is left to listen to is how those rounds now end. Open and yours to decide:
-whether an empty workout should be
-startable (**N-4**), whether to rename the stored session mode with a real
-migration (**N-2**), and still which discipline the first non-boxing workout
-targets.
+whether to rename the stored session mode with a real migration (**N-2**),
+and still which discipline the first non-boxing workout targets. (Whether an
+empty workout should be startable — **N-4** — was decided on 2026-11-25: it
+is not. See §3d.)
 
 ---
 
@@ -1238,16 +1397,18 @@ cold app restart first — `F:` has no fast refresh.
 
 **Recipe screen.**
 - Duration 20 → 60 shows a goal of 2,700 and the same intensity label.
-- Advanced → switch off every punch but the cross → the warning appears in
-  the summary and beside the punch toggles ("Every round runs out…"). That
-  is N-4, the one way left to get it. Punches 1 and 2 with combinations
-  capped at 2 — the old way — should now show **no** warning and run every
-  round to the bell.
+- Advanced → switch off every punch but the cross → an **error** appears in
+  the summary and beside the punch toggles ("These punches do not form any
+  combination…"), Start dims, and the reason is written under it. Switch the
+  jab back on and Start returns. Punches 1 and 2 with combinations capped at
+  2 should show **no** notice and run every round to the bell.
+- Pick a library workout with that broken recipe still set: Start should be
+  on — the recipe is not what runs then.
 
 **By ear.**
 - A generated workout at a low goal (try 60 minutes at 900): every round is
   now full to the bell. Is that the round you want, or too dense?
-- Any generated workout: the generator is at **1.3.1**, and each bump reseeds
+- Any generated workout: the generator is at **1.3.2**, and each bump reseeds
   selection, so a saved seed no longer gives the workout it used to.
 - A sprint-cadence workout: rounds now run to the bell. The last few seconds
   are more of the closing combination — is that the ending you want?
