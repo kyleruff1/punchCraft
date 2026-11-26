@@ -12,7 +12,7 @@
  * tests exist to prevent, so the control case matters as much as the happy one.
  */
 
-const { recordsWithTag, recordTag } = require('../logcat.mjs')
+const { recordsWithTag, recordTag, withCurrentTag } = require('../logcat.mjs')
 
 // The real captures are logcat BRIEF format, copied verbatim from
 // tools/analysis/suites/post-floor/body-work/logcat.txt:
@@ -73,5 +73,29 @@ describe('recordsWithTag legacy aliasing', () => {
   it('recordTag still parses the code out of a real record shape', () => {
     expect(recordTag("'[INFO] workout.cue.tokenDue', {}")).toBe('workout.cue.tokenDue')
     expect(recordTag("'[WARN] puncheokie.metronome', {}")).toBe('puncheokie.metronome')
+  })
+})
+
+describe('withCurrentTag', () => {
+  it('reads a pre-rename event code as it is spelled today', () => {
+    expect(withCurrentTag("'[INFO] puncheokie.clickScript.dispatch', 'x', { kind: 'call',")).toBe(
+      "'[INFO] workout.clickScript.dispatch', 'x', { kind: 'call',",
+    )
+    expect(withCurrentTag("'[WARN] puncheokie.voice.clipMissing', 'y', {}")).toBe(
+      "'[WARN] workout.voice.clipMissing', 'y', {}",
+    )
+  })
+
+  it('leaves a current code, and a code from another family, alone', () => {
+    for (const body of ["'[INFO] workout.cue.tokenDue', {}", "'[INFO] ble.slot.connect.ok', {}"]) {
+      expect(withCurrentTag(body)).toBe(body)
+    }
+  })
+
+  it('rewrites only the code — the same word elsewhere in a record is content', () => {
+    const body =
+      "'[INFO] workout.qa.run', 'x', { route: '/(tabs)/puncheokie/jam', note: 'puncheokie.x' }"
+    expect(withCurrentTag(body)).toBe(body)
+    expect(withCurrentTag("  slot: 'puncheokie.cue'")).toBe("  slot: 'puncheokie.cue'")
   })
 })

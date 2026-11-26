@@ -104,6 +104,27 @@ export function recordTag(body) {
 const LEGACY_TAG_PREFIX = 'puncheokie.'
 const CURRENT_TAG_PREFIX = 'workout.'
 
+/** A record body whose event code carries the pre-fork prefix. */
+const LEGACY_HEAD = /^('\[[A-Z]+\]\s+)puncheokie\./
+
+/**
+ * A stitched record's body with its event code in the CURRENT spelling.
+ *
+ * For a consumer that matches codes by substring instead of through
+ * `recordsWithTag` — the first-round correlator does, because the ORDER of
+ * its checks is load-bearing (`voice.playFailed` contains `voice.play`).
+ * Until 2026-11-25 that consumer matched the current spelling only, so on
+ * every capture recorded before the rename it parsed to nothing and reported
+ * "no calls dispatched": the silent-zero-rows failure the aliasing here was
+ * written to prevent, in the one tool that judges a stored capture.
+ *
+ * Only the leading code is rewritten. `puncheokie` anywhere else in the body
+ * — a route, a file path, a workout id — is content, and stays.
+ */
+export function withCurrentTag(body) {
+  return body.replace(LEGACY_HEAD, `$1${CURRENT_TAG_PREFIX}`)
+}
+
 /** Every spelling of `tag` that should match, newest first. */
 function tagAliases(tag) {
   if (!tag.startsWith(CURRENT_TAG_PREFIX)) return [tag]
