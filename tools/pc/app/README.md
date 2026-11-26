@@ -39,8 +39,21 @@ browser, is a different (empty) database. Clearing the site's data in the
 browser deletes it.
 
 The engine is sql.js, not the tablet's expo-sqlite; `src/storage/sqlJsPort.ts`
-says why. The whole database is saved about a second after each write, and
-again when the tab is hidden.
+says why. Three things follow from how it saves — the whole database, about
+a second after each write, and at once when the tab is hidden:
+
+- **Give it a second before you close or reload the tab.** A save started as
+  the page goes away does not finish, so writes from the last second are
+  lost. What was saved before is never damaged.
+- **One tab at a time.** A second tab would save its own copy over the
+  first's, so it does not start; it says the app is already open.
+- **If the browser drops the file, the app says so.** A load that finds no
+  database where one was saved logs `storage.web.savedFileMissing` as an
+  error and starts empty. This happened once, in the desktop app's built-in
+  browser pane on 2026-11-26, between two page loads fifteen minutes apart;
+  it could not be reproduced in Chrome (36 forced reloads) and its cause is
+  not known. Until it is, do not keep anything here you cannot afford to
+  lose — the tablet is where sessions live.
 
 ## The smoke test
 
@@ -51,9 +64,10 @@ npm run pc:smoke
 Builds, starts Chrome or Edge headless on a throwaway profile, and drives the
 app: boot, switch on QA mode in Settings, reload, start a workout through the
 QA link with simulated punches, wait for round 1, stop, save, reload, then
-read the saved database out of the browser and open it outside the app. It
-fails on any error on the page — a thrown error, an unhandled rejection, an
-error-level log, a failed request. About a minute after the build.
+read the saved database out of the browser and open it outside the app, and
+last, open a second tab and see that it does not start. It fails on any
+error on the page — a thrown error, an unhandled rejection, an error-level
+log, a failed request. About a minute after the build.
 
 `npm run pc:smoke -- --no-build` skips the build. `PC_SMOKE_BROWSER` names a
 browser if yours is somewhere unusual. It drives the browser through its

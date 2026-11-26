@@ -9,7 +9,11 @@
 import { replaceSinks, type LogRecord } from '@diagnostics/logger'
 import { SettingsRepository } from '@/storage/repositories/SettingsRepository'
 import { SETTINGS_KEYS } from '@/storage/migrations/006_app_settings'
+import { StorageNotice } from '@/storage/storageNotice'
 import {
+  CLAIM_WAIT_MS,
+  SAVED_MARKER_KEY,
+  SECOND_TAB_NOTICE,
   DB_FILE,
   SAVE_DELAY_MS,
   SAVE_RETRY_MS,
@@ -38,12 +42,15 @@ class FakeFiles {
   readonly writes: string[] = []
   failWritesTo: string | null = null
   available = true
+  /** A file that is there and will not be handed over. */
+  refuse: string | null = null
 
   getDirectory = async () => {
     if (!this.available) throw new Error('SecurityError: storage is not available')
     return {
       getFileHandle: async (name: string, opts?: { create?: boolean }) => {
-        if (!this.files.has(name) && !opts?.create) throw new Error('NotFoundError')
+        if (this.refuse === name) throw named('InvalidStateError')
+        if (!this.files.has(name) && !opts?.create) throw named('NotFoundError')
         return {
           getFile: async () => {
             const bytes = this.files.get(name) ?? new Uint8Array()
@@ -68,11 +75,40 @@ class FakeFiles {
   }
 }
 
+/** The Web Locks manager, as far as one named lock goes. */
+class FakeLocks {
+  heldElsewhere = false
+  /** Whether this page's callback is still holding the lock. */
+  held = false
+
+  request = (
+    _name: string,
+    options: { signal: { addEventListener(type: 'abort', listener: () => void): void } },
+    callback: () => Promise<void>,
+  ): Promise<void> =>
+    new Promise((_resolve, reject) => {
+      if (this.heldElsewhere) {
+        // Queued behind the other tab until the caller gives up.
+        options.signal.addEventListener('abort', () => reject(named('AbortError')))
+        return
+      }
+      this.held = true
+      void callback().then(() => {
+        this.held = false
+      })
+    })
+}
+
 let files: FakeFiles
+let locks: FakeLocks
+let local: Map<string, string>
 let records: LogRecord[]
 let listeners: Record<string, Array<() => void>>
 let visibility: 'visible' | 'hidden'
 
+function named(name: string): Error {
+  return Object.assign(new Error(name), { name })
+}
 const define = (name: string, value: unknown): void => {
   Object.defineProperty(globalThis, name, { value, configurable: true, writable: true })
 }
@@ -100,6 +136,8 @@ beforeEach(() => {
   jest.useFakeTimers({ doNotFake: ['performance'] })
   __resetDatabaseForTests()
   files = new FakeFiles()
+  locks = new FakeLocks()
+  local = new Map()
   records = []
   listeners = {}
   visibility = 'visible'
@@ -107,14 +145,23 @@ beforeEach(() => {
   const listen = (type: string, fn: () => void): void => {
     ;(listeners[type] ??= []).push(fn)
   }
-  define('navigator', { storage: { getDirectory: files.getDirectory } })
+  define('navigator', {
+    storage: { getDirectory: files.getDirectory, persist: async () => true },
+    locks,
+  })
   define('document', {
     addEventListener: listen,
     get visibilityState() {
       return visibility
     },
   })
-  define('window', { addEventListener: listen })
+  define('window', {
+    addEventListener: listen,
+    localStorage: {
+      getItem: (key: string) => local.get(key) ?? null,
+      setItem: (key: string, value: string) => void local.set(key, value),
+    },
+  })
 })
 
 afterEach(() => {
@@ -171,7 +218,7 @@ describe('saving', () => {
     expect(qaEnabled()).toBe(true)
   })
 
-  it('happens at once when the page is hidden or closed', async () => {
+  it('is started at once when the page is hidden or going away', async () => {
     await prepareStorage()
     setting().write(SETTINGS_KEYS.qa, { enabled: true })
     visibility = 'hidden'
@@ -266,6 +313,105 @@ describe('a browser with no private file system', () => {
     setting().write(SETTINGS_KEYS.qa, { enabled: true })
     await afterDelay(SAVE_RETRY_MS * 3)
     expect(qaEnabled()).toBe(true)
-    expect(codes().filter((c) => c.startsWith('storage.web.'))).toEqual(['storage.web.loadFailed'])
+    expect(records.filter((r) => r.level === 'error').map((r) => r.code)).toEqual([
+      'storage.web.loadFailed',
+    ])
+  })
+})
+
+describe('a saved file that is there and will not be read', () => {
+  it('is not mistaken for a first run — and is never saved over', async () => {
+    const saved = new Uint8Array([1, 2, 3])
+    files.files.set(DB_FILE, saved)
+    files.refuse = DB_FILE
+    await prepareStorage()
+    expect(isStorageReady()).toBe(true)
+    expect(codes()).toContain('storage.web.loadFailed')
+
+    files.refuse = null
+    setting().write(SETTINGS_KEYS.qa, { enabled: true })
+    await afterDelay(SAVE_RETRY_MS * 2)
+    expect(files.files.get(DB_FILE)).toBe(saved)
+  })
+})
+
+describe('one tab at a time', () => {
+  it('takes the lock, and keeps it for the life of the tab', async () => {
+    await prepareStorage()
+    expect(locks.held).toBe(true)
+    await afterDelay(60_000)
+    expect(locks.held).toBe(true)
+  })
+
+  it('does not start in a second tab, and says why in words for the athlete', async () => {
+    locks.heldElsewhere = true
+    const preparing = prepareStorage()
+    const outcome = preparing.then(
+      () => 'started',
+      (err: unknown) => err,
+    )
+    await afterDelay(CLAIM_WAIT_MS)
+    const err = await outcome
+    expect(err).toBeInstanceOf(StorageNotice)
+    expect((err as Error).message).toBe(SECOND_TAB_NOTICE)
+    expect(isStorageReady()).toBe(false)
+    // It never touched the other tab's file.
+    expect(files.writes).toEqual([])
+  })
+
+  it('waits for a reload’s old page to let go, rather than giving up at once', async () => {
+    locks.heldElsewhere = true
+    const preparing = prepareStorage()
+    await afterDelay(CLAIM_WAIT_MS - 1)
+    expect(isStorageReady()).toBe(false)
+    await afterDelay(1)
+    await expect(preparing).rejects.toBeInstanceOf(StorageNotice)
+  })
+
+  it('takes a browser without Web Locks at its word', async () => {
+    define('navigator', { storage: { getDirectory: files.getDirectory } })
+    await prepareStorage()
+    expect(isStorageReady()).toBe(true)
+  })
+})
+
+describe('a saved file that has gone missing', () => {
+  it('is said out loud: the last save left a note, and the file is not there', async () => {
+    await prepareStorage()
+    await afterDelay(SAVE_DELAY_MS)
+    const note = JSON.parse(local.get(SAVED_MARKER_KEY) ?? '{}') as { bytes: number; at: string }
+    expect(note.bytes).toBe(files.files.get(DB_FILE)?.length)
+
+    files.files.delete(DB_FILE) // the browser dropped it; the note survived
+    await reload()
+    const missing = records.find((r) => r.code === 'storage.web.savedFileMissing')
+    expect(missing?.level).toBe('error')
+    expect(missing?.fields.lastSavedBytes?.value).toBe(note.bytes)
+    // …and the app still starts, and saves again.
+    await afterDelay(SAVE_DELAY_MS)
+    expect(files.files.has(DB_FILE)).toBe(true)
+  })
+
+  it('is not cried over on a first run, or when the file is where it was left', async () => {
+    await prepareStorage()
+    await afterDelay(SAVE_DELAY_MS)
+    await reload()
+    expect(codes()).not.toContain('storage.web.savedFileMissing')
+  })
+
+  it('survives a note it cannot read', async () => {
+    local.set(SAVED_MARKER_KEY, 'not json')
+    await prepareStorage()
+    expect(codes()).not.toContain('storage.web.savedFileMissing')
+    expect(isStorageReady()).toBe(true)
+  })
+})
+
+describe('asking the browser to keep the database', () => {
+  it('asks, and logs the answer', async () => {
+    await prepareStorage()
+    await settle()
+    const asked = records.find((r) => r.code === 'storage.web.persistence')
+    expect(asked?.fields.granted?.value).toBe(true)
   })
 })

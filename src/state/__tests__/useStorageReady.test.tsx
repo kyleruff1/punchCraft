@@ -1,6 +1,6 @@
 /**
  * The root layout's storage gate: ready at once on the tablet, awaited in a
- * browser, and a stated failure when the engine will not load.
+ * browser, and a stated reason when storage cannot be had.
  */
 let mockReady = true
 let mockPrepare: jest.Mock<Promise<void>, []>
@@ -13,10 +13,11 @@ import React from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 
 import { replaceSinks, type LogRecord } from '@diagnostics/logger'
+import { StorageNotice } from '@storage/storageNotice'
 
-import { useStorageReady, type StorageState } from '../useStorageReady'
+import { STORAGE_FAULT, useStorageReady, type StorageStatus } from '../useStorageReady'
 
-const seen: StorageState[] = []
+const seen: StorageStatus[] = []
 function Probe(): null {
   seen.push(useStorageReady())
   return null
@@ -37,7 +38,7 @@ describe('on the tablet, where storage is ready when asked', () => {
     act(() => {
       create(<Probe />)
     })
-    expect(seen).toEqual(['ready'])
+    expect(seen).toEqual([{ state: 'ready' }])
     expect(mockPrepare).not.toHaveBeenCalled()
   })
 })
@@ -60,21 +61,30 @@ describe('in a browser, where storage has to load', () => {
     act(() => {
       create(<Probe />)
     })
-    expect(seen.at(-1)).toBe('loading')
+    expect(seen.at(-1)).toEqual({ state: 'loading' })
     expect(mockPrepare).toHaveBeenCalledTimes(1)
 
     await act(async () => resolve())
-    expect(seen.at(-1)).toBe('ready')
+    expect(seen.at(-1)).toEqual({ state: 'ready' })
     expect(mockPrepare).toHaveBeenCalledTimes(1)
   })
 
-  it('says failed, and logs why, when the engine does not load', async () => {
+  it('says a fault plainly, and logs the detail, when the engine does not load', async () => {
     act(() => {
       create(<Probe />)
     })
     await act(async () => reject(new Error('wasm 404')))
-    expect(seen.at(-1)).toBe('failed')
+    expect(seen.at(-1)).toEqual({ state: 'failed', reason: STORAGE_FAULT })
     expect(records.map((r) => r.code)).toContain('storage.prepareFailed')
+  })
+
+  it('shows a notice in its own words — and does not log it as a fault', async () => {
+    act(() => {
+      create(<Probe />)
+    })
+    await act(async () => reject(new StorageNotice('Already open in another tab.')))
+    expect(seen.at(-1)).toEqual({ state: 'failed', reason: 'Already open in another tab.' })
+    expect(records.map((r) => r.code)).not.toContain('storage.prepareFailed')
   })
 
   it('leaves an unmounted layout alone', async () => {

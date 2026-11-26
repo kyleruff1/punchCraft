@@ -52,14 +52,15 @@ const stackScreenOptions = {
  */
 export default function RootLayout() {
   const storage = useStorageReady()
-  if (storage === 'ready') return <AppRoot />
-  if (storage === 'loading') return null
-  // Browser only: the database engine did not load. Plain system text — the
-  // fonts and the theme's components are all on the far side of this gate.
+  if (storage.state === 'ready') return <AppRoot />
+  if (storage.state === 'loading') return null
+  // Browser only: another tab has the database, or its engine did not load.
+  // Plain system text — the fonts and the theme's components are all on the
+  // far side of this gate.
   return (
     <View style={styles.failed}>
-      <Text style={styles.failedText}>
-        punchCraft could not start: its database did not load. The browser console has the reason.
+      <Text style={styles.failedText} testID="storage-failed">
+        {storage.reason}
       </Text>
     </View>
   )

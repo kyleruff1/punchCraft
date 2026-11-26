@@ -14,9 +14,20 @@
  *   anything that could open the database.
  * - **It lives in memory and is saved as a whole.** After a write the
  *   database is exported and written to the origin-private file system,
- *   shortly afterwards and again when the page is hidden or closed. A crash
- *   or a closed tab loses at most the last second or so of writes. A save
- *   that fails is tried again, more slowly.
+ *   `SAVE_DELAY_MS` later, and at once when the tab is hidden. Closing or
+ *   reloading the tab inside that delay loses those writes: a save started
+ *   as the page goes away does not finish (measured: 36 forced reloads,
+ *   2026-11-26). It never damages what was saved before — the browser swaps
+ *   the new file in whole or not at all. A save that fails is tried again,
+ *   more slowly.
+ * - **One tab at a time.** Each tab would hold its own copy and save it over
+ *   the other's. The first tab takes a lock for its lifetime; a second is
+ *   told so (`StorageNotice`) and does not start.
+ * - **A saved file that has gone missing is said out loud.** The last save
+ *   leaves a note in `localStorage`. A load that finds the note and no file
+ *   logs an error rather than passing for a first run — which is how the one
+ *   unexplained loss so far (the desktop app's browser pane, 2026-11-26)
+ *   went unnoticed until the sessions were looked for.
  * - **If the saved file will not open, the app still runs** — on an empty
  *   database, with an error in the log. The file that would not open is
  *   copied aside first (`UNREADABLE_FILE`); if even that fails, nothing is
@@ -35,8 +46,20 @@ import wasmUrl from 'sql.js/dist/sql-wasm-browser.wasm'
 import { logger, safe } from '@/diagnostics/logger'
 import { runMigrations } from '@/storage/migrations'
 import { createSqlJsPort, type SqlJsPort } from '@/storage/sqlJsPort'
+import { StorageNotice } from '@/storage/storageNotice'
 
 export const DB_FILE = 'punchcraft.db'
+/** The Web Lock one tab holds for as long as it has the database open. */
+export const LOCK_NAME = 'punchcraft.db'
+/**
+ * How long a tab waits for that lock before deciding another tab has it. A
+ * reload's old page lets go as it unloads; this is the slack for that.
+ */
+export const CLAIM_WAIT_MS = 1_500
+/** `localStorage` key: what the last successful save was, `{ bytes, at }`. */
+export const SAVED_MARKER_KEY = 'punchcraft.db.saved'
+export const SECOND_TAB_NOTICE =
+  'punchCraft is already open in another tab of this browser. Close this tab — or close the other one, then reload this one.'
 /** Where a saved database that would not open is kept. One slot. */
 export const UNREADABLE_FILE = 'punchcraft.db.unreadable'
 /** How long after a write the file is saved. Writes inside it share one save. */
@@ -68,11 +91,72 @@ async function loadSavedBytes(): Promise<Uint8Array | null> {
   let handle: FileSystemFileHandle
   try {
     handle = await root.getFileHandle(DB_FILE)
-  } catch {
-    return null // first run: nothing saved yet
+  } catch (err) {
+    // Only "no such file" means nothing has been saved. Any other failure
+    // is storage misbehaving, and must not pass for an empty database that
+    // the next save would then write over the real one.
+    if ((err as { name?: unknown } | null)?.name === 'NotFoundError') return null
+    throw err
   }
   const file = await handle.getFile()
   return file.size === 0 ? null : new Uint8Array(await file.arrayBuffer())
+}
+
+/** What the last successful save was, by this browser's own account. */
+function readSavedMarker(): { bytes: number; at: string } | null {
+  try {
+    const raw = window.localStorage.getItem(SAVED_MARKER_KEY)
+    if (raw === null) return null
+    const { bytes, at } = JSON.parse(raw) as { bytes?: unknown; at?: unknown }
+    return typeof bytes === 'number' && typeof at === 'string' ? { bytes, at } : null
+  } catch {
+    return null
+  }
+}
+
+function writeSavedMarker(bytes: number): void {
+  try {
+    // Wall time, for a person reading the log — never used to order anything.
+    const marker = { bytes, at: new Date().toISOString() }
+    window.localStorage.setItem(SAVED_MARKER_KEY, JSON.stringify(marker))
+  } catch {
+    // The note is a courtesy to the next load; the save itself succeeded.
+  }
+}
+
+/**
+ * Take the database for this tab. Resolves false when another tab has it.
+ *
+ * The lock is held for as long as the callback's promise is pending, which
+ * is for ever: the browser releases it when the tab goes away. A browser
+ * without Web Locks is taken at its word that there is one tab.
+ */
+function claimDatabase(): Promise<boolean> {
+  const locks = navigator.locks as typeof navigator.locks | undefined
+  if (!locks) return Promise.resolve(true)
+  return new Promise((resolve) => {
+    const giveUp = new AbortController()
+    const timer = setTimeout(() => giveUp.abort(), CLAIM_WAIT_MS)
+    locks
+      .request(LOCK_NAME, { signal: giveUp.signal }, () => {
+        clearTimeout(timer)
+        resolve(true)
+        return new Promise<void>(() => undefined)
+      })
+      .catch(() => resolve(false))
+  })
+}
+
+/** Ask the browser not to evict the database when the disk runs short. */
+async function askToKeepStorage(): Promise<void> {
+  try {
+    const granted = (await navigator.storage.persist?.()) ?? false
+    logger.info('storage.web.persistence', 'asked the browser to keep the database', {
+      granted: safe(granted),
+    })
+  } catch {
+    // Not every browser has the question; none of them needs the answer.
+  }
 }
 
 const unsaved = (): boolean => port !== null && port.writeCount() !== savedCount
@@ -98,6 +182,7 @@ async function save(): Promise<void> {
   let failed = false
   try {
     await writeFile(DB_FILE, bytes)
+    writeSavedMarker(bytes.length)
     if (port === db) savedCount = count
   } catch (err) {
     failed = true
@@ -143,24 +228,40 @@ async function openSaved(SQL: SqlJsStatic, bytes: Uint8Array | null): Promise<Sq
 
 /**
  * Load the engine and the saved database. Idempotent; resolves once storage
- * can be used. Rejects only if the engine itself cannot load — there is no
- * database to offer then, and the app cannot run without one.
+ * can be used. Rejects in two cases, and the app does not start in either:
+ * another tab has the database (a `StorageNotice`, worded for the athlete),
+ * or the engine itself cannot load.
  */
 export function prepareStorage(): Promise<void> {
   preparing ??= (async () => {
     const startedAt = performance.now()
+    if (!(await claimDatabase())) throw new StorageNotice(SECOND_TAB_NOTICE)
     const SQL = await initSqlJs({ locateFile: () => wasmUrl })
     let bytes: Uint8Array | null = null
     try {
       bytes = await loadSavedBytes()
     } catch (err) {
-      // No private file system here (an old browser, a locked-down profile).
-      // The app runs; nothing it stores outlives the tab.
+      // No private file system here (an old browser, a locked-down profile),
+      // or one that would not give up the file. The app runs, and saves
+      // nothing: whatever is on disk is left exactly as it is.
       savingOff = true
-      logger.error('storage.web.loadFailed', 'this browser has no storage the app can use', {
-        error: safe(String(err)),
-      })
+      logger.error(
+        'storage.web.loadFailed',
+        'the browser storage could not be read; nothing will be saved this visit',
+        { error: safe(String(err)) },
+      )
     }
+    if (bytes === null && !savingOff) {
+      const last = readSavedMarker()
+      if (last) {
+        logger.error(
+          'storage.web.savedFileMissing',
+          'the database this browser saved is no longer there; starting empty',
+          { lastSavedBytes: safe(last.bytes), lastSavedAt: safe(last.at) },
+        )
+      }
+    }
+    void askToKeepStorage()
     const opened = await openSaved(SQL, bytes)
     // Saved once after every load: a fresh database never has been, and the
     // migration runner cannot say whether it just changed a loaded one. A

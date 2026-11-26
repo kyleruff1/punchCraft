@@ -76,6 +76,7 @@ export default [
         document: 'readonly',
         window: 'readonly',
         FileSystemFileHandle: 'readonly',
+        AbortController: 'readonly',
       },
     },
   },

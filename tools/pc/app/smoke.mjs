@@ -13,7 +13,8 @@
 //   4. stopping and saving writes the session;
 //   5. after another reload the saved database — read straight out of the
 //      browser's storage and opened here, outside the app — holds it;
-//   6. nothing on the page threw, rejected unhandled, logged an error or
+//   6. a second tab does not start — two would save over each other;
+//   7. nothing on the page threw, rejected unhandled, logged an error or
 //      failed to load, at any point.
 //
 // What it cannot prove: that the coach is AUDIBLE and on time. It sees calls
@@ -55,7 +56,7 @@ async function openSaved(base64) {
   return { scalar }
 }
 
-async function run(page, base) {
+async function run(page, base, openAnother) {
   const step = (text) => console.info(`  - ${text}`)
 
   await page.goto(`${base}settings`)
@@ -118,6 +119,17 @@ async function run(page, base) {
     throw new Error(`the saved database is wrong: ${sessions} sessions, ${cues} cues, ${runs} runs`)
   }
   step(`after a reload the saved database holds it: 1 session, ${cues} cue results`)
+
+  // A second tab, while this one is still open.
+  const second = await openAnother()
+  await second.goto(base)
+  const notice = await second.waitFor(
+    'the second tab to say it will not start',
+    `${byId('storage-failed')}?.innerText`,
+  )
+  second.close()
+  if (second.problems.length > 0) throw new Error(`the second tab: ${second.problems.join('; ')}`)
+  step(`a second tab did not start: "${String(notice).slice(0, 44)}…"`)
 }
 
 async function main() {
@@ -142,7 +154,7 @@ async function main() {
   try {
     page = await openPage(browser.wsUrl)
     console.info(`PC smoke test: ${served.url}`)
-    await run(page, served.url)
+    await run(page, served.url, () => openPage(browser.wsUrl))
   } catch (err) {
     failure = err instanceof Error ? err.message : String(err)
   } finally {

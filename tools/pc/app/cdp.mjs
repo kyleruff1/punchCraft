@@ -159,7 +159,12 @@ export async function openPage(wsUrl) {
    * @type {string[]}
    */
   const withheld = []
-  const text = (arg) => arg.value ?? arg.description ?? arg.unserializableValue ?? `<${arg.type}>`
+  // An object argument arrives as a preview of its fields — which, for the
+  // app's log records, is the part worth reading.
+  const text = (arg) =>
+    arg.type === 'object' && arg.preview
+      ? `{${arg.preview.properties.map((p) => `${p.name}: ${p.value}`).join(', ')}}`
+      : (arg.value ?? arg.description ?? arg.unserializableValue ?? `<${arg.type}>`)
   listeners.push((method, params) => {
     if (method === 'Runtime.consoleAPICalled') {
       const line = params.args.map(text).join(' ')
