@@ -33,6 +33,21 @@ export function openDatabase(): SQLiteDatabase {
   return db
 }
 
+/**
+ * Resolves when `openDatabase()` may be called. On the tablet that is always:
+ * the native database opens synchronously, so this is already done. It exists
+ * for the browser, where the engine and the saved file load asynchronously
+ * (`database.web.ts`) and the root layout has to wait.
+ */
+export function prepareStorage(): Promise<void> {
+  return Promise.resolve()
+}
+
+/** Whether `openDatabase()` may be called now. Always, on the tablet. */
+export function isStorageReady(): boolean {
+  return true
+}
+
 /** Reset the process-wide handle. Intended for tests. */
 export function __resetDatabaseForTests(): void {
   dbInstance = null

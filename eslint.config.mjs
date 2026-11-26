@@ -66,6 +66,20 @@ export default [
     },
   },
   {
+    // Web-only modules. Metro picks a `*.web.ts` over its sibling for the PC
+    // build and the tablet never bundles it, so these may use the page's
+    // globals — and nothing else in `src` may.
+    files: ['src/**/*.web.{ts,tsx}'],
+    languageOptions: {
+      globals: {
+        navigator: 'readonly',
+        document: 'readonly',
+        window: 'readonly',
+        FileSystemFileHandle: 'readonly',
+      },
+    },
+  },
+  {
     // The verifier and guard scripts. Every QA verdict and two CI gates rest
     // on these, and until 2026-11-25 `tools/**` was ignored wholesale: plain
     // JavaScript that neither eslint nor tsc ever read. Linted with the
