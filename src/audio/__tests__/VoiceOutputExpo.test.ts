@@ -52,6 +52,7 @@ import {
   VOICE_ASSET_IDS,
   type VoiceAssetId,
 } from '@domain/coach/VoiceOutputPort'
+import { addSink, replaceSinks } from '@diagnostics/logger'
 
 /* ----------------------------------------------------------------- fakes */
 
@@ -786,6 +787,63 @@ describe('preloadBothVocabsFor (M39-V2 Phase 4-v) — dual-track warmth', () => 
     const h = harness({ failMode: true })
     // In failMode `available` is false. The method must not throw.
     expect(() => h.output.preloadBothVocabsFor('1', 'combo')).not.toThrow()
+  })
+
+  describe('a clip a vocabulary has no entry for', () => {
+    // The fused body ids ship only as numbers/standalone, and the announcer
+    // warms every token of a previewed combination in `combo` form. In the
+    // last full suite before this was fixed (2026-09-11) that logged
+    // `voice.clipMissing` 3,237 times across 12 of the 22 library workouts.
+    const warnings: string[] = []
+    beforeEach(() => {
+      warnings.length = 0
+      addSink({
+        write: (r) => {
+          if (r.code === 'workout.voice.clipMissing') {
+            warnings.push(`${String(r.fields['asset']?.value)}/${String(r.fields['form']?.value)}`)
+          }
+        },
+      })
+    })
+    afterEach(() => replaceSinks([]))
+
+    it.each(['1b', '2b', '3b', '4b', '5b', '6b'] as const)(
+      'is skipped without a warning or a player — %s in combo form',
+      async (id) => {
+        const h = harness()
+        await h.output.preload()
+        const before = h.created.length
+        h.output.preloadBothVocabsFor(id, 'combo')
+        expect(warnings).toEqual([])
+        expect(h.created.length).toBe(before)
+      },
+    )
+
+    it('is still warmed where it does exist — numbers/standalone only', async () => {
+      const h = harness()
+      await h.output.preload({ light: true })
+      const before = h.created.length
+      h.output.preloadBothVocabsFor('6b', 'standalone')
+      expect(warnings).toEqual([])
+      // One player at most: the numbers clip. `names` has none to make.
+      expect(h.created.length - before).toBeLessThanOrEqual(1)
+    })
+
+    it('keeps the vocabulary it was called with', () => {
+      const h = harness()
+      h.output.setVocabulary('names')
+      h.output.preloadBothVocabsFor('2b', 'combo')
+      expect(h.output.armCoachEvent({ eventId: 'e-skip' }).lockedVocabulary).toBe('names')
+    })
+
+    it('is still reported when something tries to PLAY it', () => {
+      // The warm-up is the only path that may ask for a clip that cannot
+      // exist. A play that does is a real miss, and must stay loud.
+      const h = harness()
+      h.output.setVocabulary('names')
+      h.output.playAsset('2b')
+      expect(warnings.length).toBeGreaterThan(0)
+    })
   })
 })
 
