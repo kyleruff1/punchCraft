@@ -67,8 +67,9 @@ Where this document says a line number, it was read at `6129f24b`.
 > | **Found here:** migration 003 restored to its shipped SQL | `e9615f77` |
 > | Upgrade-path tests + append-only guard | `fa4f3291` |
 > | Saved voice settings validated | `1d7ecdee` |
+> | **Found here:** an announcement no longer costs a round its tail (N-3) | `f1bbb799` |
 >
-> **Verified at this state:** 190 suites / 4,527 tests / 22 snapshots green;
+> **Verified at this state:** 191 suites / 4,549 tests / 22 snapshots green;
 > `tsc` and `eslint` clean; both guards pass. All 22 compiled timeline hashes
 > and token-stream snapshots are unchanged. **Still not verified:** anything
 > on the tablet. §7 has the additions.
@@ -862,7 +863,7 @@ pinned. Re-applying the rename's edit fails two tests. `'puncheokie'` stays
 as a stored identifier, like the tab directory. Renaming the stored value
 properly is a new migration that rebuilds `sessions`; say if you want it.
 
-#### N-3 · One announcement can cost a round its last 15-25 seconds · **open**
+#### N-3 · One announcement can cost a round its last 15-25 seconds · **fixed**
 
 This is the real cause of the residual the first batch filed under "narrow
 recipes run 12-29 s dry". It is not about narrow recipes.
@@ -878,11 +879,33 @@ announcement then adds 7 s. The round ends at 225 of 240.
 
 It needs a long single-combination run, so it shows up where variety is low:
 a combination cap of 2 does it **with all six punches enabled** (15-25 s on
-several seeds), as does jab-only. The recipe screen's warning does fire.
-Fix, when wanted: trim reps off the last block instead of dropping it, or
-re-run the top-up afterwards (checking it does not create a new unannounced
-run). Either changes generated output, so it belongs with a version bump —
-1.3.1 is still unpushed and could carry it.
+several seeds), as does jab-only. The recipe screen's warning did fire.
+
+**Status: fixed** (`f1bbb799`), in generator 1.3.1. The payment is a pure
+function, `trimToFit`: a trailing block worth no more than what is owed still
+goes whole (that is repair filler); a block worth more gives up reps
+instead; and if the last block has none to give — a closing flurry — the
+repeated block before it does, so the round keeps its finale. The round is
+then topped back up to the repair pass's 2 s of the bell.
+
+Two things the fix taught:
+
+- **No sweep had ever run this pass.** Every property test generated without
+  `setupCallouts`, which is what switches the announcement pass on; the app
+  always passes it. The new sweeps price ceremonies in and hold three things
+  at once — covered to the bell, never past it, and every stretch longer
+  than a minute announced.
+- **My first version was measurably worse than it looked.** Taking one rep
+  off each small filler block passed every test and left about six one-rep
+  blocks a round (3,519 against 64 without ceremonies). Every block is its
+  own spoken call, so that is a chattier tail. The version committed leaves
+  626 across the same 576 rounds.
+
+With the app's real clip lengths, 960 low-variety cells now fill. The only
+dry ones left are N-4's. Not pinned by a test: that the layout is re-laid
+for each run (a stale layout passes every sweep; the case it guards is a
+top-up nudging a 59 s run past a minute). And by ear: a round that used to
+trail off now ends on a shortened pressure block plus a rep or two.
 
 #### N-4 · Some recipes generate a workout with nothing in it · **open**
 
@@ -1115,8 +1138,7 @@ residual at sprint cadence (see H-4) and is still a listening question.
 
 **After the second batch.** The sprint residual is fixed (`8538aa40`); what
 is left to listen to is how those rounds now end. Open and yours to decide:
-whether to fix **N-3** (a round losing its last 15-25 s to an announcement —
-1.3.1 is unpushed and could carry it), whether an empty workout should be
+whether an empty workout should be
 startable (**N-4**), whether to rename the stored session mode with a real
 migration (**N-2**), and still which discipline the first non-boxing workout
 targets.
@@ -1154,9 +1176,11 @@ cold app restart first — `F:` has no fast refresh.
 
 **Recipe screen.**
 - Duration 20 → 60 shows a goal of 2,700 and the same intensity label.
-- Advanced → enable only punches 1 and 2 and cap combinations at 2 → the
-  warning appears in the summary and beside the punch toggles. (Whether a
-  given build runs dry depends on its seed; it did for the one I tried.)
+- Advanced → switch off every punch but the cross → the warning appears in
+  the summary and beside the punch toggles ("Every round runs out…"). That
+  is N-4, the one way left to get it. Punches 1 and 2 with combinations
+  capped at 2 — the old way — should now show **no** warning and run every
+  round to the bell.
 
 **By ear.**
 - A generated workout at a low goal (try 60 minutes at 900): every round is
@@ -1165,6 +1189,9 @@ cold app restart first — `F:` has no fast refresh.
   selection, so a saved seed no longer gives the workout it used to.
 - A sprint-cadence workout: rounds now run to the bell. The last few seconds
   are more of the closing combination — is that the ending you want?
+- A generated workout with combinations capped at 2 (any punches): a round
+  with a "settle in" call used to trail off 15-25 s early. It now ends on a
+  slightly shortened pressure block plus a rep or two. Listen to one.
 - Voice coach **Minimal** on a library workout: bells, stance changes and the
   countdown, and no spoken punch calls or section lead-ins. Nothing on screen
   should sit dimmed waiting for a call. Standard should sound exactly as it
