@@ -920,7 +920,13 @@ about 240 seconds") but as a warning beside a `jab-disabled` warning that
 says only "variety will be reduced", and the workout can be started. Whether
 an empty workout should be startable is a product call.
 
-#### N-5 · A library workout's stored plan is frozen at its first save · **open, low**
+#### N-5 · A library workout's stored plan is frozen at its first save · **fixed** (`4aa7e2d2`)
+
+*Fixed 2026-11-26, and it was wider than filed: a generated workout's id is
+just `gen-<seed>`, so two different recipes on one seed shared a plan row
+too. The plan row is now keyed by the workout's id and a hash of what it
+says; a re-authored workout gets a new row and old sessions keep the plan
+they ran. No migration — rows written before read back as they were.*
 
 `saveGeneratedWorkout` is `INSERT OR IGNORE` on the workout id, and a library
 workout's id is fixed (`body-work`). So the plan row is whatever the first
@@ -1133,7 +1139,16 @@ from the gloves.
 **Verified at this state:** 206 suites / 4,746 tests / 22 snapshots green;
 `npm run check` passes.
 
-#### N-7 · A workout persists no raw frames · **open — a decision**
+#### N-7 · A workout persists no raw frames · **fixed in code** (`04f154d7`), unmeasured on the tablet
+
+*Fixed 2026-11-26. One capture per launch, labelled `connection`, takes every
+frame for as long as the app runs; a Velocity Lab capture still gets its own
+and takes precedence while it is open. Kept 90 days and 500,000 frames,
+oldest first. A workout's punches are deliberately NOT linked to it —
+`punch_events.capture_id` cascades on delete, so pruning would have taken a
+session's punches with it. Settings has the switch ("Keep raw glove data",
+on by default). What nobody knows yet is what writing to SQLite during a
+round does to the coach's timing on the tablet: see §7.*
 
 CLAUDE.md rule 1 says every incoming frame is persisted before any decoder
 runs. That holds for the transport's *ordering*, and for the three Velocity
@@ -1146,7 +1161,7 @@ and why a decoder change cannot be replayed over a workout. Fixing it is a
 storage decision: a raw frame is about 400 bytes, and a long session with
 both gloves is a few thousand of them.
 
-#### N-8 · `autoconnect.connected` logs no device · **open, trivial**
+#### N-8 · `autoconnect.connected` logs no device · **fixed** (`e6d1cd8c`)
 
 It logs `deviceId: deviceSensitive(deviceId)` where `deviceId` is the scan's
 result, undefined whenever the connect fell back to the known address — which
@@ -1157,6 +1172,129 @@ unbonded drop (no link dropped in any capture, so there is nothing to read);
 whether a browser can answer the glove's security request; whether System ID
 carries the address (the vendor never reads it — it identifies a tracker by
 Serial Number, which a browser refuses to read). All three need the gloves.
+
+## 3f. The PC-app batch
+
+2026-11-26, branch `feat/pc-app`, cut from `main` after PRs 392 and 393 were
+merged. Four things were asked for: the PC app boots and runs a workout on
+simulated punches; raw glove frames are kept for the whole connection (N-7);
+the tablet reads what the official app reads; and the small leftovers.
+
+**What landed.**
+
+| | Commit |
+|---|---|
+| The release APK's splash image — a clean checkout could not build one | `d1a9d718` |
+| N-8: `autoconnect.connected` names the device it connected to | `e6d1cd8c` |
+| The recipe screen's Start caption said the trackers were not wired in | `ccdb94cd` |
+| N-5: a stored plan is keyed by what it says, not only by its name | `4aa7e2d2` |
+| The log-mining scripts, kept and tested on both capture layouts | `80e599b9` |
+| N-7: raw glove frames are kept for the whole connection | `04f154d7` |
+| The tablet logs the glove's status byte and Device Information | `9cfff895`, `07ec95a5` |
+| A database for the PC version, and a start-up gate that waits for it | `ecddd096` |
+| The app boots and runs a workout in a browser | `4be0b0ae` |
+| `npm run pc:app` and `npm run pc:smoke` | `1b16eae9` |
+| One tab at a time; a lost database file is said out loud (N-10) | `b749ff96`, `4f8ec020` |
+
+**The PC app, as it stands.** Built and driven in a browser, not only in
+jest: a library workout and a built one each ran into round 1 with the
+coach's calls dispatched 7-9 ms late, were stopped and saved, and the saved
+database — read out of the browser and opened outside the app — held the
+sessions after a reload. `npm run pc:smoke` repeats that with nobody
+watching and fails on any error on the page.
+
+Two things about how it got there are worth more than the result:
+
+- **The storage library was the blocker, not the app.** The pinned
+  expo-sqlite answers a synchronous call in a browser by writing the
+  result's length into a single byte. Settings load; saving a workout does
+  not. The newest 57.0.x has the same line, so no version bump fixes it.
+  The PC build uses sql.js instead, behind the same `SqlPort`, and the
+  storage suites now run against both engines.
+- **Every browser-only failure was a rejection nobody handled**, not a
+  crash: the orientation lock, the wake lock and its release, a `play()`
+  overtaken by a `pause()`, Skia with no CanvasKit. The app looked fine with
+  all of them. They were found by listening for unhandled rejections on the
+  built page, which is what the smoke test now does for good.
+
+**Corrections to my own plan.**
+
+- I planned to hide the tracker buttons in `TrackerBadgesRow`. Nothing
+  renders that component; the buttons live in the tab header. The Connect
+  button now hides itself, as the Fix button already did off Android.
+- I planned a retry when a save lands inside a transaction. The tests showed
+  it was dead code: the statement that ends a transaction is itself a write,
+  and schedules the save.
+- The first draft of the save loop cleared its "unsaved" flag at export, so
+  a save that failed was never retried. Caught before it ran anywhere; the
+  port now counts writes instead of keeping a flag.
+- My previous commit left one guard test red — a helper named `read()`
+  tripped the check for unchecked settings reads. Fixed in `07ec95a5`; I had
+  not run the whole suite after that commit.
+
+**Verified at this state:** 221 suites / 4,893 tests / 22 snapshots green;
+`npm run check` passes; `npm run pc:smoke` passes.
+
+#### N-9 · A scan that throws leaves its stop timer running · **open, trivial**
+
+`TrackerScanner.run` arms its stop timer and then calls `facade.scan()`
+outside the `try`. If `scan` throws synchronously the timer is never
+cleared, and fires later into `facade.stopScan()`. On the tablet `scan`
+returns a promise, so this cannot happen there. In jest it does:
+`useLivePunchSource.test.tsx` stands in a transport with neither method, the
+hook arms an auto-connect pass, and ten seconds later the timer throws
+`this.facade.stopScan is not a function` inside the worker — printed in the
+middle of an otherwise green full run. It is noise, and it is the kind of
+noise that hides a real failure. Moving the `scan()` call inside the `try`
+fixes both.
+
+#### N-10 · The PC app's saved database vanished, twice · **explained — the browser pane, not the app; one decision left**
+
+Driving the PC app by hand in the Claude desktop app's built-in browser
+pane, a page load found no saved database where the loads before it had
+restored one, and started empty. No error, nothing on screen: two sessions
+simply were not there. It happened again a quarter of an hour later. Both
+times the page had sat open and untouched for ten minutes or more first;
+every reload made within a few minutes of the last restored correctly.
+
+What was established:
+
+- **It is not the save path damaging its own file.** In Chrome, 36 forced
+  reloads timed around a save (run twice) never lost a file that had once
+  been saved. The browser swaps a new file in whole or not at all.
+- **The pane empties the private file system of an idle page — and nothing
+  else.** A third run was set up to catch it: a canary in each of
+  `localStorage`, IndexedDB and a cookie, and, beside the database, a plain
+  file written by a few lines of script that have nothing to do with the
+  app. Twelve and a half minutes later, in the same open page — no reload,
+  no build, no other browser running — the cookie, `localStorage` and
+  IndexedDB still held their canaries and the private file system was
+  empty. The app's file and the unrelated one went together. On the next
+  load the new error fired as written.
+- **Chrome keeps it.** The same test in Chrome itself (headless, 158):
+  after twelve and a half idle minutes both files were still there, and a
+  reload restored the database.
+
+What changed regardless (`b749ff96`), because the loss exposed three things
+that were wrong whatever caused it: a failure to read the saved file was
+being treated as "nothing saved", and the next save would have overwritten
+it; two tabs would have saved over each other; and a missing file looked
+exactly like a first run. Now only "no such file" means empty, a second tab
+does not start, and a load that finds no file where one was saved logs an
+error the smoke test fails on.
+
+One thing it showed that is simply how it is: a save started as the page
+goes away does not finish. Closing or reloading the tab within about a
+second of a write loses that write.
+
+**The decision.** IndexedDB survived in the pane where the private file
+system did not. Keeping the saved database there instead is two functions
+and their tests, and would make the PC app keep its data in the pane too.
+Not done: the plan you approved named the private file system, and it
+works where `npm run pc:app` tells you to open it. Until it is decided,
+the pane is for looking at the PC app, not for keeping anything in it.
+
+**Still unproven, and only provable at the tablet or by ear** — added to §7.
 
 ---
 
@@ -1448,3 +1586,22 @@ every capture to carry a `workout.timeline.provenance` record and read
 where loop-call coverage is under 90%, and FAIL where a clip failed to load
 or play. A capture from a build without QA enabled reads WARN (unverified)
 by design.
+
+**From the PC-app batch (§3f).**
+- *Raw frames on the tablet (N-7).* With "Keep raw glove data" on — the
+  default — run a library workout with both gloves. Listen for the coach
+  drifting and watch the rings for stutter: writing to SQLite during a round
+  has never been measured against the coach's timing there. If it disturbs
+  anything, Settings → Keep raw glove data → off is the way back; say so.
+  At the next launch the log's `capture.ambient.previous` record says how
+  many frames that connection produced, per characteristic — the first
+  measure there has ever been of how fast idle frames accumulate.
+- *Vendor reads.* Twenty seconds after a glove connects the log should carry
+  `keepalive.status` (with the bond-gate bit) and
+  `keepalive.deviceInformation`. If a link that was holding drops within a
+  few seconds of those two records, the reads did it.
+- *The release APK.* Dispatch the `release apk` workflow on this branch. It
+  has never passed; the splash fix is proven only as far as a clean prebuild.
+- *The PC app, by ear.* `npm run pc:app`, sound on, any workout. Calls are
+  dispatched on time; nobody has heard whether they are audible, or whether
+  they land with the rings.

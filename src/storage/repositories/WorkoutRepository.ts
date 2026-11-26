@@ -32,6 +32,7 @@ import {
   type CoachPath,
   type GeneratedWorkout,
 } from '@/domain/workout/GeneratedWorkout'
+import { hashTimelineContent } from '@/domain/programs/timelineHash'
 import type { ProgramRound, WorkoutToken } from '@/domain/workout/WorkoutTokens'
 import { RECIPE_SCHEMA_VERSION } from '@/domain/workout/versions'
 import type { WorkoutRecipe } from '@/domain/workout/WorkoutRecipe'
@@ -162,6 +163,13 @@ interface BlocksPayload {
    * (`params_snapshot_json` still carries that).
    */
   coachPath?: CoachPath
+  /**
+   * The workout's own id (`body-work`, `gen-<seed>`). Always written since
+   * plan rows became keyed by content (`storedPlanId`): the row's id is no
+   * longer the workout's id, so the workout's id has to be kept somewhere.
+   * A row without it predates that, and its row id IS the workout id.
+   */
+  workoutId?: string
 }
 
 /* ------------------------------------------------------------- row mapping */
@@ -245,6 +253,47 @@ function newId(prefix: string): string {
 }
 
 /* -------------------------------------------------------------- repository */
+
+/** What of a workout is stored as its plan — and so what identifies one. */
+function blocksPayloadOf(w: GeneratedWorkout): BlocksPayload {
+  return {
+    schedule: w.schedule,
+    roundPunchTargets: w.roundPunchTargets,
+    expectedTechniqueDistribution: w.expectedTechniqueDistribution,
+    estimatedActivePunchesPerMinute: w.estimatedActivePunchesPerMinute,
+    warnings: w.warnings,
+    coachPath: coachPathOf(w),
+    workoutId: w.id,
+  }
+}
+
+/**
+ * The id a workout's plan is stored under: its own id, plus a fingerprint of
+ * what the plan actually says.
+ *
+ * A plan row is an immutable snapshot, written `INSERT OR IGNORE`. Keyed by
+ * the workout's id alone, that made the FIRST plan ever saved under an id the
+ * plan for everything that later shared it:
+ *
+ * - a library workout's id is fixed (`body-work`), so after it was
+ *   re-authored, new sessions kept linking to the plan from the build that
+ *   first ran it (N-5);
+ * - a generated workout's id is `gen-<seed>` — the seed and nothing else — so
+ *   two different recipes run on one seed shared a plan row, as did the same
+ *   recipe on either side of a generator bump.
+ *
+ * Nothing reads a plan back yet, so none of that has been visible. With the
+ * fingerprint, an identical plan still lands on its existing row and a
+ * different one gets its own; a session links to the plan it ran. Rows written
+ * before this keep their bare ids and the sessions that point at them.
+ *
+ * Use this — never `workout.id` — for every `generated_workout_id` written.
+ */
+export function storedPlanId(w: GeneratedWorkout): string {
+  const fingerprint = hashTimelineContent({ recipe: w.recipe, blocks: blocksPayloadOf(w) })
+  // `hashTimelineContent` prefixes its schema generation ("v2:"); keep the hex.
+  return `${w.id}@${fingerprint.slice(fingerprint.indexOf(':') + 1)}`
+}
 
 export class WorkoutRepository {
   constructor(private readonly db: SqlPort) {}
@@ -351,24 +400,21 @@ export class WorkoutRepository {
     }
 
     const resolvedRecipeId = recipeId ?? this.resolveRecipeId(w.recipe)
-    const blocks: BlocksPayload = {
-      schedule: w.schedule,
-      roundPunchTargets: w.roundPunchTargets,
-      expectedTechniqueDistribution: w.expectedTechniqueDistribution,
-      estimatedActivePunchesPerMinute: w.estimatedActivePunchesPerMinute,
-      warnings: w.warnings,
-      coachPath: coachPathOf(w),
-    }
+    const blocks = blocksPayloadOf(w)
+    const planId = storedPlanId(w)
     const now = new Date().toISOString()
 
-    // Plan snapshot: idempotent per id. If the row already exists, do nothing.
+    // Plan snapshot: idempotent per id, and the id carries a fingerprint of
+    // the plan (`storedPlanId`) — so "already exists" means "this very plan
+    // is already stored", not merely "something was once saved under this
+    // workout's name".
     this.run(
       `INSERT OR IGNORE INTO generated_workouts
          (id, recipe_id, generator_version, seed,
           params_snapshot_json, blocks_json, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
-        w.id,
+        planId,
         resolvedRecipeId,
         w.recipe.generatorVersion,
         w.recipe.seed,
@@ -389,12 +435,13 @@ export class WorkoutRepository {
            generated_workout_id = excluded.generated_workout_id,
            realized_tokens_json = excluded.realized_tokens_json,
            created_at = excluded.created_at`,
-        [sessionId, w.id, JSON.stringify(realized), now],
+        [sessionId, planId, JSON.stringify(realized), now],
       )
     }
 
     logger.info('storage.workout.generated.save', 'generated workout saved', {
       id: safe(w.id),
+      planId: safe(planId),
       recipeId: safe(resolvedRecipeId),
       sessionId: safe(sessionId ?? null),
       blockCount: safe(realized.length),
@@ -666,7 +713,10 @@ export class WorkoutRepository {
       )
     }
     return {
-      id: row.id,
+      // The workout's own id; the row's id is a plan key (`storedPlanId`).
+      // A row from before plans were keyed by content has no `workoutId`,
+      // and its row id is the workout id.
+      id: blocks.workoutId ?? row.id,
       recipe,
       schedule: blocks.schedule,
       roundPunchTargets: blocks.roundPunchTargets ?? [],

@@ -42,6 +42,7 @@ import {
 } from './fightcamp-v1/FightCampV1Keepalive'
 import { getProtocolRegistry } from './ProtocolRegistry'
 import { TrackerPunchEventSource, type TrackerSlotBinding } from './TrackerPunchEventSource'
+import { VendorReads } from './vendorReads'
 
 const FIGHTCAMP_V1_ID = 'fightcamp-v1'
 
@@ -53,6 +54,8 @@ export type KeepaliveBatteryListener = (hand: 'left' | 'right', batteryPct: numb
 
 let source: TrackerPunchEventSource | null = null
 let heartbeat: ReturnType<typeof setInterval> | null = null
+/** What the official app reads and we only log (H13, H14) — see the module. */
+let vendorReads: VendorReads | null = null
 const batteryListeners = new Set<KeepaliveBatteryListener>()
 const lastBatteryPct = new Map<string, number>()
 
@@ -123,6 +126,9 @@ async function heartbeatTick(): Promise<void> {
       // Battery rides the same beat: one 0x2A19 read per glove. Logged
       // only on change — the level moves far slower than the beat.
       await readBattery(facade, tracker)
+      // The status byte, and once per link the Device Information strings.
+      // Nothing before the second beat after a connect; never throws.
+      await vendorReads?.onBeat(tracker.address, tracker.hand)
     } catch (err) {
       logger.warn('keepalive.heartbeat.error', 'heartbeat tick threw', {
         deviceId: deviceSensitive(tracker.address),
@@ -155,6 +161,8 @@ export function startTrackerKeepalive(): void {
     const built = new TrackerPunchEventSource({ facade, adapter, slots })
     built.start()
     source = built
+    const reads = new VendorReads(facade)
+    vendorReads = reads
     heartbeat = setInterval(() => {
       void heartbeatTick()
     }, HEARTBEAT_INTERVAL_MS)
@@ -164,6 +172,7 @@ export function startTrackerKeepalive(): void {
       try {
         facade.onConnectionChange(tracker.address, (status) => {
           if (status.state !== 'ready') return
+          reads.linkReady(tracker.address)
           void readBattery(facade, tracker)
           // Device-info bytes carry the firmware revision — captured per
           // connect so the two gloves' firmware can be compared (red's
@@ -210,4 +219,5 @@ export function __resetTrackerKeepaliveForTests(): void {
   lastBatteryPct.clear()
   source?.stop()
   source = null
+  vendorReads = null
 }

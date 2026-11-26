@@ -19,6 +19,7 @@ import {
   setAutoRetrySuspended,
 } from '../autoConnectTrackers'
 import { KNOWN_TRACKERS } from '../knownTrackers'
+import { addSink, replaceSinks } from '@/diagnostics/logger'
 
 const blue = KNOWN_TRACKERS.find((t) => t.hand === 'left')!
 const red = KNOWN_TRACKERS.find((t) => t.hand === 'right')!
@@ -92,6 +93,28 @@ describe('autoConnectKnownTrackers', () => {
 
     expect(mockConnectSlot).toHaveBeenCalledWith('right', red.address, red.displayName)
     expect(result.connectedCount).toBe(2)
+  })
+
+  it('logs the address it connected to, seen by the scan or not (N-8)', async () => {
+    // The record used to carry the scan's sighting, which is undefined for a
+    // glove connected unseen — the usual case for a bonded one.
+    const records: Array<Record<string, unknown>> = []
+    addSink({
+      write: (r) => {
+        if (r.code !== 'autoconnect.connected') return
+        records.push(Object.fromEntries(Object.entries(r.fields).map(([k, f]) => [k, f.value])))
+      },
+    })
+    try {
+      mockScan.mockResolvedValue([ad(blue.address)])
+      await autoConnectKnownTrackers()
+    } finally {
+      replaceSinks([])
+    }
+    expect(records).toEqual([
+      { hand: 'left', color: 'blue', deviceId: blue.address, sighted: true },
+      { hand: 'right', color: 'red', deviceId: red.address, sighted: false },
+    ])
   })
 
   it('reports not-found when an unseen tracker also refuses to connect', async () => {

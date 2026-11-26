@@ -2,7 +2,7 @@ import { Stack } from 'expo-router'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
-import { StyleSheet } from 'react-native'
+import { StyleSheet, Text, View } from 'react-native'
 import {
   Kanit_400Regular,
   Kanit_500Medium,
@@ -17,16 +17,23 @@ import '@/ble'
 
 import { useEffect } from 'react'
 
+import { prepareBrowserPlayback } from '@audio/browserPlayback'
 import { useAutoConnectOnLaunch } from '@ble/useAutoConnectOnLaunch'
 import { logger, safe } from '@diagnostics/logger'
 import { onKeepaliveBattery, startTrackerKeepalive } from '@protocol/trackerKeepalive'
 import { noteSlotBattery } from '@state/useTrackerStore'
+import { startKeepingRawFramesOnce } from '@state/loadCaptureSettings'
 import { useVoiceSettingsOnLaunch } from '@state/loadVoiceSettings'
 import { useBackdropSettingsOnLaunch } from '@state/loadBackdropSettings'
 import { useInstrumentSettingsOnLaunch } from '@state/loadInstrumentSettings'
 import { useQaSettingsOnLaunch } from '@state/loadQaSettings'
+import { useStorageReady } from '@state/useStorageReady'
 import { colors } from '@/theme/colors'
 import { fonts } from '@/theme/typography'
+
+// Nothing on the tablet; in a browser, one rejection the audio code raises
+// there and nowhere else (`src/audio/interruptedPlay.ts`).
+prepareBrowserPlayback()
 
 const stackScreenOptions = {
   headerShown: false,
@@ -36,7 +43,30 @@ const stackScreenOptions = {
   headerTitleStyle: { color: colors.textPrimary, fontFamily: fonts.heading },
 } as const
 
+/**
+ * Storage first (`useStorageReady`). On the tablet it is ready on the first
+ * render and `AppRoot` mounts at once, exactly as before. In a browser the
+ * database loads asynchronously, and everything below — the settings
+ * loaders, the capture service, every screen — reads storage synchronously,
+ * so none of it may mount until that has finished.
+ */
 export default function RootLayout() {
+  const storage = useStorageReady()
+  if (storage.state === 'ready') return <AppRoot />
+  if (storage.state === 'loading') return null
+  // Browser only: another tab has the database, or its engine did not load.
+  // Plain system text — the fonts and the theme's components are all on the
+  // far side of this gate.
+  return (
+    <View style={styles.failed}>
+      <Text style={styles.failedText} testID="storage-failed">
+        {storage.reason}
+      </Text>
+    </View>
+  )
+}
+
+function AppRoot() {
   // Load the Kanit weights before anything renders text — otherwise
   // the first frame flashes system font and swaps once the fonts land.
   // Returning null while loading keeps the native splash up seamlessly.
@@ -51,6 +81,9 @@ export default function RootLayout() {
   // so a freshly-bound glove immediately hears the init plan — a
   // FightCamp tracker hangs up on a silent central (2026-08-29).
   useEffect(() => {
+    // Frames first (N-7): the sink must be on the transport before the
+    // keepalive brings a glove up and it starts to speak.
+    startKeepingRawFramesOnce()
     startTrackerKeepalive()
     // Battery levels flow from the keepalive's heartbeat into the slot
     // store, where the header lamps read them.
@@ -111,4 +144,6 @@ export default function RootLayout() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
+  failed: { flex: 1, backgroundColor: colors.background, justifyContent: 'center', padding: 32 },
+  failedText: { color: colors.textPrimary, fontSize: 18, textAlign: 'center' },
 })

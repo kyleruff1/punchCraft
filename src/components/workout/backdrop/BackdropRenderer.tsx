@@ -9,7 +9,7 @@
  * nothing else about the backdrop leaks out of this directory.
  */
 import React from 'react'
-import { StyleSheet, View } from 'react-native'
+import { Platform, StyleSheet, View } from 'react-native'
 
 import type { BackdropQuality } from '@domain/effects/backdropSettings'
 import type { PummelSensitivity } from '@domain/effects/membraneMath'
@@ -34,6 +34,19 @@ export function resolveBackdropQuality(
   return 'standard'
 }
 
+/**
+ * What this build can draw, as a step down the same seam.
+ *
+ * The Standard scene is Skia, and Skia in a browser needs CanvasKit — a few
+ * megabytes of WebAssembly the PC version does not ship. Without it the
+ * scene's two images fail to decode (two unhandled rejections on every
+ * built workout, seen in the browser 2026-11-26) and nothing is drawn. So a
+ * browser gets the Reduced tier, the still glow, which is not Skia.
+ */
+export function platformDegrade(): 'none' | 'reduced' {
+  return Platform.OS === 'web' ? 'reduced' : 'none'
+}
+
 export function BackdropRenderer({
   bus,
   quality,
@@ -55,7 +68,7 @@ export function BackdropRenderer({
   /** Pummel Sensitivity, forwarded to the scene. */
   sensitivity?: PummelSensitivity
 }): React.JSX.Element | null {
-  const effective = resolveBackdropQuality(quality, reducedMotion)
+  const effective = resolveBackdropQuality(quality, reducedMotion, platformDegrade())
   if (effective === 'off') return null
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none" testID="live-backdrop">

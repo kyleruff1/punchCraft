@@ -18,6 +18,7 @@ import type { RawBleFrame } from '@ble/bleTypes'
 import type { TrackerPunchEvent } from '@domain/punch/PunchEvent'
 import { logger, safe } from '@/diagnostics/logger'
 import type { CaptureSink } from '@capture/CaptureSink'
+import { AMBIENT_CAPTURE_LABEL } from '@capture/ambientCapture'
 import { FrameBuffer } from '@capture/FrameBuffer'
 import type {
   CaptureRepository,
@@ -46,7 +47,17 @@ export interface BleCaptureServiceDeps {
 }
 
 export class BleCaptureService implements CaptureSink {
+  /**
+   * The capture someone opened on purpose — a Velocity Lab route. Frames go
+   * here while it is open.
+   */
   private captureId: string | null = null
+  /**
+   * The capture that is open whenever no other is (`ambientCapture.ts`):
+   * one per app launch, for the whole connection. Null when raw-frame
+   * keeping is switched off, and in a test that never opened one.
+   */
+  private ambientId: string | null = null
   private timer: ReturnType<typeof setInterval> | null = null
   private readonly deviceIdByAddress = new Map<string, string | null>()
   /** Frames handed to capture() with no capture open. Should always be 0. */
@@ -99,9 +110,39 @@ export class BleCaptureService implements CaptureSink {
     })
   }
 
-  /** Id of the open capture, or null when none is running. */
+  /** Where a frame arriving now is stored: the labelled capture, else the ambient one. */
   currentCaptureId(): string | null {
-    return this.captureId
+    return this.captureId ?? this.ambientId
+  }
+
+  /** Whether the ambient capture is open. */
+  hasAmbient(): boolean {
+    return this.ambientId !== null
+  }
+
+  /**
+   * Open the ambient capture. Idempotent.
+   *
+   * It does not replace a labelled capture and a labelled capture does not
+   * replace it: while one is open frames go there, and when it closes they
+   * come back here. Before this existed, `start()` returning "the capture
+   * already open" was the right thing; with an ambient capture always open it
+   * would have swallowed every labelled one.
+   */
+  startAmbient(input: OpenCaptureInput = {}): string {
+    if (this.ambientId) return this.ambientId
+    this.ambientId = this.deps.captures.open({ ...input, label: AMBIENT_CAPTURE_LABEL })
+    this.ensureTimer()
+    return this.ambientId
+  }
+
+  /** Flush, then close the ambient capture. A labelled capture is untouched. */
+  async stopAmbient(): Promise<void> {
+    const id = this.ambientId
+    this.ambientId = null
+    if (!this.captureId) this.clearTimer()
+    await this.frames.drain()
+    if (id) this.close(id)
   }
 
   /**
@@ -115,13 +156,33 @@ export class BleCaptureService implements CaptureSink {
     if (this.captureId) return this.captureId
     this.captureId = this.deps.captures.open(input)
     this.deviceIdByAddress.clear()
-    if (!this.timer) {
-      this.timer = setInterval(() => {
-        this.frames.tick()
-        this.events.tick()
-      }, TICK_INTERVAL_MS)
-    }
+    this.ensureTimer()
     return this.captureId
+  }
+
+  private ensureTimer(): void {
+    if (this.timer) return
+    this.timer = setInterval(() => {
+      this.frames.tick()
+      this.events.tick()
+    }, TICK_INTERVAL_MS)
+  }
+
+  private clearTimer(): void {
+    if (!this.timer) return
+    clearInterval(this.timer)
+    this.timer = null
+  }
+
+  private close(id: string): void {
+    try {
+      this.deps.captures.close(id)
+    } catch (err) {
+      logger.warn('capture.close.failed', 'closing capture failed', {
+        captureId: safe(id),
+        error: safe(String(err)),
+      })
+    }
   }
 
   /**
@@ -145,24 +206,13 @@ export class BleCaptureService implements CaptureSink {
     const id = this.captureId
     this.captureId = null
 
-    if (this.timer) {
-      clearInterval(this.timer)
-      this.timer = null
-    }
+    // The ambient capture, if there is one, still needs its flushes.
+    if (!this.ambientId) this.clearTimer()
 
     await this.frames.drain()
     await this.events.drain()
 
-    if (id) {
-      try {
-        this.deps.captures.close(id)
-      } catch (err) {
-        logger.warn('capture.close.failed', 'closing capture failed', {
-          captureId: safe(id),
-          error: safe(String(err)),
-        })
-      }
-    }
+    if (id) this.close(id)
   }
 
   // -- CaptureSink -----------------------------------------------------------
@@ -172,7 +222,7 @@ export class BleCaptureService implements CaptureSink {
    * is about to run the decoder and must not be disrupted by a storage issue.
    */
   capture(frame: RawBleFrame): void {
-    const captureId = this.captureId
+    const captureId = this.captureId ?? this.ambientId
     if (!captureId) {
       // Never silent. A frame arriving with no capture open means the
       // lifecycle is wrong somewhere, and quietly discarding it is exactly
@@ -227,6 +277,11 @@ export class BleCaptureService implements CaptureSink {
    * changes, these can be rebuilt from `ble_frames`.
    */
   recordEvent(event: TrackerPunchEvent): void {
+    // The LABELLED capture only, never the ambient one. `punch_events`
+    // cascades from its capture, and ambient captures are pruned: an event
+    // recorded under one would vanish with it. A decoded event belongs to
+    // whoever asked for decoding to be recorded, which is always a labelled
+    // capture; its raw frame is kept either way.
     const captureId = this.captureId
     if (!captureId) {
       // Symmetry with capture(). Storing a decoded event whose source frame

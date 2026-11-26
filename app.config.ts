@@ -59,6 +59,12 @@ const config: ExpoConfig = {
       'android.permission.BLUETOOTH_ADMIN',
     ],
   },
+  // The PC version (`npm run pc:app`). Only the tab's icon: without one the
+  // build has no `favicon.ico`, every page load asks for it, and the 404 is
+  // the one error left on an otherwise clean page.
+  web: {
+    favicon: './assets/branding/icon.png',
+  },
   ios: {
     // Not shipping to iOS in the MVP; keep a minimal declaration so `expo prebuild`
     // does not fail when someone accidentally runs it for iOS.
@@ -78,7 +84,19 @@ const config: ExpoConfig = {
     // the same values were also hand-applied to the current android/ tree
     // (colors.xml splashscreen_background, values-v31 styles, a layer-list
     // under the logo so no decode/transition frame can flash light).
-    ['expo-splash-screen', { backgroundColor: '#0B0D0E' }],
+    //
+    // `image` is not optional, whatever the plugin's types say: prebuild
+    // always writes a style that points at `@drawable/splashscreen_logo`, and
+    // only generates that drawable when an image is configured. With a colour
+    // alone, a clean checkout fails resource linking — which is how the first
+    // CI release build died (2026-11-26). It had never shown on the
+    // workstation because its hand-kept `android/` tree still carries the
+    // logo from the original scaffold: Expo's stock placeholder. The app icon
+    // is the one square piece of branding there is.
+    [
+      'expo-splash-screen',
+      { backgroundColor: '#0B0D0E', image: './assets/branding/icon.png', imageWidth: 200 },
+    ],
     'expo-status-bar',
     'expo-screen-orientation',
     // M34-01 voice spike: cached-clip playback and TTS. `expo-audio` needs a

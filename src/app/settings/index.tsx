@@ -1,6 +1,8 @@
 import { Link } from 'expo-router'
 import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
+import { AMBIENT_LIMITS } from '@capture/ambientCapture'
 import { getBuildInfo } from '@diagnostics/buildInfo'
+import { useCaptureSettingsStore } from '@state/useCaptureSettingsStore'
 import { useQaStore } from '@state/useQaStore'
 import { colors } from '@/theme/colors'
 
@@ -9,10 +11,17 @@ export const QA_MODE_HINT =
   'Lets a punchcraft://qa/run link start a workout and throw simulated punches on its own. ' +
   'For the unattended timing suite. Leave it off otherwise.'
 
+export const KEEP_RAW_FRAMES_HINT =
+  'Stores every message the gloves send, before anything interprets it, so a workout can be ' +
+  `re-read after the decoder changes. Old data is cleared after ${AMBIENT_LIMITS.retentionDays} days. ` +
+  'Leave it on unless workouts start to stutter.'
+
 export default function SettingsLanding() {
   const info = getBuildInfo()
   const qaEnabled = useQaStore((s) => s.enabled)
   const setQaEnabled = useQaStore((s) => s.setEnabled)
+  const keepRawFrames = useCaptureSettingsStore((s) => s.keepRawFrames)
+  const setKeepRawFrames = useCaptureSettingsStore((s) => s.setKeepRawFrames)
   const rows: Array<[string, string]> = [
     ['App name', info.appName],
     ['App version', info.appVersion],
@@ -65,6 +74,21 @@ export default function SettingsLanding() {
           onValueChange={setQaEnabled}
           testID="qa-mode-switch"
           value={qaEnabled}
+        />
+      </View>
+      {/* Every glove frame is stored before anything decodes it (rule 1) —
+          for the whole connection, not only inside Velocity Lab (N-7). The
+          switch is the way back if those writes ever disturb a workout. */}
+      <View style={styles.switchRow}>
+        <View style={styles.switchText}>
+          <Text style={styles.rowLabel}>Keep raw glove data</Text>
+          <Text style={styles.switchHint}>{KEEP_RAW_FRAMES_HINT}</Text>
+        </View>
+        <Switch
+          accessibilityLabel="Keep raw glove data"
+          onValueChange={setKeepRawFrames}
+          testID="keep-raw-frames-switch"
+          value={keepRawFrames}
         />
       </View>
       <Link href="/(tabs)/velocity-lab" asChild>

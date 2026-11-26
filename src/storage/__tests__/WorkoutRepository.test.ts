@@ -9,6 +9,7 @@
 
 import { threeRoundFundamentals } from '@domain/workout/samples'
 import type { GeneratedWorkout } from '@domain/workout/GeneratedWorkout'
+import { generateWorkout } from '@domain/workout/generateWorkout'
 import { defaultRecipe } from '@domain/workout/WorkoutRecipe'
 import { RECIPE_SCHEMA_VERSION } from '@domain/workout/versions'
 import {
@@ -16,10 +17,18 @@ import {
   WorkoutRepository,
   type CueResultRow,
   type RealizedTokenStream,
+  storedPlanId,
 } from '@storage/repositories/WorkoutRepository'
 import { SessionRepository } from '@storage/repositories/SessionRepository'
 
 import { createMigratedDb, type MemoryDb } from './helpers/memoryDb'
+
+/**
+ * The id the sample workout's plan is stored under. Not the workout's own id:
+ * plan rows are keyed by content (`storedPlanId`), and every row that points
+ * at a plan uses that key.
+ */
+const PLAN_ID = storedPlanId(threeRoundFundamentals)
 
 let db: MemoryDb
 let repo: WorkoutRepository
@@ -45,7 +54,7 @@ function plannedStream(workout: GeneratedWorkout): RealizedTokenStream {
 function cueRow(overrides: Partial<CueResultRow> = {}): CueResultRow {
   return {
     sessionId: 'ses-1',
-    generatedWorkoutId: threeRoundFundamentals.id,
+    generatedWorkoutId: PLAN_ID,
     blockId: 'blk-1',
     repeatIndex: 0,
     tokenIndex: 0,
@@ -126,6 +135,107 @@ describe('recipes', () => {
       expect(e.code).toBe('json-parse-failed')
       expect(e.rawPayload).toBe('{not json')
     }
+  })
+})
+
+describe('a plan is stored under what it says, not only under its name (N-5)', () => {
+  const planRows = (): number =>
+    db.query<{ n: number }>('SELECT COUNT(*) AS n FROM generated_workouts')[0]!.n
+  const run = (w: GeneratedWorkout, sessionId: string): void => {
+    sessions.create({ id: sessionId, mode: 'puncheokie' })
+    repo.saveGeneratedWorkout(w, plannedStream(w), sessionId)
+  }
+  /** The same library workout after someone re-authors its first round. */
+  const reauthored: GeneratedWorkout = {
+    ...threeRoundFundamentals,
+    schedule: threeRoundFundamentals.schedule.map((round, i) =>
+      i === 0 ? { ...round, theme: 'Re-authored opening' } : round,
+    ),
+  }
+
+  it('gives the same plan the same key, every time', () => {
+    expect(storedPlanId(threeRoundFundamentals)).toBe(PLAN_ID)
+    expect(PLAN_ID).toMatch(/^three-round-fundamentals@[0-9a-f]{8}$/)
+    expect(storedPlanId(reauthored)).not.toBe(PLAN_ID)
+  })
+
+  it('gives a re-authored workout its own row, and leaves the old session on the plan it ran', () => {
+    // Until this, the plan row was whatever build first saved the workout:
+    // `INSERT OR IGNORE` on its fixed id. The second session below would have
+    // read back the FIRST plan.
+    run(threeRoundFundamentals, 'ses-old')
+    run(reauthored, 'ses-new')
+
+    expect(planRows()).toBe(2)
+    expect(repo.getWorkoutBySession('ses-old')?.workout).toEqual(threeRoundFundamentals)
+    expect(repo.getWorkoutBySession('ses-new')?.workout).toEqual(reauthored)
+    // Still one workout by name — only the stored plans differ.
+    expect(repo.getWorkoutBySession('ses-new')?.workout.id).toBe(threeRoundFundamentals.id)
+  })
+
+  it('does not let two recipes that share a seed share a plan', () => {
+    // A generated workout's id is `gen-<seed>` and nothing else.
+    const short = generateWorkout({ ...defaultRecipe(), seed: 'same-seed', durationMinutes: 20 })
+    const long = generateWorkout({ ...defaultRecipe(), seed: 'same-seed', durationMinutes: 40 })
+    expect(long.id).toBe(short.id)
+
+    run(short, 'ses-short')
+    run(long, 'ses-long')
+
+    expect(planRows()).toBe(2)
+    expect(repo.getWorkoutBySession('ses-short')?.workout.schedule).toHaveLength(
+      short.schedule.length,
+    )
+    expect(repo.getWorkoutBySession('ses-long')?.workout.schedule).toHaveLength(
+      long.schedule.length,
+    )
+    expect(long.schedule.length).not.toBe(short.schedule.length)
+  })
+
+  it('still lands an identical plan on its existing row', () => {
+    run(threeRoundFundamentals, 'ses-1')
+    run(threeRoundFundamentals, 'ses-2')
+    expect(planRows()).toBe(1)
+  })
+
+  it('still reads a row written before plans were keyed by content', () => {
+    // Such a row is stored under the workout's bare id and its payload does
+    // not carry the id. Build one from a modern row.
+    run(threeRoundFundamentals, 'ses-modern')
+    const modern = db.query<{
+      recipe_id: string
+      params_snapshot_json: string
+      blocks_json: string
+    }>('SELECT recipe_id, params_snapshot_json, blocks_json FROM generated_workouts WHERE id = ?', [
+      PLAN_ID,
+    ])[0]!
+    const legacyBlocks = JSON.parse(modern.blocks_json) as Record<string, unknown>
+    delete legacyBlocks['workoutId']
+    db.prepareSync(
+      `INSERT INTO generated_workouts
+         (id, recipe_id, generator_version, seed, params_snapshot_json, blocks_json, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).executeSync([
+      threeRoundFundamentals.id,
+      modern.recipe_id,
+      threeRoundFundamentals.recipe.generatorVersion,
+      threeRoundFundamentals.recipe.seed,
+      modern.params_snapshot_json,
+      JSON.stringify(legacyBlocks),
+      '2026-09-01T00:00:00.000Z',
+    ])
+    sessions.create({ id: 'ses-legacy', mode: 'puncheokie' })
+    db.prepareSync(
+      `INSERT INTO workout_runs (session_id, generated_workout_id, realized_tokens_json, created_at)
+       VALUES (?, ?, ?, ?)`,
+    ).executeSync([
+      'ses-legacy',
+      threeRoundFundamentals.id,
+      JSON.stringify(plannedStream(threeRoundFundamentals)),
+      '2026-09-01T00:00:00.000Z',
+    ])
+
+    expect(repo.getWorkoutBySession('ses-legacy')?.workout).toEqual(threeRoundFundamentals)
   })
 })
 
@@ -301,13 +411,13 @@ describe('generated workouts', () => {
     // Exactly one PLAN row (shared) and two RUN rows (one per session).
     expect(
       db.query<{ n: number }>('SELECT COUNT(*) as n FROM generated_workouts WHERE id = ?', [
-        threeRoundFundamentals.id,
+        PLAN_ID,
       ])[0]!.n,
     ).toBe(1)
     expect(
       db.query<{ n: number }>(
         'SELECT COUNT(*) as n FROM workout_runs WHERE generated_workout_id = ?',
-        [threeRoundFundamentals.id],
+        [PLAN_ID],
       )[0]!.n,
     ).toBe(2)
   })
@@ -346,7 +456,7 @@ describe('adaptations', () => {
   it('stores decided_at_monotonic_ms exactly as given — never a wall clock', () => {
     const monotonic = 123456.75
     repo.appendAdaptation({
-      generatedWorkoutId: threeRoundFundamentals.id,
+      generatedWorkoutId: PLAN_ID,
       decidedAtMonotonicMs: monotonic,
       boundary: 'round',
       inputs: { pace: 0.82 },
@@ -363,21 +473,21 @@ describe('adaptations', () => {
 
   it('reads decisions back in monotonic order with inputs intact', () => {
     repo.appendAdaptation({
-      generatedWorkoutId: threeRoundFundamentals.id,
+      generatedWorkoutId: PLAN_ID,
       decidedAtMonotonicMs: 900,
       boundary: 'rest',
       inputs: { behind: 12 },
       decision: { action: 'add-block' },
     })
     repo.appendAdaptation({
-      generatedWorkoutId: threeRoundFundamentals.id,
+      generatedWorkoutId: PLAN_ID,
       decidedAtMonotonicMs: 100,
       boundary: 'block',
       inputs: { behind: 3 },
       decision: { action: 'noop' },
     })
 
-    const log = repo.listAdaptations(threeRoundFundamentals.id)
+    const log = repo.listAdaptations(PLAN_ID)
     expect(log.map((a) => a.decidedAtMonotonicMs)).toEqual([100, 900])
     expect(log[0]?.boundary).toBe('block')
     expect(log[1]?.inputs).toEqual({ behind: 12 })
@@ -386,7 +496,7 @@ describe('adaptations', () => {
   it('rejects an unknown boundary with a typed error', () => {
     try {
       repo.appendAdaptation({
-        generatedWorkoutId: threeRoundFundamentals.id,
+        generatedWorkoutId: PLAN_ID,
         decidedAtMonotonicMs: 1,
         // Deliberately outside the CHECK enum.
         boundary: 'mid-block' as 'block',

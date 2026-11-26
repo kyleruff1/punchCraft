@@ -14,21 +14,10 @@
  *
  * Pure TypeScript.
  */
-import { hexToBytes } from '@ble/bleBytes'
+import { bondGateSet } from '@protocol/fightcamp-v1/FightCampV1Status'
 
-/** Bit 4 of byte 0: the vendor's bond gate. */
-export const STATUS_BOND_GATE_BIT = 0x10
-
-/** Whether the bond-gate bit is set, or null when the value cannot say. */
-export function bondGateSet(statusHex: string | null): boolean | null {
-  if (statusHex === null) return null
-  try {
-    const first = hexToBytes(statusHex)[0]
-    return first === undefined ? null : (first & STATUS_BOND_GATE_BIT) !== 0
-  } catch {
-    return null
-  }
-}
+// The bit itself is the protocol layer's; the tablet keepalive logs the same one.
+export { STATUS_BOND_GATE_BIT, bondGateSet } from '@protocol/fightcamp-v1/FightCampV1Status'
 
 /** One status reading in words. */
 export function statusSentence(statusHex: string | null): string {

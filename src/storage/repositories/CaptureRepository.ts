@@ -13,7 +13,7 @@
  */
 
 import { logger, safe } from '@/diagnostics/logger'
-import type { SqlPort } from '@/storage/SqlPort'
+import type { SqlBindValue, SqlPort } from '@/storage/SqlPort'
 
 export interface OpenCaptureInput {
   label?: string | null
@@ -158,6 +158,100 @@ export class CaptureRepository {
     try {
       const rows = stmt.executeSync<{ n: number }>([captureId]).getAllSync()
       return rows[0]?.n ?? 0
+    } finally {
+      stmt.finalizeSync()
+    }
+  }
+
+  /** Every capture carrying `label`, with its frame count. Oldest first. */
+  listByLabel(label: string): Array<{ id: string; startedAtIso: string; frames: number }> {
+    const stmt = this.db.prepareSync(
+      `SELECT c.id AS id, c.started_at AS started_at,
+              (SELECT COUNT(*) FROM ble_frames f WHERE f.capture_id = c.id) AS frames
+         FROM ble_captures c
+        WHERE c.label = ?
+        ORDER BY c.started_at ASC`,
+    )
+    try {
+      return stmt
+        .executeSync<{ id: string; started_at: string; frames: number }>([label])
+        .getAllSync()
+        .map((r) => ({ id: r.id, startedAtIso: r.started_at, frames: r.frames }))
+    } finally {
+      stmt.finalizeSync()
+    }
+  }
+
+  /**
+   * Mark every still-open capture carrying `label` ended, at the time of its
+   * last frame (or its start, if it never held one). Returns how many.
+   *
+   * For the ambient capture, which is normally ended by the app being
+   * killed rather than by anything calling `close()`.
+   */
+  closeAbandoned(label: string): number {
+    const open = this.select<{ n: number }>(
+      'SELECT COUNT(*) AS n FROM ble_captures WHERE label = ? AND ended_at IS NULL',
+      [label],
+    )[0]?.n
+    if (!open) return 0
+    this.run(
+      `UPDATE ble_captures
+          SET ended_at = COALESCE(
+                (SELECT MAX(f.wall_time_iso) FROM ble_frames f WHERE f.capture_id = ble_captures.id),
+                started_at)
+        WHERE label = ? AND ended_at IS NULL`,
+      [label],
+    )
+    return open
+  }
+
+  /** How many frames a capture holds on each characteristic. */
+  frameCountsByCharacteristic(captureId: string): Record<string, number> {
+    const rows = this.select<{ characteristic_uuid: string; n: number }>(
+      `SELECT characteristic_uuid, COUNT(*) AS n
+         FROM ble_frames WHERE capture_id = ?
+        GROUP BY characteristic_uuid`,
+      [captureId],
+    )
+    return Object.fromEntries(rows.map((r) => [r.characteristic_uuid, r.n]))
+  }
+
+  /**
+   * Delete captures and, by cascade, their frames. Returns how many captures
+   * went.
+   *
+   * `punch_events.capture_id` cascades too — so only ever pass captures that
+   * no punch event was recorded under. The ambient capture is one: decoded
+   * events are recorded under a labelled capture or not at all.
+   */
+  deleteCaptures(ids: readonly string[]): number {
+    if (ids.length === 0) return 0
+    this.db.execSync('BEGIN')
+    try {
+      for (const id of ids) this.run('DELETE FROM ble_captures WHERE id = ?', [id])
+      this.db.execSync('COMMIT')
+    } catch (err) {
+      this.db.execSync('ROLLBACK')
+      throw err
+    }
+    logger.info('storage.capture.pruned', 'captures deleted', { count: safe(ids.length) })
+    return ids.length
+  }
+
+  private select<TRow>(sql: string, params: SqlBindValue[]): TRow[] {
+    const stmt = this.db.prepareSync(sql)
+    try {
+      return stmt.executeSync<TRow>(params).getAllSync()
+    } finally {
+      stmt.finalizeSync()
+    }
+  }
+
+  private run(sql: string, params: SqlBindValue[]): void {
+    const stmt = this.db.prepareSync(sql)
+    try {
+      stmt.executeSync(params)
     } finally {
       stmt.finalizeSync()
     }
