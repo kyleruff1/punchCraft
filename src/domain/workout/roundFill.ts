@@ -205,6 +205,56 @@ export function volumeSpecFor(
   return spec
 }
 
+/**
+ * Take time back from the END of a round until it fits `workMs` again.
+ *
+ * Used when something earlier in the round has claimed time after the round
+ * was already filled to its bell — the "settle in" announcement. Mutates
+ * `specs`; never touches a block before `floorIndex` and never removes the
+ * block AT it (that is the one being announced).
+ *
+ * Two rules, in this order, because the back of a round is two different
+ * things:
+ *
+ * 1. **A block worth no more than what is owed goes whole.** That is the
+ *    repair tail — two-rep filler — and removing filler is exact.
+ * 2. **A block worth more than what is owed gives up reps instead.** That is
+ *    an authored phase. Dropping it whole is how a 6.6 s announcement used
+ *    to cost a 25 s pressure block. If the last block has no reps to give
+ *    (a flurry, a single rep), the nearest repeated block before it does, so
+ *    the round keeps its finale; only when nothing can give a rep is the
+ *    last block dropped after all.
+ *
+ * The result fits, and is within one rep of `workMs` — the caller tops up.
+ */
+export function trimToFit(
+  specs: BlockSpec[],
+  workMs: number,
+  bpm: number,
+  floorIndex: number,
+): void {
+  const spanOf = (list: readonly BlockSpec[]): number => blocksSpanMs(layBlocks(list, bpm))
+  // Every pass removes a rep or a block, so this ends; the cap is a backstop.
+  for (let guard = 0; guard < REPAIR_HARD_CAP; guard++) {
+    const owedMs = spanOf(specs) - workMs
+    if (owedMs <= 0) return
+    const lastIndex = specs.length - 1
+    const droppable = lastIndex > floorIndex
+    if (droppable && spanOf(specs) - spanOf(specs.slice(0, -1)) <= owedMs) {
+      specs.pop()
+      continue
+    }
+    let donor: BlockSpec | undefined
+    for (let i = lastIndex; i >= floorIndex && donor === undefined; i--) {
+      const spec = specs[i] as BlockSpec
+      if (spec.kind === 'repeated-combo' && (spec.repeat ?? 1) > 1) donor = spec
+    }
+    if (donor !== undefined) donor.repeat = (donor.repeat ?? 1) - 1
+    else if (droppable) specs.pop()
+    else return
+  }
+}
+
 /** Span a spec list would occupy once laid — the budget guard. */
 export function spanWith(specs: readonly BlockSpec[], candidate: BlockSpec, bpm: number): number {
   return blocksSpanMs(layBlocks([...specs, candidate], bpm))
@@ -635,6 +685,11 @@ export function fillScoredRound(
   // ---- coverage repair (D26): extend the closing pattern until the blocks
   // span the bell. Bounded; a round that cannot be filled is a content bug
   // the property tests surface, not a silent tail.
+  //
+  // `topUp` is declared out here because the announcement pass below needs
+  // it too: anything that takes time out of a filled round has to be able to
+  // put the last few seconds back.
+  let topUp: () => void = () => undefined
   {
     const jabShareOf = (notation: string): number => {
       const nums = notation.split('-').map((t) => Number.parseInt(t, 10)).filter((n) => n >= 1)
@@ -682,22 +737,36 @@ export function fillScoredRound(
     // block granularity — not the margin — was leaving ~4s of dead air
     // before the ding (switch-test lab). One-rep closers fill the last
     // gap almost to the margin, one breath at a time.
-    let topOff = 0
-    while (workMs - span() > REPAIR_BELL_MARGIN_MS && topOff++ < REPAIR_HARD_CAP) {
-      if (!extend(1)) break
+    topUp = (): void => {
+      let topOff = 0
+      while (workMs - span() > REPAIR_BELL_MARGIN_MS && topOff++ < REPAIR_HARD_CAP) {
+        if (!extend(1)) break
+      }
     }
+    topUp()
   }
 
   // ---- mandatory same-move announcement (Set Ceremonies, Kyle's rule):
   // any contiguous run of one notation longer than a minute MUST be
   // announced — "settle in" — so the athlete knows the stretch is
   // deliberate. The repair tail is the usual culprit (it can extend the
-  // closing pattern 60-90s). If the added reservation pushes the span
-  // past the bell, trailing repair reps are dropped to pay for it.
+  // closing pattern 60-90s).
+  //
+  // The reservation is time the round does not have — it was filled to the
+  // bell before this pass ran — so it is paid for from the back of the
+  // round, a REP at a time, and the last seconds are then topped up again.
+  // It used to be paid for by dropping whole trailing blocks, with no
+  // top-up: a 6.6 s reservation could cost a 25 s pressure block, and the
+  // round ended 15-25 s before its bell (generator 1.3.0 and earlier).
   if (opts.setupCallouts) {
-    const laid = layBlocks(specs, bpm)
+    const fitToBell = (announcedAt: number): void => {
+      trimToFit(specs, workMs, bpm, announcedAt)
+    }
     let runStart = 0
     while (runStart < specs.length) {
+      // Laid afresh for every run: an earlier announcement has shifted,
+      // trimmed and extended everything after it.
+      const laid = layBlocks(specs, bpm)
       const first = specs[runStart] as BlockSpec
       let runEnd = runStart + 1
       while (
@@ -728,13 +797,12 @@ export function fillScoredRound(
         if (callout !== undefined) {
           first.leadInBeats = (first.leadInBeats ?? 0) + msToBeats(callout.reserveMs, bpm)
           first.setupCallout = callout
-          // Bounded by the list itself — it only ever shrinks. A count here
-          // would be the same mistake as the repair loops': at sprint tempo
-          // the reps to drop are short, and stopping early leaves the round
-          // running past its bell.
-          while (blocksSpanMs(layBlocks(specs, bpm)) > workMs && specs.length - 1 > runStart) {
-            specs.pop()
-          }
+          fitToBell(runStart)
+          // Trimming lands within one rep of the bell, and a slow rep is
+          // several seconds. Close the last of it the way the repair pass
+          // does. Anything appended here is visited by the iterations that
+          // follow, so it cannot become an unannounced stretch of its own.
+          topUp()
         }
       }
       runStart = runEnd

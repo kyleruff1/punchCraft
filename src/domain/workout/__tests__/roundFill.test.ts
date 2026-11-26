@@ -13,6 +13,8 @@ import { scoredRounds, validateGeneratedWorkout } from '../GeneratedWorkout'
 import { expandTimeline } from '../../programs/CueTimeline'
 import { punchTokens } from '../WorkoutTokens'
 import { CADENCE_PROFILES } from '../cadence'
+import { MANDATORY_SAME_MOVE_MS } from '../setupCallouts'
+import { roundSpanMs } from '../roundFill'
 
 const durationFor = (combination: string): number | undefined =>
   combination.includes('-') ? 1200 : undefined
@@ -123,5 +125,127 @@ describe('the repair pass never runs a round past its bell', () => {
         }
       }
     }
+  })
+})
+
+// ---------------------------------------------------------------------------
+// D26 with set ceremonies priced in (generator 1.3.1)
+//
+// Every sweep above generates WITHOUT `setupCallouts`, so none of them runs
+// the pass that announces a long same-move stretch — the app always does.
+// That pass adds a 6-7 s "settle in" reservation after the round has been
+// filled to the bell, and used to pay for it by dropping whole trailing
+// blocks with nothing refilling the round: on one measured round a 6.6 s
+// reservation cost a 2.1 s block and then a 25.7 s one, and the round ended
+// 15 s early. It needs a long run of one combination, so it showed up where
+// variety is low — a combination cap of 2 is enough, with every punch enabled.
+// ---------------------------------------------------------------------------
+
+/** Every ceremony priced at a typical measured length. */
+const CEREMONIES = { setupCallouts: { reserveMsFor: () => 6_500 } }
+const LOW_VARIETY: Array<[string, Partial<WorkoutRecipe>]> = [
+  ['the default recipe', {}],
+  ['combinations capped at 2', { maximumComboPunches: 2 }],
+  ['jab only', { enabledPunches: [1] }],
+  ['jab and cross, capped at 2', { enabledPunches: [1, 2], maximumComboPunches: 2 }],
+]
+const CEREMONY_SEEDS = ['a', 'b', 'x']
+
+const notationOf = (block: { tokens: ReadonlyArray<{ kind: string }> }): string =>
+  block.tokens
+    .map((t) => {
+      const token = t as { kind: string; number?: number; body?: boolean }
+      return token.kind === 'punch' ? `${token.number}${token.body ? 'b' : ''}` : token.kind
+    })
+    .join('-')
+
+describe.each(LOW_VARIETY)('with ceremonies priced in — %s', (_label, over) => {
+  const workouts = (): Array<ReturnType<typeof generateWorkout>> =>
+    ALL_CADENCES.flatMap((cadenceProfile) =>
+      ([20, 40] as const).flatMap((durationMinutes) =>
+        CEREMONY_SEEDS.map((seed) =>
+          generateWorkout(
+            { ...defaultRecipe(), ...over, seed, durationMinutes, cadenceProfile },
+            CEREMONIES,
+          ),
+        ),
+      ),
+    )
+
+  it('covers every scored round to the bell', () => {
+    for (const workout of workouts()) {
+      for (const round of scoredRounds(workout.schedule)) {
+        const coverage = coverageAudit(round.blocks, round.workDurationMs)
+        const at = `${workout.recipe.cadenceProfile}/${workout.recipe.durationMinutes}/${workout.recipe.seed}/${round.id}`
+        expect({ at, shortByMs: coverage.ok ? 0 : Math.round(round.workDurationMs - coverage.spanMs) }).toEqual({ at, shortByMs: 0 })
+      }
+    }
+  })
+
+  it('never runs a round past its bell', () => {
+    for (const workout of workouts()) {
+      expect(validateGeneratedWorkout(workout).map((e) => e.code)).toEqual([])
+    }
+  })
+
+  it('announces every same-move stretch longer than a minute', () => {
+    for (const workout of workouts()) {
+      for (const round of scoredRounds(workout.schedule)) {
+        const blocks = round.blocks
+        let start = 0
+        while (start < blocks.length) {
+          const first = blocks[start]!
+          let end = start + 1
+          while (
+            end < blocks.length &&
+            first.kind === 'repeated-combo' &&
+            blocks[end]!.kind === 'repeated-combo' &&
+            notationOf(blocks[end]!) === notationOf(first)
+          ) {
+            end += 1
+          }
+          const last = blocks[end - 1]!
+          const runMs = last.startOffsetMs + last.durationMs - first.startOffsetMs
+          if (runMs > MANDATORY_SAME_MOVE_MS) {
+            const at = `${workout.recipe.cadenceProfile}/${workout.recipe.seed}/${round.id}/${first.id}`
+            expect({ at, announced: first.setupCallout !== undefined }).toEqual({ at, announced: true })
+          }
+          start = end
+        }
+      }
+    }
+  })
+})
+
+describe('after paying for an announcement the round is topped back up', () => {
+  // Trimming lands within one rep of the bell, and at technical tempo a rep
+  // is several seconds. The repair pass promises to work to within 2 s of
+  // the bell (`REPAIR_BELL_MARGIN_MS`); the announcement pass has to keep
+  // that promise after taking time back. Across a 27,648-round search,
+  // skipping the top-up left 134 rounds more than 2 s short (worst 4.2 s)
+  // against 11 with it (worst 2.2 s, where one more rep will not fit). The
+  // grid below is the corner of that search where it shows.
+  it('ends every technical-tempo round within a breath of the bell', () => {
+    let worst = { at: '', tailMs: 0 }
+    for (const totalPunchGoal of [300, 900, 2_000]) {
+      for (const seed of ['a', 'b', 'x', 'q', 'k1', 'k2', 'k3', 'k4']) {
+        const workout = generateWorkout(
+          {
+            ...defaultRecipe(),
+            seed,
+            totalPunchGoal,
+            durationMinutes: 40,
+            cadenceProfile: 'technical',
+            maximumComboPunches: 2,
+          },
+          CEREMONIES,
+        )
+        for (const round of scoredRounds(workout.schedule)) {
+          const tailMs = Math.round(round.workDurationMs - roundSpanMs(round.blocks))
+          if (tailMs > worst.tailMs) worst = { at: `${totalPunchGoal}/${seed}/${round.id}`, tailMs }
+        }
+      }
+    }
+    expect(worst.tailMs).toBeLessThanOrEqual(2_500)
   })
 })

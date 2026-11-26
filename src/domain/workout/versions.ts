@@ -23,9 +23,13 @@
  *   round's last 40-60 s without content (D26). The version also seeds
  *   selection, so every generated workout differs from its `1.2.0` plan
  *   for the same recipe and seed — not only the low-goal ones.
- * - `1.3.1` — the coverage repair pass is bounded by progress toward the
- *   bell instead of by a count of passes, so a sprint-tempo round no longer
- *   stops 5-7 s short. Same reseeding caveat as above.
+ * - `1.3.1` — two more ways a round stopped before its bell. The coverage
+ *   repair pass is bounded by progress instead of by a count of passes, so
+ *   a sprint-tempo round no longer stops 5-7 s short. And the "settle in"
+ *   announcement for a long same-move stretch is paid for a rep at a time,
+ *   with the round topped up afterwards, instead of by dropping whole
+ *   trailing blocks — which had cost low-variety recipes (a combination cap
+ *   of 2 is enough) their last 15-25 s. Same reseeding caveat as above.
  */
 export const GENERATOR_VERSION = '1.3.1'
 

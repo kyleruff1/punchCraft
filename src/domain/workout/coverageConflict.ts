@@ -15,20 +15,31 @@
  *
  * ## What still causes it
  *
- * Until generator 1.3.0 the common cause was a low punch goal — a repeat
- * phase kept too few reps to span its time share, and a twenty-minute goal
- * kept for sixty minutes left a minute of silence in every round. That is
- * fixed in the fill. What remains is a content pool too narrow for the round:
- * one enabled punch, or combinations capped at one or two, leaves no build-up
- * ladder to teach and not enough to repeat. Hence the advice below.
+ * One thing, as of generator 1.3.1: **punches that form no combination at
+ * all.** A single enabled punch other than the jab, or a pair like the two
+ * uppercuts, appears in no motif the library has, so there is no ladder to
+ * teach and no fallback to repeat — every round is laid empty. Likewise two
+ * punches with combinations capped at one. Hence the advice below.
+ *
+ * Three other causes have come and gone, and each was first mistaken for
+ * the one after it:
+ *
+ * - a low punch goal: a repeat phase kept too few reps to span its time
+ *   share (fixed in 1.3.0);
+ * - sprint tempo: the repair pass was bounded by a count of passes and ran
+ *   out 5-7 s early (fixed in 1.3.1);
+ * - low variety: a long same-move stretch earns a "settle in" call, and
+ *   paying for it dropped a whole trailing block with nothing refilling the
+ *   round — 15-25 s, with a combination cap of 2 or a jab-only recipe (fixed
+ *   in 1.3.1). This one was filed for a while as "a content pool too narrow
+ *   for the round", which it never was: the pool could fill the round, and
+ *   had, before the announcement took the time back.
  *
  * ## The threshold
  *
  * The generator's own audit allows a round to stop 5 s short — the bell
  * covers it. An athlete-facing warning needs more than a breath: this fires
- * at twice that. (A sprint-cadence round can still finish 5-7 s short, where
- * the count-bounded repair pass runs out; that is below this line on
- * purpose, and there is nothing the athlete could change to fix it.)
+ * at twice that.
  *
  * Pure TypeScript — no React, Expo, SQLite or BLE imports (spec §15.1).
  */

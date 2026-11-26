@@ -192,11 +192,15 @@ describe('rounds that would run out of combinations', () => {
     tree.root.findAllByProps({ testID: 'conflict-rounds-run-dry' }, { deep: false })
 
   /**
-   * A recipe narrow enough that the generator cannot fill a round: two
-   * punches, combinations capped at two. No build-up ladder survives, and
-   * what is left runs out before the bell.
+   * A recipe the generator can lay nothing for: the cross on its own is in
+   * no combination the library has, so every round comes out empty.
+   *
+   * This used to be jab-and-cross capped at two, which ran 15 s dry on seed
+   * 'x' — not because the pool was too narrow, but because paying for a
+   * "settle in" announcement dropped a whole block. Generator 1.3.1 fixed
+   * that, and a recipe with any combination at all now fills its rounds.
    */
-  const NARROW = { enabledPunches: [1, 2] as PunchNumber[], maximumComboPunches: 2, seed: 'x' }
+  const NARROW = { enabledPunches: [2] as PunchNumber[] }
   const narrow = (): void => {
     act(() => {
       store().setRecipe(NARROW)
@@ -229,6 +233,17 @@ describe('rounds that would run out of combinations', () => {
     })
     const tree = render(<RecipeScreen />)
     expect(dryNotice(tree)).toHaveLength(0)
+  })
+
+  it('says nothing about a low-variety recipe that can still fill its rounds', () => {
+    // Jab and cross, combinations capped at two: the recipe this suite used
+    // to use as its dry case, through generator 1.3.0.
+    act(() => {
+      store().setRecipe({ enabledPunches: [1, 2], maximumComboPunches: 2, seed: 'x' })
+    })
+    const recipe = store().recipe
+    expect(coverageConflict(generateWorkout(recipe, fillOptionsForRecipe(recipe)))).toBeNull()
+    expect(dryNotice(render(<RecipeScreen />))).toHaveLength(0)
   })
 
   it('warns, in the summary, when the punches are too few to fill the rounds', () => {
