@@ -1,0 +1,38 @@
+# Line endings. Text is stored and checked out as LF everywhere, whatever
+# `core.autocrlf` says on the machine. Until 2026-11-25 the repo had neither
+# this file nor a rule: 86 of its 723 text files were CRLF, a one-line edit
+# with the wrong tool rewrote a whole file, and the diff said nothing useful.
+* text=auto eol=lf
+
+# Windows-only scripts keep CRLF in the working tree.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Never touched, whatever git guesses.
+*.wav binary
+*.mp3 binary
+*.ogg binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ttf binary
+*.otf binary
+*.apk binary
+*.keystore binary
+*.sf2 binary
+*.mid binary
+*.lnk binary
+
+# Puncheoke — the instrument — is forked to its own product and its code here
+# is not ours to rework. These paths are left byte-for-byte as committed
+# (some CRLF, some LF) so they stay diffable against the fork. The same list
+# is in .prettierignore; keep the two in step.
+docs/puncheoke/** -text
+src/app/(tabs)/puncheokie/** -text
+src/domain/instrument/** -text
+src/instrument/** -text
+tools/punchbridge/** -text
+tools/tablet-voice/** -text
+*[Ii]nstrument* -text
