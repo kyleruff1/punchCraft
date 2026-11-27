@@ -133,6 +133,13 @@ const CALL_KINDS = ['downloaded', 'lead-in', 'phantom', 'other']
 export const PLAY_MATCH_WINDOW_MS = 250
 /** How far an element's own length may be from the clip's stated one and still be that clip. */
 export const LENGTH_MATCH_MS = 300
+/**
+ * A clip sent this close to the end of the capture has not had time to
+ * sound, and nothing can be said of it. Over 8 404 clips in 44 whole
+ * workouts (2026-11-27) the longest wait from a dispatch to its first sound
+ * was 122 ms; this is four times that.
+ */
+export const STARTING_MS = 500
 
 /**
  * @typedef {object} HeardClip a call or lead-in the app played, and what was heard of it
@@ -334,9 +341,21 @@ export function soundReport(records, events, { floorMs, truncationMs }) {
   const others = plays.filter((play) => !claimed.has(play) && play.kind !== 'phantom')
   // A clip played at volume 0 was ducked on purpose; silence is what it is for.
   const audible = clips.filter((c) => c.volume > 0)
-  const silent = audible.filter((c) => c.firstSoundMs === null)
-  // Still sounding when the capture stopped: nothing can be said of its end.
-  const unfinished = audible.filter((c) => c.firstSoundMs !== null && c.lastSoundMs === null)
+  // When the capture stopped: the last thing the page's log or the tap noted.
+  const endMs = Math.max(
+    0,
+    ...[...records.map((r) => r.monoMs), ...events.map((e) => e.atMs)].filter(Number.isFinite),
+  )
+  // Sent as the capture stopped. A drive ends three seconds into the next
+  // round, and a call sent in its last instant has made no sound *yet* —
+  // which is not a call that made no sound.
+  const starting = (c) => c.firstSoundMs === null && endMs - c.dispatchMs < STARTING_MS
+  const silent = audible.filter((c) => c.firstSoundMs === null && !starting(c))
+  // Still sounding when the capture stopped, or not yet: nothing can be said
+  // of its end.
+  const unfinished = audible.filter(
+    (c) => starting(c) || (c.firstSoundMs !== null && c.lastSoundMs === null),
+  )
   const heard = audible.filter((c) => c.heardMs !== null)
   // Cut short is judged by the playhead, not by the sound: where the element
   // was in the clip when it stopped. What is heard of a clip that played to
@@ -452,7 +471,7 @@ export function renderSoundReport(report, title) {
       : '**the sound tap did not start — nothing below was measured**',
     ...tap.failures.map((f) => `- tap failure: ${f}`),
     '',
-    `calls and lead-ins: ${clips.played} played · ${clips.heard} heard · ${clips.silent.length} silent · ${clips.cutShort.length} cut short · ${clips.ducked} ducked on purpose · ${clips.unfinished} still sounding when the capture stopped`,
+    `calls and lead-ins: ${clips.played} played · ${clips.heard} heard · ${clips.silent.length} silent · ${clips.cutShort.length} cut short · ${clips.ducked} ducked on purpose · ${clips.unfinished} not finished when the capture stopped`,
     `bells: ${report.bells.rung} of ${report.bells.expected} round boundaries rung · ${report.bells.silent.length} silent · ${report.bells.cutShort.length} cut · first sound ${cell(report.bells.afterBoundary.medianMs)} ms after the boundary (most ${cell(report.bells.afterBoundary.maxMs)})`,
     `intro, countdowns and rest lines: ${
       Object.entries(report.ceremonies.found)

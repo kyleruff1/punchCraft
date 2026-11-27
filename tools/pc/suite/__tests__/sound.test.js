@@ -11,6 +11,7 @@ import {
   renderSoundReport,
   soundReport,
   soundVerdict,
+  STARTING_MS,
 } from '../sound.mjs'
 
 const record = (code, fields) => ({
@@ -120,6 +121,15 @@ const bellEvents = played(99, WORK_STARTS, {
   startAfter: 60,
 }).map((event) => (event.type === 'play' ? { ...event, src: BELL_FILE } : event))
 const SENT = WORK_STARTS + 2_600 + 40
+/**
+ * The last line of a capture. What a clip did is judged against when the
+ * capture stopped, so every report says when that was: a minute after the
+ * round started, unless a test is about the end itself.
+ */
+const stopped = (atMs = WORK_STARTS + 60_000) => ({
+  ...record('workout.qa.sim', {}),
+  monoMs: atMs,
+})
 
 describe('playsFrom', () => {
   it('makes one play of each call to play(), with the sound that followed it', () => {
@@ -334,8 +344,13 @@ describe('clipTimings', () => {
 
 describe('soundReport', () => {
   const ready = { type: 'tap-ready', atMs: 1, state: 'running', sampleRate: 48_000 }
-  const report = (records, events) =>
-    soundReport([...round, bellRecord, ...records], [ready, ...bellEvents, ...events], LIMITS)
+  /** The capture runs on for a minute after the round starts, unless told when it stopped. */
+  const report = (records, events, stoppedAtMs = WORK_STARTS + 60_000) =>
+    soundReport(
+      [...round, bellRecord, ...records, stopped(stoppedAtMs)],
+      [ready, ...bellEvents, ...events],
+      LIMITS,
+    )
 
   it('counts a clean drive and gives the gap before the ring', () => {
     const r = report(
@@ -424,6 +439,18 @@ describe('soundReport', () => {
     })
   })
 
+  it('does not call silent a clip sent as the capture stopped: it had no time to sound', () => {
+    // A drive ends three seconds into the next round. This call was sent
+    // 130 ms before that; a call first sounds some 70 ms after it is sent.
+    const sentAsItStopped = report(call(2_600), [], SENT + 130)
+    expect(sentAsItStopped.clips).toMatchObject({ played: 1, unfinished: 1, silent: [] })
+    expect(soundVerdict(sentAsItStopped, { floorRatio: 0.02 }).hard).toEqual([])
+    // Sent half a second before the end and still nothing: that is silence.
+    const hadItsChance = report(call(2_600), [], SENT + STARTING_MS)
+    expect(hadItsChance.clips).toMatchObject({ unfinished: 0 })
+    expect(hadItsChance.clips.silent).toHaveLength(1)
+  })
+
   it('judges the gap before a ring for calls only; a lead-in is heard and counted', () => {
     const r = report(call(2_600, { kind: 'lead-in', slot: 'lead-in/x' }), played(7, SENT + 1))
     expect(r.calls.n).toBe(0)
@@ -463,7 +490,11 @@ describe('soundVerdict', () => {
   const ready = { type: 'tap-ready', atMs: 1, state: 'running', sampleRate: 48_000 }
   const verdict = (records, events, floorRatio = 0.02) =>
     soundVerdict(
-      soundReport([...round, bellRecord, ...records], [ready, ...bellEvents, ...events], LIMITS),
+      soundReport(
+        [...round, bellRecord, ...records, stopped()],
+        [ready, ...bellEvents, ...events],
+        LIMITS,
+      ),
       { floorRatio },
     )
 
@@ -549,7 +580,11 @@ describe('what is and is not a clip being cut', () => {
     args: ['[INFO] workout.warn', 'round warning stopped', {}],
   })
   const report = (records, events) =>
-    soundReport([...round, bellRecord, ...records], [ready, ...bellEvents, ...events], LIMITS)
+    soundReport(
+      [...round, bellRecord, ...records, stopped()],
+      [ready, ...bellEvents, ...events],
+      LIMITS,
+    )
 
   it('is not cut when the app stopped it and said so', () => {
     const events = played(7, SENT + 1, { stoppedAt: 300 })
