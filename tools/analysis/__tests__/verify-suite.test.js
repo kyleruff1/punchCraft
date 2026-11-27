@@ -22,6 +22,7 @@ import {
   parseVolumeGet,
   planJobs,
   quoteForDeviceShell,
+  runQuery,
   renderSummaryMd,
   timingVerdictFromExit,
   verdictFromVerifyExit,
@@ -36,6 +37,12 @@ describe('run URL', () => {
     expect(url).toBe(
       'punchcraft://qa/run?workout=quick-one-two&vocab=techniques&sim=captured-jam&simForce=1&simBpm=120&autostart=1&nonce=suite%201',
     )
+  })
+
+  it('is the shared query behind the tablet’s scheme — the PC suite opens the same query as a page', () => {
+    const run = { workout: 'body-work', vocab: 'numbers', sim: 'captured-jam', nonce: 'n-1' }
+    expect(runQuery(run)).toBe('workout=body-work&vocab=numbers&sim=captured-jam&autostart=1&nonce=n-1')
+    expect(buildRunUrl(run)).toBe(`punchcraft://qa/run?${runQuery(run)}`)
   })
 
   it('quotes for the device shell so & does not fork, and never leaks a single quote', () => {
