@@ -1387,6 +1387,142 @@ migration.
 
 ---
 
+## 3h. The PC sync-bench batch
+
+**The ask:** keep building on the PC version so that audio and workout
+synchronization can be tested there and trusted to hold on the tablet. Three
+pieces — the tablet's verify suite on the PC, a PC-against-tablet comparison,
+and measuring the sound itself — enforced by a command and an advisory CI
+job. Branch `feat/pc-sync-bench`. How to use it: `tools/pc/suite/README.md`.
+
+### What landed
+
+| What | Commit |
+|---|---|
+| The tablet's timing analyzer refuses a capture the tablet did not write; the QA run record names its platform | `9316add4` |
+| The browser driver keeps the page's log whole (it kept five fields of each record) | `08719905` |
+| N-13: the web build named a commit it was not built from | `a5931bb2` |
+| `npm run pc:suite` — every workout driven in a browser, judged by the tablet's correlator | `1d493ca7` |
+| The sound tap: what the page plays, heard and measured against the rings | `37529b42` |
+| The sound gate, and `--fault` to prove it | `c3077e94` |
+| A cut clip is judged by its playhead, not by how much was heard | `4568de9e` |
+| Several browsers at once | `f624807d` |
+| `npm run pc:parity` and the committed tablet reference | `dc12f236` |
+| CI: an advisory `pc-sync` job | `669d3ced` |
+
+### What it measured
+
+All 22 workouts, round 1, six at a time, in 18½ minutes (in series: an hour
+and three quarters):
+
+- **Correlator:** 22 of 22 pass. The tablet's own tool, unchanged, on the
+  PC's capture.
+- **Sound:** 22 of 22 pass. 1 379 calls heard; none silent, none cut; none
+  under the 150 ms floor before its ring; the least gap 247 ms.
+- **Parity with the tablet's September captures:** 12 workouts identical in
+  every dispatch of round 1 — clip, words, scheduled time, length, ring.
+  None different. Ten could not be compared (N-15).
+- **The gate fires.** On One-Two with a fault injected: a muted call fails
+  as 19 clips silent; a call stopped part-way as 19 cut; a call held back as
+  19 still sounding when their ring was due. Without a fault it passes.
+
+On One-Two the last sound of a call ends 376 ms before its ring is due at
+the least, against an intended 400. The shortfall is the 40-odd ms by which
+this PC's 50 ms loop sends a call late.
+
+### Findings
+
+#### N-13 · The web build named a commit it was not built from · **fixed** (`a5931bb2`)
+
+The bundler caches each module's compiled form, and the app config — the
+commit id among it — is compiled into one of them. Nothing about that module
+changes when the config does, so every PC build since PR 393 said it was
+`fbffb896`: on the build-info screen and in the QA run record. Found by the
+suite's first run, which compared the two. `buildWebApp` now clears the cache
+when the build on disk is not the checkout's commit, and checks the result.
+CI builds were always cold and always right. **The tablet is not affected**:
+its captures show the build and the host agreeing.
+
+#### N-14 · The app's playback observer means nothing in a browser · **guarded** (`9316add4`); the observer itself **open, low**
+
+`src/audio/PlaybackObserver.ts` stamps "started" when the player reports
+`playing`. expo-audio's web player reports that the moment play is
+requested, and it swaps its `<audio>` element under a download-first clip,
+which the observer reads as a play 4 ms long. On a PC capture the tablet's
+`observed-timing.mjs` therefore reported five clips cut short — the sound tap
+heard all five in full — and proposed moving `CALL_DISPATCH_LAG_MS` from 71
+to 28. The tool now refuses any capture but the tablet's. The observer is
+left as it is: the PC suite does not use it. Making it truthful in a browser
+is a change to audio code that nothing needs yet.
+
+The same swap is what `audio.web.playInterrupted` ("a clip was cut short
+before it began") logs. The message is wrong: the clip plays, on the second
+element. Harmless, and worth rewording when that file is next open.
+
+#### N-15 · Ten of the 22 tablet captures predate re-recorded clips · **open — needs a tablet suite run**
+
+Four call clips were re-recorded after the September tablet suite:
+`call/1-1-1-1` ("One! One! One! One!", 1558 ms, is now "Four ones!", 889 ms),
+`call/2-2-2-2`, `call/1b-1b-1b-1b`, and `call/1-2-3-4` (the same words,
+1631 ms to 1300). A shorter clip is sent later — it has to end the same
+distance before its ring — and moves the lead-in before it. So for the ten
+workouts that play one of them, today's code and September's capture
+legitimately disagree, on either device.
+
+The timeline hash does not see this: it covers the rings, not the
+recordings. `pc:parity` looks for it directly and skips those workouts with a
+note naming the clip. **They are no evidence either way until the tablet
+suite runs again**; then `npm run pc:parity -- --build-reference <the run>`.
+
+#### N-16 · The tablet's log drops lines · **known; now allowed for**
+
+Three of the September captures are short a line the PC has: a ring-token
+record in One-Two (the ring fired — its forensics record is there), and one
+call dispatch each in body-work and southpaw-mirror. `observed-timing.mjs`
+already documents the same for a round boundary. `pc:parity` reads a tablet
+capture short of one or two dispatches as the same with lines lost, says so,
+and fails on more.
+
+### Corrections to my own work in this batch
+
+- **The plan said all 24 stored tablet captures were still comparable.** They
+  share today's timeline hashes; ten do not share today's clips (N-15). I
+  had checked the hash and not asked what it covers.
+- **The first cut-short rule was wrong.** It compared how much of a clip was
+  heard with the file's length, and failed a lead-in that had played to its
+  end. A clip's own quiet head and tail put 60–150 ms under the follower's
+  threshold. Found by the first full run, fixed in `4568de9e`.
+- **Before the plan, I read first-time clips as silent on the PC** for a few
+  minutes: my analysis followed the element the player starts on, not the
+  one it swaps to. Nothing was built on it; `heardClips` now prefers the
+  element that sounded, and has a test for exactly this.
+- **The tablet reference is 296 KB**, not the "about 100 KB" the plan said.
+  One dispatch to a line, so a changed schedule reads as changed lines.
+- **One planned step was dropped on review:** lifting the tablet suite's
+  judging block out to share it. It is tangled with the tablet's retry and
+  with the timing tool the PC must not use. The PC suite calls the correlator
+  directly instead.
+
+### Still unproven
+
+- **The CI job has never run on a runner.** Unknown there: how late a shared
+  four-processor machine sends clips, and whether a browser with no sound
+  card will start its audio at all. If it will not, the suite warns that the
+  sound tap did not start and judges the rest.
+- **Whole workouts (`--full`) have not been run**, only round 1 — which is
+  what the correlator judges.
+- **Technique names:** one workout driven, correlator only. The 22 above
+  were in numbers.
+- **More than six browsers at once** has not been measured.
+- **The sound is measured where it enters the browser's mixer**, through a
+  graph that replaces the element's usual output path. With the tap on and
+  off the app does the same thing (81 of 81 dispatches, the same verdict);
+  what the routing does to the start latency itself cannot be known without
+  a microphone, which is why that figure is reported and never judged.
+
+---
+
+
 ## 4. The roadmap finding you asked me to verify first
 
 **Verdict: confirmed, and narrower than stated in a way that strengthens the
@@ -1597,6 +1733,19 @@ is not. See §3d.)
 
 Nothing below is proven by jest. Every item needs a Metro restart **and** a
 cold app restart first — `F:` has no fast refresh.
+
+**First, what no longer needs the tablet.** Whether the coach says the right
+thing at the right scheduled time, and whether each call's sound is clear of
+its ring, is now checked on the PC in 20 minutes: `npm run pc:suite`, then
+`npm run pc:parity` (§3h). Run it before any tablet session; a correlator or
+sound failure there is a failure here.
+
+**The tablet suite, once — it is what the PC compares itself with.** Ten of
+the 22 workouts play a call clip re-recorded since the September captures and
+cannot be compared until the suite runs again (N-15): the `qa-audio-verify`
+loop, then `npm run pc:parity -- --build-reference tools/analysis/suites/<run>`.
+What that run alone can say: the tablet's start latency and delivered breath
+with the re-recorded clips, which the PC cannot stand in for.
 
 **Bluetooth (H-3) — the one that matters most.**
 - Gloves connected → Velocity Lab → Live → back → start a workout → punches
