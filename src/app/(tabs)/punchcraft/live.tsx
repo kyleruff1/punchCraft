@@ -32,6 +32,7 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake'
 
 import { TAB_BAR_STYLE } from '../_layout'
 import { armAutoRetry, setAutoRetrySuspended } from '@ble/autoConnectTrackers'
+import { summaryOfferFor } from './_finishedOverlay'
 import { canFindGloves } from '@ble/gloveSupport'
 import { useReducedMotion, useSharedValue } from 'react-native-reanimated'
 import { ActionButton } from '@components/branding/ActionButton'
@@ -47,6 +48,7 @@ import { fonts, sizes, weights } from '@/theme/typography'
 import { nextRoundPreview } from '@domain/session/restPhases'
 import { systemMonotonicClock } from '@domain/time/MonotonicClock'
 import { getSampleWorkout } from '@domain/workout/samples'
+import { disciplineOf } from '@domain/workout/discipline'
 import { coachPathOf } from '@domain/workout/GeneratedWorkout'
 import { generateWorkout } from '@domain/workout/generateWorkout'
 import {
@@ -722,6 +724,8 @@ export default function LiveScreen(): React.JSX.Element {
   const isWorking = live.phase === 'work'
   const isPaused = live.phase === 'paused'
   const isOver = live.phase === 'completed' || live.phase === 'cancelled'
+  // The saved session the finished overlay may offer a summary of, if any.
+  const summarySessionId = summaryOfferFor(live.phase, endOutcome)
 
   const handleStart = useCallback(() => {
     if (startedRef.current) return
@@ -894,6 +898,7 @@ export default function LiveScreen(): React.JSX.Element {
               {...(cues.freeWork ? { idleLabel: 'Free work — keep your hands moving' } : {})}
               reducedMotion={reducedMotion}
               avatarAnchor={avatarAnchor}
+              discipline={disciplineOf(workout)}
               workClock={workClock}
               {...(cues.walkPlan ? { walkPlan: cues.walkPlan } : {})}
             />
@@ -914,6 +919,24 @@ export default function LiveScreen(): React.JSX.Element {
                 <Text style={styles.saveNote} testID="save-failed">
                   This workout could not be saved.
                 </Text>
+              ) : null}
+              {/* Read back from the database, so it shows exactly what
+                  History will. Which workouts it is offered for is
+                  `summaryOfferFor`'s call. */}
+              {summarySessionId !== null ? (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() =>
+                    router.push({
+                      pathname: '/(tabs)/punchcraft/summary',
+                      params: { id: summarySessionId },
+                    })
+                  }
+                  style={({ pressed }) => [styles.seeSummary, pressed && styles.seeSummaryPressed]}
+                  testID="see-summary"
+                >
+                  <Text style={styles.seeSummaryText}>See summary</Text>
+                </Pressable>
               ) : null}
             </View>
           ) : null}
@@ -1153,6 +1176,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     opacity: 0.92,
   },
+  seeSummary: {
+    marginTop: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 22,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+  },
+  seeSummaryPressed: { opacity: 0.7 },
+  seeSummaryText: { fontSize: 16, fontWeight: '700', color: colors.textPrimary },
   saveNote: {
     marginTop: 6,
     fontSize: sizes.label,

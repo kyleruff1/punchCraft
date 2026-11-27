@@ -2296,8 +2296,8 @@
       "clipId": "li-243d8ad7",
       "text": "One, two, three, four — straight time, nine bars. Both hooks close the bar. Turn the hips, not the shoulders.",
       "durationMs": 8560,
-      "expectedStartTick": 178548,
-      "expectedStartMs": 185988,
+      "expectedStartTick": 178866,
+      "expectedStartMs": 186319,
       "source": "clickScript.schedule"
     }
   ],

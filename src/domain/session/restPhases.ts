@@ -228,6 +228,16 @@ export class RoundResultFreeze {
   }
 
   /**
+   * The round being counted, or undefined when none is open. A workout that
+   * ends inside a round — its last one, or the one the athlete stopped in —
+   * has had no bell to freeze it, and whoever closes it needs to know which
+   * round's target to grade against.
+   */
+  get openRoundIndex(): number | undefined {
+    return this.open ? this.roundIndex : undefined
+  }
+
+  /**
    * Count a punch into the open round.
    *
    * A no-op once frozen. That silence is the feature: the alternative is a

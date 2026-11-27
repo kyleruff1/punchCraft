@@ -627,3 +627,53 @@ describe('cue results', () => {
     expect(db.count('SELECT COUNT(*) AS n FROM cue_results')).toBe(1)
   })
 })
+
+describe("a workout's discipline is kept with its plan", () => {
+  const storedPayload = (): Record<string, unknown> =>
+    JSON.parse(
+      db.query<{ blocks_json: string }>('SELECT blocks_json FROM generated_workouts')[0]
+        ?.blocks_json ?? '{}',
+    ) as Record<string, unknown>
+
+  it('writes nothing for boxing — the stored plan and its key are what they were', () => {
+    // The key a build from before the field existed logged for this workout
+    // (the PC app's console, 2026-11-26). Had the field leaked into the
+    // payload, every stored plan would have been re-keyed.
+    expect(PLAN_ID).toBe('three-round-fundamentals@7f4e47d1')
+    expect(storedPlanId({ ...threeRoundFundamentals, discipline: 'boxing' })).toBe(PLAN_ID)
+
+    sessions.create({ id: 'ses-box', mode: 'puncheokie' })
+    repo.saveGeneratedWorkout(
+      threeRoundFundamentals,
+      plannedStream(threeRoundFundamentals),
+      'ses-box',
+    )
+    expect('discipline' in storedPayload()).toBe(false)
+    const found = repo.getWorkoutBySession('ses-box')?.workout
+    expect(found && 'discipline' in found).toBe(false)
+  })
+
+  it('round-trips another discipline, under a key of its own', () => {
+    const drill = { ...threeRoundFundamentals, id: 'reaction-drill', discipline: 'reaction' }
+    expect(storedPlanId({ ...threeRoundFundamentals, discipline: 'reaction' })).not.toBe(PLAN_ID)
+
+    sessions.create({ id: 'ses-rx', mode: 'puncheokie' })
+    repo.saveGeneratedWorkout(drill, plannedStream(drill), 'ses-rx')
+    expect(storedPayload().discipline).toBe('reaction')
+    expect(repo.getWorkoutBySession('ses-rx')?.workout).toEqual(drill)
+  })
+
+  it('drops a stored discipline that is not a slug, rather than trust it into a clip path', () => {
+    sessions.create({ id: 'ses-bad', mode: 'puncheokie' })
+    repo.saveGeneratedWorkout(
+      threeRoundFundamentals,
+      plannedStream(threeRoundFundamentals),
+      'ses-bad',
+    )
+    db.prepareSync('UPDATE generated_workouts SET blocks_json = ?').executeSync([
+      JSON.stringify({ ...storedPayload(), discipline: '../../etc' }),
+    ])
+    const found = repo.getWorkoutBySession('ses-bad')?.workout
+    expect(found && 'discipline' in found).toBe(false)
+  })
+})

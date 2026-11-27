@@ -61,6 +61,17 @@ export interface SessionRow {
   notes: string | null
   quality: SessionQualityCounters
   createdAt: string
+  /**
+   * What the live screen counted, as stored (migration 009). Null on a
+   * session saved before that column existed. Read it through
+   * `parseLiveCounts` — it is JSON, and is checked there.
+   */
+  liveCountsJson: string | null
+}
+
+/** A session with its place in save order — see `listSaved`. */
+export interface SavedSessionRow extends SessionRow {
+  seq: number
 }
 
 export interface SessionCreateInput {
@@ -77,6 +88,7 @@ export interface SessionCreateInput {
   leftCalibrationId?: string | null
   rightCalibrationId?: string | null
   notes?: string | null
+  liveCountsJson?: string | null
 }
 
 export interface SessionEndInput {
@@ -229,6 +241,7 @@ interface RawSession {
   unmatched_events: number
   malformed_events: number
   created_at: string
+  live_counts_json: string | null
 }
 
 function mapSession(r: RawSession): SessionRow {
@@ -254,6 +267,7 @@ function mapSession(r: RawSession): SessionRow {
       malformedEvents: r.malformed_events,
     },
     createdAt: r.created_at,
+    liveCountsJson: r.live_counts_json ?? null,
   }
 }
 
@@ -423,8 +437,8 @@ export class SessionRepository {
       `INSERT INTO sessions
          (id, mode, status, started_at, ended_at, started_monotonic_ms, ended_monotonic_ms,
           active_duration_ms, timer_config_json, generated_workout_id, spotify_playlist_id,
-          left_calibration_id, right_calibration_id, notes, created_at)
-       VALUES (?, ?, ?, ?, NULL, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          left_calibration_id, right_calibration_id, notes, created_at, live_counts_json)
+       VALUES (?, ?, ?, ?, NULL, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         input.mode,
@@ -439,6 +453,7 @@ export class SessionRepository {
         input.rightCalibrationId ?? null,
         input.notes ?? null,
         createdAt,
+        input.liveCountsJson ?? null,
       ],
     )
     logger.info('storage.session.create', 'session created', {
@@ -482,6 +497,55 @@ export class SessionRepository {
       [...params, limit, offset],
     )
     return rows.map(mapSession)
+  }
+
+  /**
+   * Finished sessions in the order they were SAVED, newest first — what a
+   * history screen pages through.
+   *
+   * Not `list()`. That orders by the monotonic start, which resets on every
+   * app launch and so cannot order sessions across launches; and wall time
+   * can be changed under the app. A session row is inserted exactly once,
+   * when the workout is saved, so the table's own row order IS save order
+   * and depends on neither clock. (`sessions` is an ordinary rowid table.
+   * If it is ever rebuilt, the rebuild must copy rows in rowid order.)
+   *
+   * `before` is the `seq` of the last row already shown; paging by it stays
+   * correct while new sessions are being added, which an OFFSET does not.
+   */
+  listSaved(options: {
+    modes: readonly SessionMode[]
+    before?: number
+    limit: number
+  }): SavedSessionRow[] {
+    if (options.modes.length === 0) return []
+    const params: SqlBindValue[] = [...options.modes]
+    let before = ''
+    if (options.before !== undefined) {
+      before = 'AND rowid < ?'
+      params.push(options.before)
+    }
+    return this.select<RawSession & { seq: number }>(
+      `SELECT rowid AS seq, * FROM sessions
+        WHERE mode IN (${options.modes.map(() => '?').join(', ')})
+          AND status IN ('completed', 'cancelled')
+          ${before}
+        ORDER BY rowid DESC
+        LIMIT ?`,
+      [...params, options.limit],
+    ).map((r) => ({ ...mapSession(r), seq: r.seq }))
+  }
+
+  /** Which of these sessions stored at least one punch from this decoder. */
+  sessionsWithDecoder(sessionIds: readonly string[], decoderId: string): Set<string> {
+    if (sessionIds.length === 0) return new Set()
+    return new Set(
+      this.select<{ session_id: string }>(
+        `SELECT DISTINCT session_id FROM punch_events
+          WHERE decoder_id = ? AND session_id IN (${sessionIds.map(() => '?').join(', ')})`,
+        [decoderId, ...sessionIds],
+      ).map((r) => r.session_id),
+    )
   }
 
   /**

@@ -12,6 +12,7 @@
  * Pure TypeScript — no React, Expo, SQLite or BLE imports (spec §15.1).
  */
 
+import { isDisciplineSlug, type Discipline } from './discipline'
 import type { ProgramRound, WorkoutBlock } from './WorkoutTokens'
 import type { WorkoutRecipe } from './WorkoutRecipe'
 
@@ -43,6 +44,13 @@ export interface GeneratedWorkout {
    * workout still says which path ran it.
    */
   coachPath?: 'click-script'
+  /**
+   * Whose recorded calls and avatar art the workout uses; absent means
+   * boxing. Read it through `disciplineOf` (`discipline.ts`). Saved with
+   * the plan only when it is set, so a boxing plan is stored — and hashed —
+   * exactly as it was before the field existed.
+   */
+  discipline?: Discipline
   schedule: ProgramRound[]
   /** One entry per scored round, in order. Warm-up/cooldown are excluded. */
   roundPunchTargets: number[]
@@ -141,6 +149,15 @@ function validateBlock(
 export function validateGeneratedWorkout(workout: GeneratedWorkout): WorkoutValidationError[] {
   const errors: WorkoutValidationError[] = []
   const schedule = workout.schedule
+
+  // It becomes a segment of clip slots and asset paths.
+  if (workout.discipline !== undefined && !isDisciplineSlug(workout.discipline)) {
+    errors.push({
+      code: 'invalid-discipline',
+      path: 'discipline',
+      message: 'a discipline is a lowercase slug: letters, digits and hyphens',
+    })
+  }
 
   if (schedule.length === 0) {
     errors.push({

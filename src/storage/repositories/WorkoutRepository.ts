@@ -33,6 +33,7 @@ import {
   type GeneratedWorkout,
 } from '@/domain/workout/GeneratedWorkout'
 import { hashTimelineContent } from '@/domain/programs/timelineHash'
+import { BOXING, disciplineOf, isDisciplineSlug } from '@/domain/workout/discipline'
 import type { ProgramRound, WorkoutToken } from '@/domain/workout/WorkoutTokens'
 import { RECIPE_SCHEMA_VERSION } from '@/domain/workout/versions'
 import type { WorkoutRecipe } from '@/domain/workout/WorkoutRecipe'
@@ -170,6 +171,8 @@ interface BlocksPayload {
    * A row without it predates that, and its row id IS the workout id.
    */
   workoutId?: string
+  /** Written only when it is not boxing (`discipline.ts`). */
+  discipline?: unknown
 }
 
 /* ------------------------------------------------------------- row mapping */
@@ -264,6 +267,9 @@ function blocksPayloadOf(w: GeneratedWorkout): BlocksPayload {
     warnings: w.warnings,
     coachPath: coachPathOf(w),
     workoutId: w.id,
+    // Only when it is not boxing: a boxing plan's payload — and so its
+    // stored id, which is a hash of it — is what it was before the field.
+    ...(disciplineOf(w) === BOXING ? {} : { discipline: disciplineOf(w) }),
   }
 }
 
@@ -293,6 +299,16 @@ export function storedPlanId(w: GeneratedWorkout): string {
   const fingerprint = hashTimelineContent({ recipe: w.recipe, blocks: blocksPayloadOf(w) })
   // `hashTimelineContent` prefixes its schema generation ("v2:"); keep the hex.
   return `${w.id}@${fingerprint.slice(fingerprint.indexOf(':') + 1)}`
+}
+
+/**
+ * The workout's own id out of a stored plan id (`storedPlanId`'s inverse).
+ * A plan row from before plans were keyed by content has no `@…` suffix, and
+ * its id is the workout's.
+ */
+export function workoutIdOfPlanId(planId: string): string {
+  const at = planId.lastIndexOf('@')
+  return at < 0 ? planId : planId.slice(0, at)
 }
 
 export class WorkoutRepository {
@@ -653,6 +669,27 @@ export class WorkoutRepository {
     })
   }
 
+  /**
+   * For each of these sessions, how many cue results carry one of the given
+   * outcomes. One query for a page of history, rather than one per row.
+   */
+  countCueOutcomes(
+    sessionIds: readonly string[],
+    outcomes: readonly CueOutcome[],
+  ): Map<string, number> {
+    const counts = new Map<string, number>()
+    if (sessionIds.length === 0 || outcomes.length === 0) return counts
+    const rows = this.select<{ session_id: string; n: number }>(
+      `SELECT session_id, COUNT(*) AS n FROM cue_results
+        WHERE session_id IN (${sessionIds.map(() => '?').join(', ')})
+          AND outcome IN (${outcomes.map(() => '?').join(', ')})
+        GROUP BY session_id`,
+      [...sessionIds, ...outcomes],
+    )
+    for (const row of rows) counts.set(row.session_id, row.n)
+    return counts
+  }
+
   /** Results in cue order for one session. */
   listCueResults(sessionId: string): CueResultRow[] {
     interface RawCueResult {
@@ -725,6 +762,11 @@ export class WorkoutRepository {
       warnings: blocks.warnings ?? [],
       // Only the marked path is a field on the workout; `score` is its absence.
       ...(blocks.coachPath === 'click-script' ? { coachPath: 'click-script' as const } : {}),
+      // Likewise boxing is the absence of a discipline. A stored value that
+      // is not a slug is dropped rather than trusted into a clip path.
+      ...(isDisciplineSlug(blocks.discipline) && blocks.discipline !== BOXING
+        ? { discipline: blocks.discipline }
+        : {}),
     }
   }
 

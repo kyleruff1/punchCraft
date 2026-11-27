@@ -72,6 +72,12 @@ export async function launchBrowser(executable) {
       '--autoplay-policy=no-user-gesture-required',
       '--mute-audio',
       '--window-size=1280,800',
+      // A CI runner's kernel refuses Chrome the user namespaces its sandbox
+      // is built from ("No usable sandbox!"), and it exits before opening a
+      // port. The page is this repo's own build on the loopback address, on
+      // a machine that is thrown away afterwards — so there, and only there,
+      // the sandbox is switched off.
+      ...(process.env.CI ? ['--no-sandbox'] : []),
       'about:blank',
     ],
     { stdio: 'ignore' },

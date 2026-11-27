@@ -38,6 +38,7 @@ import type {
 } from './repositories/WorkoutRepository'
 import { storedPlanId } from './repositories/WorkoutRepository'
 import type { GeneratedWorkout } from '@domain/workout/GeneratedWorkout'
+import type { LiveCounts } from '@domain/programs/liveCounts'
 import type { TrackerPunchEvent } from '@domain/punch/PunchEvent'
 
 export interface PersistWorkoutSessionArgs {
@@ -65,6 +66,14 @@ export interface PersistWorkoutSessionArgs {
   activeDurationMs: number
   /** Set when the athlete stopped early rather than finishing. */
   cancelled?: boolean
+  /**
+   * What the live screen counted (migration 009). The cue results cover only
+   * punches that answered a called combination; this is everything else the
+   * athlete saw, and it exists nowhere once the workout is over. Omitted by
+   * callers that have no live screen — the column is then NULL, which reads
+   * as "not recorded".
+   */
+  liveCounts?: LiveCounts
   /**
    * Wall time for the `ended_at` column — display and export only, never
    * ordering (spec §3.2). Injectable so a test can pin it.
@@ -99,6 +108,7 @@ export function persistWorkoutSession(args: PersistWorkoutSessionArgs): Persiste
     endedMonotonicMs,
     activeDurationMs,
     cancelled = false,
+    liveCounts,
     endedAtIso = new Date().toISOString(),
   } = args
 
@@ -126,6 +136,7 @@ export function persistWorkoutSession(args: PersistWorkoutSessionArgs): Persiste
       startedMonotonicMs,
       activeDurationMs,
       generatedWorkoutId,
+      ...(liveCounts === undefined ? {} : { liveCountsJson: JSON.stringify(liveCounts) }),
     })
 
     workouts.saveGeneratedWorkout(workout, realized, session.id)

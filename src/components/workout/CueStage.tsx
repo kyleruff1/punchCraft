@@ -30,6 +30,7 @@ import { colors } from '@/theme/colors'
 import { fonts, sizes, weights } from '@/theme/typography'
 import type { CueInstance } from '@domain/programs/CueTimeline'
 import type { WorkoutToken } from '@domain/workout/WorkoutTokens'
+import type { Discipline } from '@domain/workout/discipline'
 import { logger, safe } from '@/diagnostics/logger'
 
 export interface CueView {
@@ -105,6 +106,11 @@ export interface CueStageProps {
    * W0) → the card falls back to the setInterval path.
    */
   avatarAnchor?: SharedValue<SharedTransportAnchor>
+  /**
+   * Whose avatar art to show (`avatarFrames.ts`). Absent means boxing; a
+   * discipline with no art of its own stands in guard.
+   */
+  discipline?: Discipline
   /**
    * UI-thread work clock (MVP v2, GH #305). When present, the active
    * sequence cue's beat cursor is projected per frame by
@@ -330,7 +336,7 @@ function useWalkedView(
 }
 
 function CueStageInner(props: CueStageProps): React.JSX.Element {
-  const { next, reducedMotion = false, idleLabel, avatarAnchor, workClock } = props
+  const { next, reducedMotion = false, idleLabel, avatarAnchor, workClock, discipline } = props
   const { view: current, walkOrdinal } = useWalkedView(
     props.current,
     props.walkPlan ?? null,
@@ -361,6 +367,7 @@ function CueStageInner(props: CueStageProps): React.JSX.Element {
         activeTokenIndex={avatarIndex}
         reducedMotion={reducedMotion}
         {...(avatarAnchor ? { anchor: avatarAnchor } : {})}
+        {...(discipline === undefined ? {} : { discipline })}
       />
       <View style={styles.zones}>
         <View style={styles.nextZone}>

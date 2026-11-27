@@ -86,6 +86,10 @@ describe('an upgrade on this engine', () => {
     expect(
       query<{ name: string }>(db, 'PRAGMA table_info(generated_workouts)').map((r) => r.name),
     ).not.toContain('realized_tokens_json')
+    // 009 added a column and backfilled nothing.
+    expect(
+      query<{ live_counts_json: string | null }>(db, 'SELECT live_counts_json FROM sessions'),
+    ).toEqual(expect.arrayContaining([{ live_counts_json: null }]))
     expect(query(db, 'PRAGMA foreign_key_check')).toEqual([])
     expect(new WorkoutRepository(db).getWorkoutBySession('s1')?.realized).toEqual(
       JSON.parse(REALIZED_S1),

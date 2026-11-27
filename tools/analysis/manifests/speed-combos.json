@@ -3142,8 +3142,8 @@
       "clipId": "li-ee77364c",
       "text": "Long set: ones only, straight time — ten bars. Finish with fast clean ones. No reaching.",
       "durationMs": 8352,
-      "expectedStartTick": 181794,
-      "expectedStartMs": 189369,
+      "expectedStartTick": 182436,
+      "expectedStartMs": 190038,
       "source": "clickScript.schedule"
     }
   ],

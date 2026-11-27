@@ -61,6 +61,34 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=6144
 
+  # The PC version, end to end, in the runner's own Chrome: it builds the web
+  # bundle, boots it, runs a workout on simulated punches, saves it, reloads,
+  # and reads the saved database back (`tools/pc/app/README.md`). The only
+  # test of the real WebAssembly engine and the browser's own storage.
+  #
+  # ADVISORY. It is deliberately NOT in the `ci` gate below: when this was
+  # written it had never run on a runner, and how long the build takes there
+  # is unknown (it copies about 760 MB of audio). Add it to `needs` once it
+  # has been green for a while.
+  pc-smoke:
+    name: pc smoke (advisory)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # What makes it advisory in fact: the job still shows as failed, but the
+    # run does not fail with it. Without this, leaving it out of `needs`
+    # below would keep it out of the gate and still turn the run red.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run pc:smoke
+
   # One stable name for "did CI pass", whatever the jobs above are called or
   # split into later. Runs even when one of them failed, so it reports a
   # failure rather than a skip.

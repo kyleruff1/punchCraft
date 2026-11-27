@@ -16,16 +16,58 @@
  *   what the numbers are, so a bare figure never suggests a physical
  *   measurement that was not made (spec §8.5, §4.3).
  */
-import React from 'react'
+import React, { useMemo } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
-import { Stack, useRouter } from 'expo-router'
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router'
 
 import { CountBadge } from '@components/workout/CountBadge'
 import { colors } from '@/theme/colors'
+import { logger, safe } from '@diagnostics/logger'
 import type { WorkoutSummaryData } from '@domain/programs/workoutSummary'
+import { formatSessionWhen } from '@domain/session/sessionDisplay'
+import { getWorkoutPersistence } from '@storage/getWorkoutPersistence'
+import { readSessionSummary, type StoredSessionSummary } from '@storage/sessionHistory'
 
 export interface SummaryScreenProps {
+  /** A summary handed in directly, rather than read from a saved session. */
   summary?: WorkoutSummaryData
+  /** A saved session handed in directly, rather than read by the route's id. */
+  stored?: StoredSessionSummary
+}
+
+/**
+ * Shown for a session saved before the live counts were kept (migration
+ * 009). The number is real; it is just not the whole count, and saying so is
+ * the difference between a low figure and a wrong one.
+ */
+export const MATCHED_ONLY_NOTE =
+  'Only the punches that answered a called combination were kept for this session. The full count was not, so this is lower than the counter showed.'
+
+/** In place of a figure nothing stored. Never a zero (D11). */
+export const NOT_RECORDED = 'not recorded'
+
+/**
+ * The saved session the route names (`summary?id=…`) — read through the same
+ * service the history list uses, so the two cannot disagree. `asked` is
+ * whether a session was asked for at all.
+ */
+function useStoredSession(props: SummaryScreenProps): {
+  stored: StoredSessionSummary | null
+  asked: boolean
+} {
+  const { id } = useLocalSearchParams<{ id?: string }>()
+  return useMemo(() => {
+    if (props.stored) return { stored: props.stored, asked: true }
+    if (props.summary || typeof id !== 'string' || id === '') return { stored: null, asked: false }
+    try {
+      return { stored: readSessionSummary(getWorkoutPersistence(), id), asked: true }
+    } catch (err) {
+      logger.error('workout.summary.readFailed', 'a saved session could not be read', {
+        error: safe(String(err)),
+      })
+      return { stored: null, asked: true }
+    }
+  }, [id, props.stored, props.summary])
 }
 
 /** Shown beside a short count. A measurement note, not a judgement (D13). */
@@ -49,20 +91,26 @@ function Metric(props: {
 
 export default function SummaryScreen(props: SummaryScreenProps): React.JSX.Element {
   const router = useRouter()
-  const summary = props.summary
+  const { stored, asked } = useStoredSession(props)
+  const summary = props.summary ?? stored?.summary
 
   if (!summary) {
     return (
       <ScrollView style={styles.root} contentContainerStyle={styles.container}>
         <Stack.Screen options={{ title: 'Workout summary' }} />
         <Text style={styles.empty} testID="summary-empty">
-          No workout to summarise yet.
+          {asked ? 'That session is not saved here.' : 'No workout to summarise yet.'}
         </Text>
       </ScrollView>
     )
   }
 
-  const isShort = summary.grade.outcome === 'short'
+  // A session from before the live counts: its number is matched punches.
+  const matchedOnly = stored !== null && summary.countBasis === 'matched'
+  // The sensing-threshold note explains a short count on a workout that ran
+  // its course. A stopped workout, or a count that was never the whole
+  // count, is short for a reason that note does not give.
+  const isShort = summary.grade.outcome === 'short' && !matchedOnly && !stored?.stopped
 
   return (
     <ScrollView
@@ -73,6 +121,30 @@ export default function SummaryScreen(props: SummaryScreenProps): React.JSX.Elem
       <Stack.Screen options={{ title: 'Workout summary' }} />
 
       <Text style={styles.title}>{summary.recipeName}</Text>
+
+      {stored ? (
+        <View style={styles.meta} testID="summary-meta">
+          <Text style={styles.metaText} testID="summary-when">
+            {formatSessionWhen(stored.when)}
+          </Text>
+          {stored.stopped ? (
+            <Text style={styles.tag} testID="summary-stopped">
+              {`Stopped in round ${Math.max(1, stored.roundsReached)} of ${stored.roundsPlanned}`}
+            </Text>
+          ) : null}
+          {stored.simulated === true ? (
+            <Text style={styles.tag} testID="summary-simulated">
+              Simulated punches
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
+
+      {matchedOnly ? (
+        <Text style={styles.basis} testID="summary-basis">
+          Matched punches
+        </Text>
+      ) : null}
 
       {/* The headline count reuses the same badge the round results use, so
           over / short / exact read identically everywhere (M33-03). */}
@@ -97,6 +169,11 @@ export default function SummaryScreen(props: SummaryScreenProps): React.JSX.Elem
           {SHORT_COUNT_NOTE}
         </Text>
       ) : null}
+      {matchedOnly ? (
+        <Text style={styles.note} testID="matched-only-note">
+          {MATCHED_ONLY_NOTE}
+        </Text>
+      ) : null}
 
       <View style={styles.grid}>
         <Metric
@@ -110,7 +187,11 @@ export default function SummaryScreen(props: SummaryScreenProps): React.JSX.Elem
           label="Left / right"
           value={`${summary.leftRightSplit.left} / ${summary.leftRightSplit.right}`}
         />
-        <Metric testID="summary-extras" label="Extra punches" value={`${summary.extraPunches}`} />
+        <Metric
+          testID="summary-extras"
+          label="Extra punches"
+          value={matchedOnly ? NOT_RECORDED : `${summary.extraPunches}`}
+        />
 
         {/* Omitted entirely rather than shown as zero when nothing measured
             it (D11). */}
@@ -184,6 +265,25 @@ const styles = StyleSheet.create({
   title: { fontSize: 26, fontWeight: '800', color: colors.textPrimary },
   badgeRow: { alignItems: 'flex-start' },
   empty: { fontSize: 16, color: colors.textSecondary },
+  meta: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10 },
+  metaText: { fontSize: 14, color: colors.textSecondary },
+  tag: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  basis: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+  },
   note: { fontSize: 13, lineHeight: 19, color: colors.textSecondary },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 20 },
   metric: { gap: 2, minWidth: 130 },

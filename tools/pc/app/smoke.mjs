@@ -12,7 +12,8 @@
 //   3. a workout starts, the coach's calls go out, simulated punches count;
 //   4. stopping and saving writes the session;
 //   5. after another reload the saved database — read straight out of the
-//      browser's storage and opened here, outside the app — holds it;
+//      browser's storage and opened here, outside the app — holds it, and
+//      History and the session's summary show what the live counter counted;
 //   6. a second tab does not start — two would save over each other;
 //   7. nothing on the page threw, rejected unhandled, logged an error or
 //      failed to load, at any point.
@@ -36,10 +37,22 @@ export function punchesIn(text) {
   return match ? Number(match[1].replace(/,/g, '')) : 0
 }
 
+// Read with this script's own few lines, not the app's: IndexedDB database
+// `punchcraft`, store `files`, key `punchcraft.db` (`idbByteStore.web.ts`).
 const READ_DATABASE = `(async () => {
-  const root = await navigator.storage.getDirectory()
-  const handle = await root.getFileHandle('punchcraft.db')
-  const bytes = new Uint8Array(await (await handle.getFile()).arrayBuffer())
+  const db = await new Promise((resolve, reject) => {
+    const request = indexedDB.open('punchcraft')
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
+  })
+  const stored = await new Promise((resolve, reject) => {
+    const request = db.transaction('files').objectStore('files').get('punchcraft.db')
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
+  })
+  db.close()
+  if (!stored) throw new Error('nothing is saved under punchcraft.db')
+  const bytes = stored instanceof Uint8Array ? stored : new Uint8Array(stored)
   let binary = ''
   for (let i = 0; i < bytes.length; i += 0x8000) {
     binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000))
@@ -86,8 +99,10 @@ async function run(page, base, openAnother) {
     30_000,
   )
   // Past the intro and into round 1: calls dispatched, punches counted.
+  let punchesSeen = 0
   for (let waited = 0; ; waited += 500) {
     const punches = punchesIn(await page.evaluate(`${byId('metric-punches')}?.innerText`))
+    punchesSeen = punches
     const calls = page.consoleLines.slice(from).filter((l) => l.includes('clickScript.dispatch'))
     if (punches > 0 && calls.length >= 2) {
       step(`round 1 ran: ${calls.length} calls dispatched, ${punches} simulated punches counted`)
@@ -119,6 +134,31 @@ async function run(page, base, openAnother) {
     throw new Error(`the saved database is wrong: ${sessions} sessions, ${cues} cues, ${runs} runs`)
   }
   step(`after a reload the saved database holds it: 1 session, ${cues} cue results`)
+
+  // What the live counter counted is kept with the session (migration 009),
+  // and History shows that — not the handful of punches the cue results hold.
+  const counted = JSON.parse(saved.scalar('SELECT live_counts_json FROM sessions') ?? 'null')
+  if (!counted || !(counted.total >= punchesSeen) || counted.source !== 'simulated') {
+    throw new Error(`the live counts were not saved as counted: ${JSON.stringify(counted)}`)
+  }
+  await page.evaluate(`${byId('open-history')}.click()`)
+  const row = `document.querySelector('[data-testid^="history-row-"]')`
+  await page.waitFor('the session in History', `${row} !== null`)
+  const rowText = String(await page.evaluate(`${row}.innerText`))
+  for (const expected of [`${counted.total} punches`, 'Stopped early', 'Simulated']) {
+    if (!rowText.includes(expected)) {
+      throw new Error(`the History row does not say "${expected}": ${JSON.stringify(rowText)}`)
+    }
+  }
+  await page.evaluate(`${row}.click()`)
+  await page.waitFor('the session summary', `${byId('summary-screen')} !== null`)
+  const summaryText = String(await page.evaluate(`${byId('summary-screen')}.innerText`))
+  for (const expected of [String(counted.total), 'Stopped in round 1 of', 'Simulated punches']) {
+    if (!summaryText.includes(expected)) {
+      throw new Error(`the summary does not say "${expected}": ${JSON.stringify(summaryText)}`)
+    }
+  }
+  step(`History lists it, and its summary shows the ${counted.total} punches the counter counted`)
 
   // A second tab, while this one is still open.
   const second = await openAnother()

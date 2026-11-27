@@ -3226,8 +3226,8 @@
       "clipId": "lt-d51205fb",
       "text": "Pump: jabs only, time-and-a-half — fifteen bars. Finish the round owning the lead hand. Crisp, not tense.",
       "durationMs": 7504,
-      "expectedStartTick": 185976,
-      "expectedStartMs": 193725,
+      "expectedStartTick": 186488,
+      "expectedStartMs": 194258,
       "source": "clickScript.schedule"
     }
   ],

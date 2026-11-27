@@ -32,8 +32,8 @@ reachable from the network.
 
 ## Where the data lives
 
-In the browser's own private storage for `127.0.0.1:8788` — one SQLite file,
-`punchcraft.db`, the same schema and migrations as the tablet's. It is not
+In the browser's IndexedDB for `127.0.0.1:8788` — one SQLite database, the
+same schema and migrations as the tablet's, kept as a single blob. It is not
 the tablet's data and does not sync with it. A different port, or a different
 browser, is a different (empty) database. Clearing the site's data in the
 browser deletes it.
@@ -47,15 +47,17 @@ a second after each write, and at once when the tab is hidden:
   lost. What was saved before is never damaged.
 - **One tab at a time.** A second tab would save its own copy over the
   first's, so it does not start; it says the app is already open.
-- **If the browser drops the file, the app says so.** A load that finds no
-  database where one was saved logs `storage.web.savedFileMissing` as an
-  error and starts empty.
-- **Do not use the Claude desktop app's built-in browser pane for anything
-  you want kept.** It empties this kind of storage for a page left idle
-  about ten minutes — measured 2026-11-26 with an unrelated file beside the
-  database: both gone, while `localStorage` and IndexedDB survived. Sessions
-  saved there are lost. Chrome itself kept both files through the same
-  twelve-minute test — this is the pane, not the app.
+- **If the browser drops the database, the app says so.** A load that finds
+  none where one was saved logs `storage.web.savedFileMissing` as an error
+  and starts empty.
+
+**Why IndexedDB.** The database was first kept as a file in the browser's
+private file system. Chrome keeps that faithfully; the Claude desktop app's
+built-in browser pane empties it for a page left idle about ten minutes, and
+two saved sessions vanished that way. IndexedDB survives there: with the
+database in IndexedDB and a canary file in the old place, thirteen idle
+minutes took the canary and left the database, and a reload restored it
+(2026-11-27). Nothing saved under the old scheme is carried over.
 
 ## The smoke test
 

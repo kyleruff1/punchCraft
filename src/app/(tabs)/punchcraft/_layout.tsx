@@ -12,8 +12,8 @@ const screenOptions = {
 
 /**
  * Stack layout inside the punchCraft tab, mirroring Velocity Lab's. The
- * recipe screen — and later `presets`, `live` and `summary` — push onto
- * this stack rather than appearing as their own bottom-tab entries.
+ * recipe, `live`, `history` and `summary` screens push onto this stack
+ * rather than appearing as their own bottom-tab entries.
  */
 export default function PunchCraftLayout() {
   return (
@@ -24,6 +24,7 @@ export default function PunchCraftLayout() {
           the cue stage needs (doc §19). */}
       <Stack.Screen name="live" options={{ headerShown: false }} />
       <Stack.Screen name="summary" options={{ headerShown: true, title: 'Workout summary' }} />
+      <Stack.Screen name="history" options={{ headerShown: true, title: 'History' }} />
       {/* Throwaway M32-05 spike route (#182); removed when the spike closes. */}
       <Stack.Screen
         name="orientation-spike"

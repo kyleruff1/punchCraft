@@ -2912,8 +2912,8 @@
       "clipId": "li-d016c656",
       "text": "One, two, three, four — straight time, nine bars. Same corners, walked in order. Feet under you.",
       "durationMs": 8471,
-      "expectedStartTick": 40394,
-      "expectedStartMs": 42077,
+      "expectedStartTick": 40712,
+      "expectedStartMs": 42408,
       "source": "clickScript.schedule"
     },
     {

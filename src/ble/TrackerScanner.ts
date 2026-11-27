@@ -31,9 +31,15 @@ export class TrackerScanner {
       if (stopped) return
       stopped = true
       // Fire-and-forget: causes the in-flight scan() promise to resolve.
-      void this.facade.stopScan().catch(() => {
-        // Idempotent; swallow.
-      })
+      // The `try` is for a transport that throws rather than rejects — this
+      // runs from a timer, where a throw has nobody to catch it.
+      try {
+        void this.facade.stopScan().catch(() => {
+          // Idempotent; swallow.
+        })
+      } catch {
+        // Nothing to stop.
+      }
     }
 
     const onAdvertisement = (ad: AdvertisementSnapshot): void => {
@@ -66,12 +72,18 @@ export class TrackerScanner {
 
     const timeoutHandle = setTimeout(requestStop, timeoutMs)
 
-    // Kick off scan WITHOUT awaiting — it resolves when the scan actually
-    // terminates (either on its own, or because we called stopScan()).
-    const scanPromise = this.facade.scan(scanOptions, onAdvertisement)
-
     try {
-      await scanPromise
+      // The scan resolves when it actually terminates — on its own, or
+      // because `requestStop` called stopScan().
+      //
+      // The call itself is inside the `try` (N-9). It used to sit just above
+      // it, so a transport whose `scan` THREW rather than rejected skipped
+      // the handler below, left the stop timer armed, and had it fire into
+      // `stopScan()` ten seconds later with nothing to catch it. The tablet's
+      // transport returns a promise, so this only ever happened under a test
+      // double — where it printed an uncaught error in the middle of every
+      // full, green jest run.
+      await this.facade.scan(scanOptions, onAdvertisement)
     } catch {
       // A failed scan yields an empty result rather than propagating.
       clearTimeout(timeoutHandle)

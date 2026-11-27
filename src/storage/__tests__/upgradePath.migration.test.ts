@@ -149,6 +149,14 @@ describe('upgrading a database that already holds sessions (004 → current)', (
     expect(db.count('SELECT COUNT(*) AS n FROM workout_adaptations')).toBe(1)
   })
 
+  it('gives every existing session an empty live-counts column — not recorded, not zero (009)', () => {
+    const rows = db.query<{ id: string; live_counts_json: string | null }>(
+      'SELECT id, live_counts_json FROM sessions ORDER BY id',
+    )
+    expect(rows.length).toBeGreaterThan(0)
+    for (const row of rows) expect(row.live_counts_json).toBeNull()
+  })
+
   it('leaves no dangling reference and a sound file', () => {
     expect(db.query('PRAGMA foreign_key_check')).toEqual([])
     expect(db.query('PRAGMA integrity_check')).toEqual([{ integrity_check: 'ok' }])
@@ -195,6 +203,8 @@ describe('a shipped migration is append-only', () => {
     6: 'ce02d426373a93e0',
     7: '679518b61440d0d0',
     8: '5a15032a09306812',
+    // Added with the migration, 2026-11-27 (sessions.live_counts_json).
+    9: '970ae00214bdacbd',
   }
 
   /** Whitespace and SQL comments do not change a schema; everything else does. */
