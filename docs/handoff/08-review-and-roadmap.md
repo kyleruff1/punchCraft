@@ -1372,7 +1372,7 @@ names the first value that differs. **If it fails, read the diff before
 regenerating: a change you did not expect is a timing regression, not a
 stale file.**
 
-#### N-12 · A discarded session leaves its adaptation records behind · **open, low**
+#### N-12 · A discarded session leaves its adaptation records behind · **fixed** (`f9255736`, migration 010 — §3i)
 
 `workout_adaptations` is keyed by the plan, not the session, and its only
 foreign key is to the plan. Discarding a stopped session deletes the session
@@ -1443,7 +1443,7 @@ when the build on disk is not the checkout's commit, and checks the result.
 CI builds were always cold and always right. **The tablet is not affected**:
 its captures show the build and the host agreeing.
 
-#### N-14 · The app's playback observer means nothing in a browser · **guarded** (`9316add4`); the observer itself **open, low**
+#### N-14 · The app's playback observer means nothing in a browser · **guarded** (`9316add4`); the observer itself **fixed** (`3d5bd4f3` — §3i)
 
 `src/audio/PlaybackObserver.ts` stamps "started" when the player reports
 `playing`. expo-audio's web player reports that the moment play is
@@ -1525,6 +1525,280 @@ and fails on more.
   off the app does the same thing (81 of 81 dispatches, the same verdict);
   what the routing does to the start latency itself cannot be known without
   a microphone, which is why that figure is reported and never judged.
+
+**Later on 2026-11-27:** the first three of these are closed in §3i — the
+manual run of all 22 on a runner, whole workouts, and technique names.
+
+## 3i. The every-sound batch
+
+**The ask:** on the PC, with no tablet: whole workouts in both vocabularies;
+the bells, the intro and the countdown judged by sound as the calls are; the
+rings. And three loose ends — the playback observer in a browser (N-14),
+what a discarded session leaves behind (N-12), and the two merged branches.
+CI to stay advisory, with one run of all 22. Branch `feat/pc-every-sound`.
+How to use what it built: `tools/pc/suite/README.md`.
+
+### What landed
+
+| What | Commit |
+|---|---|
+| Which clip an audio element played, and why it stopped | `6d970648` |
+| Bells judged by sound | `245cfd99` |
+| N-17: the PC's file server could not resume an audio file the browser had suspended | `bf1e191f` |
+| The intro, the countdown and the rest line judged by sound; a drive now runs through the first rest | `ae1fe3ad` |
+| The rings: did every one light, and when | `60c89637` |
+| Figures for every round, and the app's own admissions | `7064705f` |
+| N-12: a discarded workout takes its adaptation records with it (migration 010) | `f9255736` |
+| The "cut short before it began" log line says what it is | `a27db520` |
+| N-14: the playback observer reads a browser's player as a browser's | `3d5bd4f3` |
+| CI: sound is judged on a runner as it is on a PC | `6887c5cd` |
+| A call sent as the capture stops is not a call that made no sound | `f666ca2c` |
+
+The two merged branches (`feat/pc-sync-bench`, `docs/pc-sync-first-run`) are
+deleted on GitHub.
+
+### What it measured
+
+**All 22 on a GitHub runner** (the manual run of the workflow, before any of
+this batch's code): 22 of 22 passed, two at a time, in 52 minutes. Every
+clip heard, none silent or cut; least gap before a ring 262 ms (247 on this
+PC); parity the same as here — 12 identical, 10 skipped, none different.
+
+**Whole workouts, both vocabularies** — 44 drives at `7064705f`, six at a
+time, in 1 hour 52 minutes. 44 of 44 pass.
+
+- **Correlator:** 44 of 44, round 1 of each against its own manifest, in
+  numbers and in technique names.
+- **Calls and lead-ins:** 8 404 played, 8 404 heard; none silent, none cut.
+  Of the 8 006 calls measured against their ring, none stopped under the
+  150 ms floor and none was still sounding when its ring was due. The least
+  gap in any drive was 218 ms.
+- **Bells:** 252 of 252 round boundaries rung, none silent or stopped; first
+  sound a median 73 to 103 ms after the boundary (at most 283).
+- **Intro, rest line, countdown:** 44 intros, 82 rest lines and 82
+  countdowns, every one played whole. No countdown was cut by its bell; from
+  its last word to the bell's first sound, 88 to 528 ms.
+- **Rings:** 29 932 of 29 932 lit. None stepped over, none painted more than
+  100 ms late, no stall in the app's loop. Painted a median 3.7 to 7.6 ms
+  after their time in rounds 2 to 4 — and 4.9 to 53.9 ms in round 1 (N-18).
+- **The app's own admissions:** no clip it could not play or find, no call
+  skipped or deferred, no error on the page, in any round.
+- **Parity, round 1 of each:** 12 the same, none different, 32 skipped — the
+  ten of N-15, and every technique-name drive. The tablet has two
+  technique-name captures and both play re-recorded clips, so **technique
+  names have never been compared with the tablet**; they are judged by the
+  correlator and by sound.
+
+**All 22 as `npm run pc:suite` now runs them** — round 1 and the rest after
+it, at `f666ca2c`, the last code commit of the batch, six at a time, in 22
+minutes. 22 of 22 pass.
+
+- **Correlator:** 22 of 22. **Parity:** 12 the same, none different, 10
+  skipped (N-15), as before.
+- **Calls and lead-ins:** 1 464 played, 1 451 heard, none silent, none cut;
+  13 not finished when the capture stopped, which is where a drive ends. Of
+  1 379 calls measured, none under the floor, none past its ring; least gap
+  252 ms.
+- **Bells:** 66 of 66. **Intro, rest line, countdown:** 22 of each, whole.
+- **Rings:** 4 758 of 4 758 lit; painted a median 6.3 to 54.7 ms after their
+  time, drive by drive — round 1, so N-18.
+- **The app's own observer against the audio elements:** 1 583 plays timed,
+  every one closed "ok" and every one matched to its element. The two differ
+  by at most 20.6 ms on when a clip began and 1.5 ms on when it ended.
+
+**Each new rule fails when it should.** On One-Two, with the app broken on
+purpose and still believing all is well:
+
+| Fault | Verdict | On what |
+|---|---|---|
+| none | PASS | 194 of 194 rings lit; every bell and ceremony whole |
+| `mute-bell` | FAIL | "2 bell(s) rang and made no sound" |
+| `cut-countdown` | FAIL | "countdown 1: its clip warn-opener-06 was stopped 2213 ms before its end, and the log does not say why" |
+| `late-rings` | FAIL | "3 bar(s) did not light all their rings"; 79 stepped over by a late frame, 97 painted more than 100 ms late — and the sound untouched, 81 clips heard as before |
+
+### Findings
+
+#### N-17 · The PC's file server could not resume an audio file · **fixed** (`bf1e191f`)
+
+`tools/pc/app/webApp.mjs` ignored `Range` and sent no `Content-Length`. A
+browser that has loaded an `<audio>` element and not yet played it suspends
+the download, and resumes it with a range request when play is called. The
+server answered with the whole file again and no length; Chrome gave up
+(`PIPELINE_ERROR_READ: FFmpegDemuxer: data source error`). The countdown's
+350 ms silence track is exactly such an element — loaded ahead, played
+later — so the countdown lost everything after its first clip in 7 of 8
+drives of One-Two. With no length the browser also reported every clip's
+duration as unknown, which is why the first `cut-countdown` fault passed: a
+clip of unknown length cannot be seen to stop short.
+
+Found by the countdown rule on its first run. The server now sends lengths
+and answers ranges (206, and 416 outside the file); four of four drives then
+played the countdown whole. **PC only** — the tablet reads its clips from the
+app bundle. It does mean every PC run before `bf1e191f` played a broken
+countdown and nothing noticed, because nothing listened to it.
+
+#### N-18 · A round that opens on a skip starts its work clock up to a tick early · **open — yours to decide; it changes what the tablet does**
+
+Round 1 never opens on the clock. The countdown is a cap; the intro ends
+ahead of it and calls `skipCountdown()` (`live.tsx:398`). `skipRest()` is the
+same door for a rest the athlete skips. Both enter the work phase without
+moving the clock's anchor (`WorkoutSessionClock.ts:186`, `:172`): the anchor
+stays at the last 50 ms tick, and the next tick counts everything since then
+as work. `resume()` moves the anchor, with a comment saying why; the skips
+do not.
+
+So in a round opened by a skip, the work clock is ahead of the bell by the
+time since the last tick. That clock schedules the calls and the ring tokens
+and scores the punches. The rings on screen are painted from a second clock,
+published at the skip itself with a reading of zero
+(`_useWorkoutRunner.ts:1626`). The two disagree for the whole round.
+
+A second, smaller thing adds to it in every round: that publish pairs the
+work clock's reading *at the tick* with a timestamp taken later in the same
+tick, after the bell has been sent and the phase announced. Whatever that
+took, the rings run behind by.
+
+*In the domain, exactly:* a skip 30 ms after the last tick opens the round
+with the work clock reading 30, and 50 twenty milliseconds later. (A
+throwaway test; the existing test of the skip passes because its harness
+only ever skips on a tick.)
+
+*On the PC:* rings painted 37 to 54 ms after their scheduled time in round 1
+of One-Two across five drives, and a median 4 to 8 ms from round 2 on in
+all 44 whole-workout drives. Round 1's figure is a different number every
+run — 5 to 54 ms over those 44 — because it is where the intro's end
+happens to fall between two ticks. Drive by drive it is the gap between the
+work clock's zero and the boundary record, plus a frame: 32 → 35, 18 → 23,
+2 → 6.
+
+*On the tablet — from its own September captures, no new run:* the timing
+tool already prints this gap for every round ("the work-entered boundary
+trails the tokenDue fit by … ms") and files it as the log site's latency.
+Across all 24 captures it is **43 to 87 ms in round 1** and 7 to 22 ms in
+later rounds. In heavy-hands the work clock's zero is 68 ms before the bell
+was even sent.
+
+What that means at the bag, on the tablet, today: in round 1 the rings
+light 43 to 87 ms later, against the calls, than the schedule says —
+against 7 to 22 ms from round 2 on — and a punch thrown on a ring is scored
+that much late against its cue. Round 1 is the round the verifier judges
+and, I would guess, the one most often listened to.
+
+*Tried, on the PC only, in a build kept out of the repository:* with both
+changes below, three drives of One-Two and one of Body Work put the
+boundary 0.6 to 0.8 ms after the work clock's zero and painted round 1's
+rings a median 3.5 to 5.8 ms after their time (most 15) — where five drives
+of One-Two without them had 37 to 54, and Body Work 35 and 52. The
+correlator, the sound gate and the ring check passed as before; every call
+was heard, and the least gap before a ring was unchanged (370 to 391 ms on
+One-Two). The whole test suite passes with them applied too, snapshots
+unchanged — which also says that no test pins what the skips do today.
+
+**I have not changed it.** The fix is small — move the anchor in the two
+skips, as `resume()` does; publish the ring clock with
+`session.workElapsedAt(now)` — and it has tests waiting to be written. But
+it moves round 1 on the tablet by most of that 43 to 87 ms against
+everything tuned by ear, toward what rounds 2 on already are, so it is your
+call, and it wants one tablet suite run after it. The note in
+`observed-timing.mjs` that explains the gap away should go with it.
+
+#### N-14 · The playback observer in a browser · **fixed** (`3d5bd4f3`)
+
+Closed as §3h left it open. expo-audio's browser players say `playing: true`
+from the request, not the sound, and a download-first player's second
+element says `playing: false` as it loads. The observer now takes an
+optional reading of a status (`readStatus`); the tablet build supplies none
+and its tests are unchanged; the PC build's (`observedStatus.web.ts`) counts
+a status only once the playhead has moved. The suite holds the result
+against the audio elements in every drive's report. One-Two, round 1 and its
+rest, before and after: first-time clips "4 to 13 ms long" → whole; a
+ceremony closed 8.3 s early → ends agree within 1.1 ms; starts agree within
+11.5 ms.
+
+The tablet's timing tool still refuses a PC capture. Its message now gives
+the reason that was always the real one: its onsets are corrected by the
+tablet's measured start latency.
+
+#### N-12 · A discarded session's adaptation records · **fixed** (`f9255736`)
+
+Migration 010: `workout_adaptations.session_id`, nullable, cascading from
+`sessions`. A save fills it in; rows written before keep an empty one and
+stay with their plan. `listAdaptationsForSession` now describes one session.
+Like 009 it is one `ADD COLUMN`, it passes the upgrade path on both engines,
+and **the tablet's real database has not run it** (§7).
+
+#### Seen, and not chased
+
+- **Rounds after the first have no independent check.** The correlator and
+  its manifests cover round 1. In later rounds the suite judges what the app
+  played and fails a clip the app itself logged it could not play; nothing
+  says what a later round *should* have played. Manifests for every round
+  would close it.
+- **A browser playlist sets its volume on the current audio element only**
+  (expo-audio's web `AudioPlaylist`), so a volume change mid-ceremony could
+  leave the next clip at the old one. The suite warns when one ceremony
+  plays at two volumes; it has not fired. PC only.
+- **The closing bell is not covered by the check written to protect it.**
+  `msUntilQuiet()` (GH #356, 2026-09-06) is what stops the live screen
+  tearing its audio down over the closing bell (`live.tsx:627`). It reads
+  the coach lane's busy window — and bells have been kept out of that
+  window since 2026-08-31 (GH #305, on purpose: a bell must not block
+  speech). So for a bell on its own it answers 0. It can only matter when a
+  workout ends with the live screen out of focus, and I have not reproduced
+  it: in every whole-workout drive here the screen was in focus and the
+  closing bell rang whole. A design reviewer raised it against the plan.
+
+### Corrections to my own work in this batch
+
+- **There is no ten-second warning.** The survey offered to judge one. That
+  moment is silent by design; the countdown is the one at the end of the
+  rest.
+- **I first read the rest line as talking over the countdown**, by about two
+  seconds. A wrong grouping in a scratch script; a careful pass showed 28
+  seconds of clear air between them. Nothing was built on it.
+- **I planned a rule for a ring lighting out of order.** The walk only moves
+  forward within a bar, so it could never fire — which is also why all 22
+  saved runs were "clean" on it. What can go wrong is a ring that is late or
+  never lights, and that is what is judged.
+- **I planned to warn at 50 ms of ring lateness.** Round 1 sat at 37 to 54 on
+  this PC, so it would have warned on every drive. The threshold is 100, and
+  the reason round 1 sat there turned out to be N-18.
+- **I first blamed N-18 on the ring clock's publish alone, and called it
+  unmeasured on the tablet.** The larger part is the skip's anchor, and the
+  tablet's own tool has printed the gap on every capture since September.
+- **The first `cut-countdown` fault passed.** Durations were unknown, for
+  the reason N-17 gives. A gate that cannot fail is worth finding before it
+  is trusted, which is what the faults are for.
+- **My "made no sound" rule failed four clean drives.** The first time all
+  22 ran through the rest, the first call of round 2 was judged silent in
+  four of them: it had been sent 0 to 141 ms before the capture stopped and
+  had not sounded *yet*. Only One-Two had been driven that way before, and
+  its capture happens to stop mid-call. Fixed in `f666ca2c`; the run
+  reported above is the one after it.
+- **The observer fix needed one thing the plan did not have.** Dropping
+  statuses before the playhead moves leaves a clip shorter than the
+  browser's reporting interval never seen to start. A status that has moved
+  and already stopped is now read as both.
+- **The CI change is smaller than the plan made it sound.** A warning
+  already exited non-zero, so the step went red on a sound finding either
+  way. What changed is the word in the summary.
+- **The default drive is longer than "round 1" now.** It runs through the
+  first rest, about a minute more a workout, because that is where the
+  bell, the rest line and the countdown are.
+
+### Still unproven
+
+- **N-18 on the tablet.** The diagnosis rests on the tablet's September
+  captures; no fix has been near it.
+- **Migration 010 on the tablet's real database** (§7).
+- **The rest, and the rings, on a GitHub runner.** The four runs there
+  predate both. A ring painted more than 100 ms late warns, and a shared
+  four-processor machine may do that.
+- **The observer's browser reading**, beyond the drives above: it is held
+  against the audio elements, which is one browser's account of itself.
+- As before: the tablet's speaker delay and start latency, whether its
+  processor keeps up, anything by ear — and ten of the 22 parity
+  comparisons, until the tablet suite runs again (N-15).
 
 ---
 
@@ -1741,10 +2015,12 @@ Nothing below is proven by jest. Every item needs a Metro restart **and** a
 cold app restart first — `F:` has no fast refresh.
 
 **First, what no longer needs the tablet.** Whether the coach says the right
-thing at the right scheduled time, and whether each call's sound is clear of
-its ring, is now checked on the PC in 20 minutes: `npm run pc:suite`, then
-`npm run pc:parity` (§3h). Run it before any tablet session; a correlator or
-sound failure there is a failure here.
+thing at the right scheduled time; whether each call's sound is clear of its
+ring; whether every bell, the intro, the countdown and the rest line sound
+whole; and whether every ring lights — all checked on the PC in about 22
+minutes: `npm run pc:suite`, then `npm run pc:parity` (§3h, §3i). Run it
+before any tablet session; a correlator, sound or ring failure there is a
+failure here.
 
 **The tablet suite, once — it is what the PC compares itself with.** Ten of
 the 22 workouts play a call clip re-recorded since the September captures and
@@ -1871,3 +2147,20 @@ by design.
 - *The next suite drive.* It judges against the regenerated manifests
   (N-11). Six workouts' lead-ins that the stale files would have flagged
   should now read clean; anything still flagged there is real.
+
+**From the every-sound batch (§3i).**
+- *Migration 010 on the tablet's real database.* Installing this build adds
+  one nullable column to `workout_adaptations`. Same kind as 009, same
+  tests, and the tablet's own database has never run it. Nothing reads the
+  column on screen; one finished workout, then
+  `SELECT COUNT(*), COUNT(session_id) FROM workout_adaptations` is the look:
+  the new rows carry a session, the old ones do not.
+- *N-18, if you take the fix.* One tablet suite run. In every
+  `observed-timing-report.md` the note "the work-entered boundary trails
+  the tokenDue fit by … ms" stood at 43 to 87 ms for round 1 in September;
+  it should fall to the 7 to 22 ms the later rounds show, or below. Then
+  round 1 by ear and eye against round 2: today they differ by that much,
+  and after the fix they should not.
+- *N-18, if you do not.* Nothing to run — but round 1 is then the wrong
+  round to tune anything by, because its rings sit 43 to 87 ms late against
+  the calls where every other round's sit 7 to 22.

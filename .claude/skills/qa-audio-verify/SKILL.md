@@ -36,12 +36,18 @@ the observers' summary beside every verdict.
 ### The same suite on the PC
 
 `npm run pc:suite` drives the same 22 workouts from the same QA link in a
-headless browser, with no tablet: about 20 minutes for all of them. The
-correlator is this skill's, unchanged, on a capture in this skill's layout.
-The timing half is different, and has to be: `observed-timing.mjs` **refuses
-a PC capture**, because the playhead observer above means nothing in a
-browser. The PC listens to the sound itself instead and judges that
-(`tools/pc/suite/README.md`).
+headless browser, with no tablet: about 22 minutes for all of them, each
+through round 1 and the rest after it. The correlator is this skill's,
+unchanged, on a capture in this skill's layout. The timing half is
+different, and has to be: `observed-timing.mjs` **refuses a PC capture**,
+because every onset in it is corrected by this tablet's measured start
+latency and every constant it proposes is this tablet's. The PC listens to
+the sound itself instead and judges that — calls, bells, the intro, the
+countdown and the rest line — and checks that every ring lit
+(`tools/pc/suite/README.md`). The playback observer does run there, read
+through `src/audio/observedStatus.web.ts`, and the PC suite reports how it
+compares with the sound; that reading is the browser's and changes nothing
+on this device.
 
 Use it first. What is said, in what order and when is code both devices run,
 so a correlator failure there is a failure here, found without the tablet.
