@@ -23,10 +23,13 @@ import {
   planJobs,
   quoteForDeviceShell,
   runQuery,
+  isEmulatorDevice,
   renderSummaryMd,
+  timingRefusal,
   timingVerdictFromExit,
   verdictFromVerifyExit,
   WALKOUT_ALLOWANCE_MS,
+  workAxisLines,
   worstVerdict,
 } from '../verify-suite.mjs'
 import { latencyStats, summarizeObserved } from '../observed-summary.mjs'
@@ -361,5 +364,91 @@ describe('observed summary', () => {
   it('latencyStats ignores non-numbers and reports jitter as p95 − median', () => {
     expect(latencyStats([10, undefined, 20, null, 30, 100])).toEqual({ n: 4, medianMs: 25, p95Ms: 100, jitterMs: 75 })
     expect(latencyStats([])).toEqual({ n: 0, medianMs: null, p95Ms: null, jitterMs: null })
+  })
+})
+
+describe('an emulator is a PC (findings doc, N-19)', () => {
+  // 2026-11-27: this suite ran the timing analyzer on an emulator's capture,
+  // and it proposed CALL_DISPATCH_LAG_MS 71 → 28 from this PC's audio path.
+
+  describe('asking the device', () => {
+    it('knows an emulator by the name adb gives it', () => {
+      expect(isEmulatorDevice({ serial: 'emulator-5556' })).toBe(true)
+      expect(isEmulatorDevice({ serial: 'emulator-5554', qemu: '', characteristics: '' })).toBe(true)
+    })
+
+    it('knows one by its own properties, whatever it is called', () => {
+      expect(isEmulatorDevice({ serial: '192.0.2.10:5555', qemu: '1' + String.fromCharCode(13, 10) })).toBe(true)
+      expect(isEmulatorDevice({ serial: '192.0.2.10:5555', characteristics: 'emulator' })).toBe(true)
+      expect(isEmulatorDevice({ serial: '192.0.2.10:5555', characteristics: 'tablet,emulator' })).toBe(true)
+    })
+
+    it('leaves a tablet a tablet', () => {
+      expect(isEmulatorDevice({ serial: '192.0.2.10:5555', qemu: '', characteristics: 'tablet,nosdcard' })).toBe(false)
+      expect(isEmulatorDevice({ serial: 'ABC123XYZ', qemu: '0', characteristics: 'tablet' })).toBe(false)
+      expect(isEmulatorDevice({ serial: 'my-emulator-5556-lookalike' })).toBe(false)
+      expect(isEmulatorDevice({})).toBe(false)
+      expect(isEmulatorDevice()).toBe(false)
+    })
+  })
+
+  describe('whether timing is judged', () => {
+    it('is, on the tablet’s own capture', () => {
+      expect(timingRefusal({ platform: 'android', deviceIsEmulator: false })).toBeNull()
+    })
+
+    it('is not, when the capture says an emulator wrote it', () => {
+      expect(timingRefusal({ platform: 'android-emulator', deviceIsEmulator: false })).toMatch(/emulator/)
+    })
+
+    it('is not, when the device is an emulator and the build is too old to say so', () => {
+      // A September release APK installed to test an upgrade carries no field.
+      expect(timingRefusal({ platform: 'android', deviceIsEmulator: true })).toMatch(/emulator/)
+    })
+
+    it('is not, for a PC capture', () => {
+      expect(timingRefusal({ platform: 'web', deviceIsEmulator: false })).toMatch(/written on "web", not on the tablet/)
+    })
+  })
+
+  describe('what is shown in its place', () => {
+    const P = '08-31 10:00:00.000 I/ReactNativeJS( 8286): '
+    const rec = (tag, fields) => {
+      const [first, ...rest] = Object.entries(fields).map(([k, v]) => k + ': ' + (typeof v === 'string' ? "'" + v + "'" : String(v)))
+      return [P + "'[INFO] " + tag + "', 'message', { " + first + ',', ...rest.map((f) => P + '  ' + f + ','), P + '}'].join(NEWLINE)
+    }
+    const NEWLINE = String.fromCharCode(10)
+    const capture = [
+      rec('workout.round.boundary', { transition: 'work-entered', roundIndex: 0, workElapsedMs: 0, monotonicTimeMs: 10012 }),
+      rec('workout.cue.tokenDue', { roundIndex: 0, cueId: 'a#0', combination: '1-2', tokenIndex: 0, ordinal: 0, workElapsedMs: 5000, monotonicTimeMs: 15000, scheduledMs: 4990 }),
+      rec('workout.cue.tokenDue', { roundIndex: 0, cueId: 'a#0', combination: '1-2', tokenIndex: 1, ordinal: 1, workElapsedMs: 6000, monotonicTimeMs: 16000, scheduledMs: 5995 }),
+    ].join(NEWLINE)
+
+    it('gives the work axis: the app’s two clocks, round by round', () => {
+      expect(workAxisLines(capture)).toEqual(['round 0: 2 ring tokens place the work clock (spread 0 ms) · boundary record 12 ms after its zero'])
+      expect(workAxisLines('')).toEqual([])
+    })
+
+    it('puts it in the summary, with no timing figure and a plain warning', () => {
+      const md = renderSummaryMd(
+        [{ workoutId: 'quick-one-two', vocab: 'numbers', verdict: 'PASS', verifyExit: 0, timingVerdict: 'NOT JUDGED', timingRefusal: 'the device is an emulator, and an emulator on this PC is a PC', workAxis: workAxisLines(capture), breathFloor: null, elapsedMs: 1000 }],
+        { suiteId: '1', deviceId: 'emulator-5556', deviceIsEmulator: true, launch: 'cold', vocab: 'numbers', sim: 'captured-jam', firstRoundOnly: false, timingGate: 'fail', exitCode: 0 },
+      )
+      expect(md).toContain('device emulator-5556 (an emulator) ·')
+      expect(md).toContain('| quick-one-two | numbers | PASS |  | 0 | not judged | — | — | — |')
+      expect(md).toContain('### Timing — not judged')
+      expect(md).toContain('no tablet constant is set from any of them')
+      expect(md).toContain('- **quick-one-two (numbers)** — round 0: 2 ring tokens place the work clock (spread 0 ms) · boundary record 12 ms after its zero')
+    })
+
+    it('says nothing of the kind for a tablet', () => {
+      const md = renderSummaryMd(
+        [{ workoutId: 'body-work', vocab: 'numbers', verdict: 'PASS', verifyExit: 0, timingExit: 0, timingVerdict: 'PASS', breathFloor: null, elapsedMs: 1000 }],
+        { suiteId: '1', deviceId: 'dev', launch: 'cold', vocab: 'numbers', sim: 'captured-jam', firstRoundOnly: false, timingGate: 'fail', exitCode: 0 },
+      )
+      expect(md).toContain('device dev · cold launch')
+      expect(md).toContain('| 0 PASS |')
+      expect(md).not.toContain('not judged')
+    })
   })
 })
