@@ -145,6 +145,21 @@ describe('work axis fit', () => {
     const r1 = report.fit.find((r) => r.roundIndex === 1)
     expect(r1).toMatchObject({ offsetMs: 310000, boundaryOffsetMs: 310000, disagreementMs: 0 })
   })
+  it('notes an opening boundary that trails its fit, and says what the gap can hold', () => {
+    // Round 0's boundary record 68 ms after its work clock's zero — the shape
+    // of round 1 in a September tablet capture (findings doc, N-18).
+    const opening = (monotonicTimeMs) => rec('10:00:10.000', 'workout.round.boundary', { transition: 'work-entered', roundIndex: 0, workElapsedMs: 0, monotonicTimeMs })
+    const text = capture().replace(opening(10000), opening(10068))
+    expect(text).not.toBe(capture())
+    const report = analyze(text, CONSTANTS)
+    expect(report.fit.find((r) => r.roundIndex === 0)).toMatchObject({ offsetMs: 10000, boundaryOffsetMs: 10068, disagreementMs: 68 })
+    const note = report.notes.find((n) => n.startsWith('round 0: the work-entered boundary trails the tokenDue fit by 68 ms'))
+    // A note, not a warning — and no longer explained away as log latency.
+    expect(note).toMatch(/N-18/)
+    expect(note).not.toMatch(/log site/)
+    expect(report.verdict.soft.some((s) => s.startsWith('round 0: tokenDue fit'))).toBe(false)
+    expect(report.verdict.hard.some((s) => s.startsWith('round 0: tokenDue fit'))).toBe(false)
+  })
   it('falls back to the boundary when a round has no tokenDue', () => {
     const fit = fitWorkAxis([], [{ transition: 'work-entered', roundIndex: 0, workElapsedMs: 0, monotonicTimeMs: 500 }])
     expect(fit.get(0)).toMatchObject({ offsetMs: 500, n: 0, source: 'boundary' })

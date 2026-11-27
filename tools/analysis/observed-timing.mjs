@@ -531,15 +531,25 @@ export function analyze(text, constants = null) {
   }
   for (const round of fit.values()) {
     if (round.disagreementMs === null) continue
-    // A round's OWN opening boundary carries `workElapsedMs: 0` — the session
-    // clock has not advanced yet — so the whole disagreement there is the gap
-    // between the transition firing and the log record being written, not two
-    // clocks disagreeing. Warning on it made every capture report a ~78 ms
-    // "clock disagreement" that was the log site's own latency.
+    // A round's OWN opening boundary carries `workElapsedMs: 0`, and its
+    // record is written after the bell has been sent. So the gap there is not
+    // two clocks disagreeing about the same instant, and it is a note rather
+    // than a warning — warning on it made every capture report one.
+    //
+    // What the gap IS depends on the build. This comment used to file all of
+    // it as "the log site's own latency", and that is how a real fault sat in
+    // every report from September to November unread (findings doc, N-18):
+    // a round opened by a skip — round 1 always is, the intro ends ahead of
+    // the lead-in's cap — started its work clock at the tick BEFORE the skip,
+    // so the calls, the ring tokens and the scoring ran that far ahead of the
+    // bell. Across the September suite the gap is 43 to 87 ms in round 1 and
+    // 7 to 22 ms in later rounds; the 7 to 22 is the bell being sent, the
+    // rest was the head start. Fixed 2026-11-27. On a build with the fix, a
+    // round-1 gap well above the later rounds' is that fault back.
     const opensTheRound = round.boundaryWorkElapsedMs === 0
     if (round.disagreementMs > FIT_DISAGREEMENT_HARD_MS) hard.push(`round ${round.roundIndex}: tokenDue fit disagrees with its work-entered boundary by ${round.disagreementMs} ms`)
     else if (!opensTheRound && round.disagreementMs > FIT_DISAGREEMENT_SOFT_MS) soft.push(`round ${round.roundIndex}: tokenDue fit vs boundary ${round.disagreementMs} ms`)
-    else if (opensTheRound && round.disagreementMs > FIT_DISAGREEMENT_SOFT_MS) notes.push(`round ${round.roundIndex}: the work-entered boundary trails the tokenDue fit by ${round.disagreementMs} ms — that is the boundary log site's latency (its workElapsedMs is 0 by construction), not a clock disagreement`)
+    else if (opensTheRound && round.disagreementMs > FIT_DISAGREEMENT_SOFT_MS) notes.push(`round ${round.roundIndex}: the work-entered boundary trails the tokenDue fit by ${round.disagreementMs} ms. The record is written after the bell is sent, so on a build from 2026-11-27 or later that is what sending the bell took. On an older build a round opened by a skip (round 1 always is) also started its work clock at the tick before the skip, and that head start is in this figure (findings doc, N-18) — compare the later rounds`)
   }
   const toMonotonic = (roundIndex, workMs) => {
     const round = fit.get(roundIndex)
