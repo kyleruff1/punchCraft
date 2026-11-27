@@ -13,6 +13,7 @@
  * only, never re-stage).
  */
 import React from 'react'
+import { Platform } from 'react-native'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 
 const mockReplace = jest.fn()
@@ -93,6 +94,12 @@ describe('qa/run', () => {
     // The vocabulary reaches the RECIPE — the only thing the round-1 opener reads.
     expect(useWorkoutStore.getState().recipe.voiceVocabulary).toBe('names')
     expect(logged('workout.qa.run')).toHaveLength(1)
+    // The capture says which device wrote it — the timing analyzer refuses
+    // one the tablet did not.
+    expect(logged('workout.qa.run')[0]?.fields.platform).toEqual({
+      value: Platform.OS,
+      class: 'safe',
+    })
 
     // The bug: a re-render with a fresh params object must not cancel the
     // pending navigation.

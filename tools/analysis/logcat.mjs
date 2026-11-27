@@ -189,3 +189,31 @@ export function recordsWithTag(logcatText, tag) {
     .filter((r) => accepted.has(recordTag(r.body)))
     .map((r) => ({ ts: parseTimestampMs(r.dateStr, r.timeStr), body: r.body }))
 }
+
+/**
+ * The process tag a capture from the PC version is written under, where the
+ * tablet's is `ReactNativeJS`. Nothing in this file reads the tag while
+ * parsing — any word is accepted — so this is the capture saying where it
+ * came from even when it holds no `workout.qa.run` record to say it in words.
+ */
+export const WEB_CAPTURE_TAG = 'PunchCraftWeb'
+
+/** A `-v time` line under that tag: `MM-DD HH:MM:SS.mmm I/PunchCraftWeb(pid):`. */
+const WEB_TAGGED_LINE = new RegExp(String.raw`^\d{2}-\d{2}\s+\S+\s+\w\/${WEB_CAPTURE_TAG}\(`, 'm')
+
+/**
+ * Which platform wrote a capture: `'android'`, `'web'`, or whatever else the
+ * app named.
+ *
+ * The QA run record says so in its own `platform` field — but only since
+ * 2026-11-26, and only when the capture holds one. So two more rules follow,
+ * in order: a capture written under `WEB_CAPTURE_TAG` is the PC's; and a
+ * capture that says nothing at all is the tablet's, because every capture
+ * taken before that date is.
+ */
+export function capturePlatform(logcatText) {
+  const run = recordsWithTag(logcatText, 'workout.qa.run').at(-1)
+  const named = run ? extractField(run.body, 'platform') : undefined
+  if (named) return named
+  return WEB_TAGGED_LINE.test(logcatText) ? 'web' : 'android'
+}

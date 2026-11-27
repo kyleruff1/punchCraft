@@ -171,6 +171,10 @@ export default function QaRunLauncher(): React.JSX.Element {
       releaseChannel: safe(build.releaseChannel),
       expoSdk: safe(build.expoSdk),
       reactNative: safe(build.reactNative),
+      // Which device wrote this capture. The timing analyzer refuses one the
+      // tablet did not write; a capture without the field predates it and is
+      // the tablet's.
+      platform: safe(build.platform),
       platformVersion: safe(String(build.platformVersion)),
       installationId: safe(build.installationId ?? null),
     })
