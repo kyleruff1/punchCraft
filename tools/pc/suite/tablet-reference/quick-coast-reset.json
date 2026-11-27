@@ -1,0 +1,109 @@
+{
+ "workoutId": "quick-coast-reset",
+ "vocab": "numbers",
+ "timelineHash": "v2:fbcb2a56",
+ "source": {
+  "suite": "post-floor",
+  "capturedOn": "2026-09-08",
+  "device": "tablet",
+  "build": "b8e72bc5",
+  "simulatedPunches": "captured-jam",
+  "verdict": "WARN",
+  "correlator": "matched=4 extras=0 reanchor=0"
+ },
+ "round1": {
+  "dispatches": [
+   { "kind": "call", "slot": "call/1-1-1-1", "dispatchAtMs": 2871, "durationMs": 1558, "firstNodeMs": 4800, "text": "One! One! One! One!" },
+   { "kind": "call", "slot": "call/1-1-1-1", "dispatchAtMs": 7671, "durationMs": 1558, "firstNodeMs": 9600, "text": "One! One! One! One!" },
+   { "kind": "call", "slot": "call/1-1-1-1", "dispatchAtMs": 12471, "durationMs": 1558, "firstNodeMs": 14400, "text": "One! One! One! One!" },
+   { "kind": "call", "slot": "call/1-1-1-1", "dispatchAtMs": 17271, "durationMs": 1558, "firstNodeMs": 19200, "text": "One! One! One! One!" },
+   { "kind": "call", "slot": "call/1-1-1-1", "dispatchAtMs": 22071, "durationMs": 1558, "firstNodeMs": 24000, "text": "One! One! One! One!" },
+   { "kind": "call", "slot": "call/1-1-1-1", "dispatchAtMs": 26871, "durationMs": 1558, "firstNodeMs": 28800, "text": "One! One! One! One!" },
+   { "kind": "call", "slot": "call/1-1-1-1", "dispatchAtMs": 31671, "durationMs": 1558, "firstNodeMs": 33600, "text": "One! One! One! One!" },
+   { "kind": "call", "slot": "call/1-1-1-1", "dispatchAtMs": 36471, "durationMs": 1558, "firstNodeMs": 38400, "text": "One! One! One! One!" },
+   {
+    "kind": "lead-in",
+    "slot": "lead-in/quick-coast-reset/r1s2",
+    "dispatchAtMs": 41554,
+    "durationMs": 9960,
+    "text": "Coast bar — one, then three empty slots, straight time, eight bars. One shot, then recover on your feet. The empty slots are the work."
+   },
+   { "kind": "call", "slot": "call/1-.-.-.", "dispatchAtMs": 51764, "durationMs": 720, "firstNodeMs": 52800, "text": "One!" },
+   { "kind": "call", "slot": "call/1-.-.-.", "dispatchAtMs": 56564, "durationMs": 720, "firstNodeMs": 57600, "text": "One!" },
+   { "kind": "call", "slot": "call/1-.-.-.", "dispatchAtMs": 61364, "durationMs": 720, "firstNodeMs": 62400, "text": "One!" },
+   { "kind": "call", "slot": "call/1-.-.-.", "dispatchAtMs": 66164, "durationMs": 720, "firstNodeMs": 67200, "text": "One!" },
+   { "kind": "call", "slot": "call/1-.-.-.", "dispatchAtMs": 70964, "durationMs": 720, "firstNodeMs": 72000, "text": "One!" },
+   { "kind": "call", "slot": "call/1-.-.-.", "dispatchAtMs": 75764, "durationMs": 720, "firstNodeMs": 76800, "text": "One!" },
+   { "kind": "call", "slot": "call/1-.-.-.", "dispatchAtMs": 80564, "durationMs": 720, "firstNodeMs": 81600, "text": "One!" },
+   { "kind": "call", "slot": "call/1-.-.-.", "dispatchAtMs": 85364, "durationMs": 720, "firstNodeMs": 86400, "text": "One!" },
+   {
+    "kind": "lead-in",
+    "slot": "lead-in/quick-coast-reset/r1s3",
+    "dispatchAtMs": 86627,
+    "durationMs": 6914,
+    "text": "Pump: twos only, double-time — ten bars. Rear hand, fast and straight. Then we breathe."
+   },
+   { "kind": "call", "slot": "call/2-2-2-2", "dispatchAtMs": 93791, "durationMs": 1538, "firstNodeMs": 96000, "text": "Two, two, two, two!" },
+   { "kind": "call", "slot": "call/2-2-2-2", "dispatchAtMs": 96191, "durationMs": 1538, "firstNodeMs": 98400, "text": "Two, two, two, two!" },
+   { "kind": "call", "slot": "call/2-2-2-2", "dispatchAtMs": 98591, "durationMs": 1538, "firstNodeMs": 100800, "text": "Two, two, two, two!" },
+   { "kind": "call", "slot": "call/2-2-2-2", "dispatchAtMs": 100991, "durationMs": 1538, "firstNodeMs": 103200, "text": "Two, two, two, two!" },
+   { "kind": "call", "slot": "call/2-2-2-2", "dispatchAtMs": 103391, "durationMs": 1538, "firstNodeMs": 105600, "text": "Two, two, two, two!" },
+   { "kind": "call", "slot": "call/2-2-2-2", "dispatchAtMs": 105791, "durationMs": 1538, "firstNodeMs": 108000, "text": "Two, two, two, two!" },
+   { "kind": "call", "slot": "call/2-2-2-2", "dispatchAtMs": 108191, "durationMs": 1538, "firstNodeMs": 110400, "text": "Two, two, two, two!" },
+   { "kind": "call", "slot": "call/2-2-2-2", "dispatchAtMs": 110591, "durationMs": 1538, "firstNodeMs": 112800, "text": "Two, two, two, two!" },
+   {
+    "kind": "lead-in",
+    "slot": "lead-in/quick-coast-reset/r1s4",
+    "dispatchAtMs": 114360,
+    "durationMs": 8947,
+    "text": "One, two — with a hold after each, straight time, fourteen bars. Punch, wait, punch, wait. Reset between every shot."
+   },
+   { "kind": "call", "slot": "call/1-.-2-.", "dispatchAtMs": 123557, "durationMs": 927, "firstNodeMs": 124800, "text": "One, two!" },
+   { "kind": "call", "slot": "call/1-.-2-.", "dispatchAtMs": 128357, "durationMs": 927, "firstNodeMs": 129600, "text": "One, two!" },
+   { "kind": "call", "slot": "call/1-.-2-.", "dispatchAtMs": 133157, "durationMs": 927, "firstNodeMs": 134400, "text": "One, two!" },
+   { "kind": "call", "slot": "call/1-.-2-.", "dispatchAtMs": 137957, "durationMs": 927, "firstNodeMs": 139200, "text": "One, two!" },
+   { "kind": "call", "slot": "call/1-.-2-.", "dispatchAtMs": 142757, "durationMs": 927, "firstNodeMs": 144000, "text": "One, two!" },
+   { "kind": "call", "slot": "call/1-.-2-.", "dispatchAtMs": 147557, "durationMs": 927, "firstNodeMs": 148800, "text": "One, two!" },
+   { "kind": "call", "slot": "call/1-.-2-.", "dispatchAtMs": 152357, "durationMs": 927, "firstNodeMs": 153600, "text": "One, two!" },
+   { "kind": "call", "slot": "call/1-.-2-.", "dispatchAtMs": 157157, "durationMs": 927, "firstNodeMs": 158400, "text": "One, two!" },
+   { "kind": "call", "slot": "call/1-.-2-.", "dispatchAtMs": 161957, "durationMs": 927, "firstNodeMs": 163200, "text": "One, two!" },
+   { "kind": "call", "slot": "call/1-.-2-.", "dispatchAtMs": 166757, "durationMs": 927, "firstNodeMs": 168000, "text": "One, two!" },
+   { "kind": "call", "slot": "call/1-.-2-.", "dispatchAtMs": 171557, "durationMs": 927, "firstNodeMs": 172800, "text": "One, two!" },
+   { "kind": "call", "slot": "call/1-.-2-.", "dispatchAtMs": 176357, "durationMs": 927, "firstNodeMs": 177600, "text": "One, two!" },
+   { "kind": "call", "slot": "call/1-.-2-.", "dispatchAtMs": 181157, "durationMs": 927, "firstNodeMs": 182400, "text": "One, two!" },
+   {
+    "kind": "lead-in",
+    "slot": "lead-in/quick-coast-reset/r1s5",
+    "dispatchAtMs": 187027,
+    "durationMs": 8260,
+    "text": "Coast bar — two, three, empty, empty, straight time, nine bars. Cross, hook, then stand tall and breathe."
+   },
+   { "kind": "call", "slot": "call/2-3-.-.", "dispatchAtMs": 195537, "durationMs": 892, "firstNodeMs": 196800, "text": "Two, three!" },
+   { "kind": "call", "slot": "call/2-3-.-.", "dispatchAtMs": 200337, "durationMs": 892, "firstNodeMs": 201600, "text": "Two, three!" },
+   { "kind": "call", "slot": "call/2-3-.-.", "dispatchAtMs": 205137, "durationMs": 892, "firstNodeMs": 206400, "text": "Two, three!" },
+   { "kind": "call", "slot": "call/2-3-.-.", "dispatchAtMs": 209937, "durationMs": 892, "firstNodeMs": 211200, "text": "Two, three!" },
+   { "kind": "call", "slot": "call/2-3-.-.", "dispatchAtMs": 214737, "durationMs": 892, "firstNodeMs": 216000, "text": "Two, three!" },
+   { "kind": "call", "slot": "call/2-3-.-.", "dispatchAtMs": 219537, "durationMs": 892, "firstNodeMs": 220800, "text": "Two, three!" },
+   { "kind": "call", "slot": "call/2-3-.-.", "dispatchAtMs": 224337, "durationMs": 892, "firstNodeMs": 225600, "text": "Two, three!" },
+   { "kind": "call", "slot": "call/2-3-.-.", "dispatchAtMs": 229137, "durationMs": 892, "firstNodeMs": 230400, "text": "Two, three!" },
+   { "kind": "call", "slot": "call/2-3-.-.", "dispatchAtMs": 233937, "durationMs": 892, "firstNodeMs": 235200, "text": "Two, three!" }
+  ],
+  "tokensDue": 129
+ },
+ "timing": {
+  "dispatchLateMs": {
+   "n": 50,
+   "minMs": 1,
+   "medianMs": 27,
+   "p95Ms": 60,
+   "maxMs": 63
+  },
+  "ringTokenLateMs": {
+   "n": 129,
+   "minMs": 0.5,
+   "medianMs": 32.5,
+   "p95Ms": 86.1,
+   "maxMs": 117.2
+  }
+ }
+}

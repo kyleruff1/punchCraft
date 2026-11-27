@@ -1,0 +1,108 @@
+{
+ "workoutId": "uppercut-clinic",
+ "vocab": "numbers",
+ "timelineHash": "v2:6e21e6f9",
+ "source": {
+  "suite": "post-floor",
+  "capturedOn": "2026-09-08",
+  "device": "tablet",
+  "build": "b8e72bc5",
+  "simulatedPunches": "captured-jam",
+  "verdict": "WARN",
+  "correlator": "matched=3 extras=0 reanchor=0"
+ },
+ "round1": {
+  "dispatches": [
+   { "kind": "call", "slot": "call/1-2-5-2", "dispatchAtMs": 3823, "durationMs": 1508, "firstNodeMs": 5647, "text": "One, two, five, two!" },
+   { "kind": "call", "slot": "call/1-2-5-2", "dispatchAtMs": 9470, "durationMs": 1508, "firstNodeMs": 11294, "text": "One, two, five, two!" },
+   { "kind": "call", "slot": "call/1-2-5-2", "dispatchAtMs": 15117, "durationMs": 1508, "firstNodeMs": 16941, "text": "One, two, five, two!" },
+   { "kind": "call", "slot": "call/1-2-5-2", "dispatchAtMs": 20764, "durationMs": 1508, "firstNodeMs": 22588, "text": "One, two, five, two!" },
+   { "kind": "call", "slot": "call/1-2-5-2", "dispatchAtMs": 26411, "durationMs": 1508, "firstNodeMs": 28235, "text": "One, two, five, two!" },
+   { "kind": "call", "slot": "call/1-2-5-2", "dispatchAtMs": 32058, "durationMs": 1508, "firstNodeMs": 33882, "text": "One, two, five, two!" },
+   { "kind": "call", "slot": "call/1-2-5-2", "dispatchAtMs": 37705, "durationMs": 1508, "firstNodeMs": 39529, "text": "One, two, five, two!" },
+   { "kind": "call", "slot": "call/1-2-5-2", "dispatchAtMs": 43352, "durationMs": 1508, "firstNodeMs": 45176, "text": "One, two, five, two!" },
+   { "kind": "call", "slot": "call/1-2-5-2", "dispatchAtMs": 49000, "durationMs": 1508, "firstNodeMs": 50824, "text": "One, two, five, two!" },
+   { "kind": "call", "slot": "call/1-2-5-2", "dispatchAtMs": 54647, "durationMs": 1508, "firstNodeMs": 56471, "text": "One, two, five, two!" },
+   { "kind": "call", "slot": "call/1-2-5-2", "dispatchAtMs": 60294, "durationMs": 1508, "firstNodeMs": 62118, "text": "One, two, five, two!" },
+   { "kind": "call", "slot": "call/1-2-5-2", "dispatchAtMs": 65941, "durationMs": 1508, "firstNodeMs": 67765, "text": "One, two, five, two!" },
+   { "kind": "call", "slot": "call/1-2-5-2", "dispatchAtMs": 71588, "durationMs": 1508, "firstNodeMs": 73412, "text": "One, two, five, two!" },
+   { "kind": "call", "slot": "call/1-2-5-2", "dispatchAtMs": 77235, "durationMs": 1508, "firstNodeMs": 79059, "text": "One, two, five, two!" },
+   {
+    "kind": "lead-in",
+    "slot": "lead-in/uppercut-clinic/r1s2",
+    "dispatchAtMs": 84794,
+    "durationMs": 8640,
+    "text": "One, six, three, two — straight time, eight bars. One, six, three, two. Rise through the six, turn the three."
+   },
+   { "kind": "call", "slot": "call/1-6-3-2", "dispatchAtMs": 93684, "durationMs": 2000, "firstNodeMs": 96000, "text": "One, six, three, two!" },
+   { "kind": "call", "slot": "call/1-6-3-2", "dispatchAtMs": 99331, "durationMs": 2000, "firstNodeMs": 101647, "text": "One, six, three, two!" },
+   { "kind": "call", "slot": "call/1-6-3-2", "dispatchAtMs": 104978, "durationMs": 2000, "firstNodeMs": 107294, "text": "One, six, three, two!" },
+   { "kind": "call", "slot": "call/1-6-3-2", "dispatchAtMs": 110625, "durationMs": 2000, "firstNodeMs": 112941, "text": "One, six, three, two!" },
+   { "kind": "call", "slot": "call/1-6-3-2", "dispatchAtMs": 116272, "durationMs": 2000, "firstNodeMs": 118588, "text": "One, six, three, two!" },
+   { "kind": "call", "slot": "call/1-6-3-2", "dispatchAtMs": 121919, "durationMs": 2000, "firstNodeMs": 124235, "text": "One, six, three, two!" },
+   { "kind": "call", "slot": "call/1-6-3-2", "dispatchAtMs": 127566, "durationMs": 2000, "firstNodeMs": 129882, "text": "One, six, three, two!" },
+   { "kind": "call", "slot": "call/1-6-3-2", "dispatchAtMs": 133213, "durationMs": 2000, "firstNodeMs": 135529, "text": "One, six, three, two!" },
+   {
+    "kind": "lead-in",
+    "slot": "lead-in/uppercut-clinic/r1s3",
+    "dispatchAtMs": 136113,
+    "durationMs": 8760,
+    "text": "Five, six, five — time-and-a-half, sixteen bars. Five, six, five. Three short shots and a reset."
+   },
+   { "kind": "call", "slot": "call/5-6-5-.", "dispatchAtMs": 145123, "durationMs": 1200, "firstNodeMs": 146824, "text": "Five, six, five!" },
+   { "kind": "call", "slot": "call/5-6-5-.", "dispatchAtMs": 147947, "durationMs": 1200, "firstNodeMs": 149647, "text": "Five, six, five!" },
+   { "kind": "call", "slot": "call/5-6-5-.", "dispatchAtMs": 150770, "durationMs": 1200, "firstNodeMs": 152471, "text": "Five, six, five!" },
+   { "kind": "call", "slot": "call/5-6-5-.", "dispatchAtMs": 153594, "durationMs": 1200, "firstNodeMs": 155294, "text": "Five, six, five!" },
+   { "kind": "call", "slot": "call/5-6-5-.", "dispatchAtMs": 156417, "durationMs": 1200, "firstNodeMs": 158118, "text": "Five, six, five!" },
+   { "kind": "call", "slot": "call/5-6-5-.", "dispatchAtMs": 159241, "durationMs": 1200, "firstNodeMs": 160941, "text": "Five, six, five!" },
+   { "kind": "call", "slot": "call/5-6-5-.", "dispatchAtMs": 162064, "durationMs": 1200, "firstNodeMs": 163765, "text": "Five, six, five!" },
+   { "kind": "call", "slot": "call/5-6-5-.", "dispatchAtMs": 164888, "durationMs": 1200, "firstNodeMs": 166588, "text": "Five, six, five!" },
+   { "kind": "call", "slot": "call/5-6-5-.", "dispatchAtMs": 167711, "durationMs": 1200, "firstNodeMs": 169412, "text": "Five, six, five!" },
+   { "kind": "call", "slot": "call/5-6-5-.", "dispatchAtMs": 170535, "durationMs": 1200, "firstNodeMs": 172235, "text": "Five, six, five!" },
+   { "kind": "call", "slot": "call/5-6-5-.", "dispatchAtMs": 173358, "durationMs": 1200, "firstNodeMs": 175059, "text": "Five, six, five!" },
+   { "kind": "call", "slot": "call/5-6-5-.", "dispatchAtMs": 176182, "durationMs": 1200, "firstNodeMs": 177882, "text": "Five, six, five!" },
+   { "kind": "call", "slot": "call/5-6-5-.", "dispatchAtMs": 179005, "durationMs": 1200, "firstNodeMs": 180706, "text": "Five, six, five!" },
+   { "kind": "call", "slot": "call/5-6-5-.", "dispatchAtMs": 181829, "durationMs": 1200, "firstNodeMs": 183529, "text": "Five, six, five!" },
+   { "kind": "call", "slot": "call/5-6-5-.", "dispatchAtMs": 184653, "durationMs": 1200, "firstNodeMs": 186353, "text": "Five, six, five!" },
+   {
+    "kind": "lead-in",
+    "slot": "lead-in/uppercut-clinic/r1s4",
+    "dispatchAtMs": 186647,
+    "durationMs": 8863,
+    "text": "One, five, two — double-time, seventeen bars. One, five, two. Fast and compact, then stop."
+   },
+   { "kind": "call", "slot": "call/1-5-2-.", "dispatchAtMs": 195760, "durationMs": 1269, "firstNodeMs": 197647, "text": "One, five, two!" },
+   { "kind": "call", "slot": "call/1-5-2-.", "dispatchAtMs": 198584, "durationMs": 1269, "firstNodeMs": 200471, "text": "One, five, two!" },
+   { "kind": "call", "slot": "call/1-5-2-.", "dispatchAtMs": 201407, "durationMs": 1269, "firstNodeMs": 203294, "text": "One, five, two!" },
+   { "kind": "call", "slot": "call/1-5-2-.", "dispatchAtMs": 204231, "durationMs": 1269, "firstNodeMs": 206118, "text": "One, five, two!" },
+   { "kind": "call", "slot": "call/1-5-2-.", "dispatchAtMs": 207054, "durationMs": 1269, "firstNodeMs": 208941, "text": "One, five, two!" },
+   { "kind": "call", "slot": "call/1-5-2-.", "dispatchAtMs": 209878, "durationMs": 1269, "firstNodeMs": 211765, "text": "One, five, two!" },
+   { "kind": "call", "slot": "call/1-5-2-.", "dispatchAtMs": 212701, "durationMs": 1269, "firstNodeMs": 214588, "text": "One, five, two!" },
+   { "kind": "call", "slot": "call/1-5-2-.", "dispatchAtMs": 215525, "durationMs": 1269, "firstNodeMs": 217412, "text": "One, five, two!" },
+   { "kind": "call", "slot": "call/1-5-2-.", "dispatchAtMs": 218348, "durationMs": 1269, "firstNodeMs": 220235, "text": "One, five, two!" },
+   { "kind": "call", "slot": "call/1-5-2-.", "dispatchAtMs": 221172, "durationMs": 1269, "firstNodeMs": 223059, "text": "One, five, two!" },
+   { "kind": "call", "slot": "call/1-5-2-.", "dispatchAtMs": 223995, "durationMs": 1269, "firstNodeMs": 225882, "text": "One, five, two!" },
+   { "kind": "call", "slot": "call/1-5-2-.", "dispatchAtMs": 226819, "durationMs": 1269, "firstNodeMs": 228706, "text": "One, five, two!" },
+   { "kind": "call", "slot": "call/1-5-2-.", "dispatchAtMs": 229642, "durationMs": 1269, "firstNodeMs": 231529, "text": "One, five, two!" },
+   { "kind": "call", "slot": "call/1-5-2-.", "dispatchAtMs": 232466, "durationMs": 1269, "firstNodeMs": 234353, "text": "One, five, two!" },
+   { "kind": "call", "slot": "call/1-5-2-.", "dispatchAtMs": 235289, "durationMs": 1269, "firstNodeMs": 237176, "text": "One, five, two!" }
+  ],
+  "tokensDue": 185
+ },
+ "timing": {
+  "dispatchLateMs": {
+   "n": 55,
+   "minMs": 1,
+   "medianMs": 36,
+   "p95Ms": 62,
+   "maxMs": 89
+  },
+  "ringTokenLateMs": {
+   "n": 185,
+   "minMs": 0.1,
+   "medianMs": 28.2,
+   "p95Ms": 64.8,
+   "maxMs": 97.7
+  }
+ }
+}
