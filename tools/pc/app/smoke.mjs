@@ -36,10 +36,22 @@ export function punchesIn(text) {
   return match ? Number(match[1].replace(/,/g, '')) : 0
 }
 
+// Read with this script's own few lines, not the app's: IndexedDB database
+// `punchcraft`, store `files`, key `punchcraft.db` (`idbByteStore.web.ts`).
 const READ_DATABASE = `(async () => {
-  const root = await navigator.storage.getDirectory()
-  const handle = await root.getFileHandle('punchcraft.db')
-  const bytes = new Uint8Array(await (await handle.getFile()).arrayBuffer())
+  const db = await new Promise((resolve, reject) => {
+    const request = indexedDB.open('punchcraft')
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
+  })
+  const stored = await new Promise((resolve, reject) => {
+    const request = db.transaction('files').objectStore('files').get('punchcraft.db')
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
+  })
+  db.close()
+  if (!stored) throw new Error('nothing is saved under punchcraft.db')
+  const bytes = stored instanceof Uint8Array ? stored : new Uint8Array(stored)
   let binary = ''
   for (let i = 0; i < bytes.length; i += 0x8000) {
     binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000))

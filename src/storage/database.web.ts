@@ -7,33 +7,31 @@
  * is different is underneath (`sqlJsPort.ts` says why it is not expo-sqlite)
  * and around it:
  *
- * - **It has to be prepared first.** The engine is WebAssembly and the file
- *   lives in the browser's private storage; both load asynchronously, and
- *   every storage call in the app is synchronous. `prepareStorage()` does
- *   the loading once, and the root layout waits for it before mounting
- *   anything that could open the database.
+ * - **It has to be prepared first.** The engine is WebAssembly and the saved
+ *   database is in IndexedDB; both load asynchronously, and every storage
+ *   call in the app is synchronous. `prepareStorage()` does the loading
+ *   once, and the root layout waits for it before mounting anything that
+ *   could open the database.
  * - **It lives in memory and is saved as a whole.** After a write the
- *   database is exported and written to the origin-private file system,
- *   `SAVE_DELAY_MS` later, and at once when the tab is hidden. Closing or
- *   reloading the tab inside that delay loses those writes: a save started
- *   as the page goes away does not finish (measured: 36 forced reloads,
- *   2026-11-26). It never damages what was saved before — the browser swaps
- *   the new file in whole or not at all. A save that fails is tried again,
- *   more slowly.
+ *   database is exported and put in IndexedDB (`idbByteStore.web.ts` says
+ *   why there), `SAVE_DELAY_MS` later, and at once when the tab is hidden.
+ *   Closing or reloading the tab inside that delay loses those writes: a
+ *   save started as the page goes away does not finish. It never damages
+ *   what was saved before — an IndexedDB transaction commits whole or not
+ *   at all. A save that fails is tried again, more slowly.
  * - **One tab at a time.** Each tab would hold its own copy and save it over
  *   the other's. The first tab takes a lock for its lifetime; a second is
  *   told so (`StorageNotice`) and does not start.
- * - **A saved file that has gone missing is said out loud.** The last save
- *   leaves a note in `localStorage`. A load that finds the note and no file
- *   logs an error rather than passing for a first run. It happens: the
- *   Claude desktop app's built-in browser pane empties the private file
- *   system of a page left idle for about ten minutes, while leaving
- *   `localStorage` and IndexedDB alone (measured with an unrelated canary
- *   file beside the database, 2026-11-26; findings doc N-10).
- * - **If the saved file will not open, the app still runs** — on an empty
- *   database, with an error in the log. The file that would not open is
+ * - **A saved database that has gone missing is said out loud.** The last
+ *   save leaves a note in `localStorage`. A load that finds the note and no
+ *   database logs an error rather than passing for a first run. This is not
+ *   hypothetical: when the database was a file in the private file system,
+ *   the Claude desktop app's browser pane emptied it twice (findings doc
+ *   N-10).
+ * - **If the saved database will not open, the app still runs** — on an
+ *   empty one, with an error in the log. The bytes that would not open are
  *   copied aside first (`UNREADABLE_FILE`); if even that fails, nothing is
- *   saved for the rest of the visit, so it is never overwritten unseen.
+ *   saved for the rest of the visit, so they are never overwritten unseen.
  *
  * Saving the whole file is fine for workouts and settings — a few hundred
  * kilobytes. It is the wrong shape for a glove's raw frames arriving many
@@ -47,9 +45,11 @@ import wasmUrl from 'sql.js/dist/sql-wasm-browser.wasm'
 
 import { logger, safe } from '@/diagnostics/logger'
 import { runMigrations } from '@/storage/migrations'
+import { openIdbByteStore, type ByteStore } from '@/storage/idbByteStore.web'
 import { createSqlJsPort, type SqlJsPort } from '@/storage/sqlJsPort'
 import { StorageNotice } from '@/storage/storageNotice'
 
+/** The key the database is kept under (`idbByteStore.web.ts`). */
 export const DB_FILE = 'punchcraft.db'
 /** The Web Lock one tab holds for as long as it has the database open. */
 export const LOCK_NAME = 'punchcraft.db'
@@ -78,31 +78,9 @@ let savedCount = 0
 /** Set when saving would destroy a file that could not be copied aside. */
 let savingOff = false
 
-async function writeFile(name: string, bytes: Uint8Array): Promise<void> {
-  const root = await navigator.storage.getDirectory()
-  const handle = await root.getFileHandle(name, { create: true })
-  const writable = await handle.createWritable()
-  // sql.js hands back a copy on an ordinary buffer; the DOM types only
-  // cannot see that it is not a shared one.
-  await writable.write(bytes as Uint8Array<ArrayBuffer>)
-  await writable.close()
-}
-
-async function loadSavedBytes(): Promise<Uint8Array | null> {
-  const root = await navigator.storage.getDirectory()
-  let handle: FileSystemFileHandle
-  try {
-    handle = await root.getFileHandle(DB_FILE)
-  } catch (err) {
-    // Only "no such file" means nothing has been saved. Any other failure
-    // is storage misbehaving, and must not pass for an empty database that
-    // the next save would then write over the real one.
-    if ((err as { name?: unknown } | null)?.name === 'NotFoundError') return null
-    throw err
-  }
-  const file = await handle.getFile()
-  return file.size === 0 ? null : new Uint8Array(await file.arrayBuffer())
-}
+/** Opened on first use, so a browser with no IndexedDB fails where it is handled. */
+let store: ByteStore | null = null
+const byteStore = (): ByteStore => (store ??= openIdbByteStore())
 
 /** What the last successful save was, by this browser's own account. */
 function readSavedMarker(): { bytes: number; at: string } | null {
@@ -183,7 +161,7 @@ async function save(): Promise<void> {
   saving = true
   let failed = false
   try {
-    await writeFile(DB_FILE, bytes)
+    await byteStore().put(DB_FILE, bytes)
     writeSavedMarker(bytes.length)
     if (port === db) savedCount = count
   } catch (err) {
@@ -215,7 +193,7 @@ async function openSaved(SQL: SqlJsStatic, bytes: Uint8Array | null): Promise<Sq
       bytes: safe(bytes.length),
     })
     try {
-      await writeFile(UNREADABLE_FILE, bytes)
+      await byteStore().put(UNREADABLE_FILE, bytes)
     } catch (asideErr) {
       savingOff = true
       logger.error(
@@ -241,11 +219,12 @@ export function prepareStorage(): Promise<void> {
     const SQL = await initSqlJs({ locateFile: () => wasmUrl })
     let bytes: Uint8Array | null = null
     try {
-      bytes = await loadSavedBytes()
+      bytes = await byteStore().get(DB_FILE)
     } catch (err) {
-      // No private file system here (an old browser, a locked-down profile),
-      // or one that would not give up the file. The app runs, and saves
-      // nothing: whatever is on disk is left exactly as it is.
+      // No IndexedDB here (a locked-down profile), or one that would not
+      // give the database up. The app runs, and saves nothing: whatever is
+      // stored is left exactly as it is. Only a key that was never written
+      // reads as "nothing saved" — see `idbByteStore.web.ts`.
       savingOff = true
       logger.error(
         'storage.web.loadFailed',
@@ -307,4 +286,5 @@ export function __resetDatabaseForTests(): void {
   savingOff = false
   port = null
   preparing = null
+  store = null
 }

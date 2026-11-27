@@ -1,10 +1,10 @@
 /**
  * The browser's database module (`database.web.ts`), with the browser stood
- * in for: the real sql.js engine (its Node build), an in-memory private file
- * system, and fake timers for the save delay.
+ * in for: the real sql.js engine (its Node build), a map where IndexedDB
+ * would be, and fake timers for the save delay.
  *
  * What this cannot show is the real thing — WebAssembly loading from the
- * served URL, and the browser's own file system. `npm run pc:smoke` does.
+ * served URL, and the browser's own IndexedDB. `npm run pc:smoke` does.
  */
 import { replaceSinks, type LogRecord } from '@diagnostics/logger'
 import { SettingsRepository } from '@/storage/repositories/SettingsRepository'
@@ -35,45 +35,37 @@ jest.mock(
   { virtual: true },
 )
 
-/** The origin-private file system, as far as `database.web.ts` uses it. */
+/**
+ * The byte store `database.web.ts` saves into — IndexedDB in a browser
+ * (`idbByteStore.web.ts`, which has its own tests), a map here.
+ */
 class FakeFiles {
   readonly files = new Map<string, Uint8Array>()
-  /** Names written, in order — one entry per completed write. */
+  /** Keys written, in order — one entry per committed write. */
   readonly writes: string[] = []
   failWritesTo: string | null = null
   available = true
-  /** A file that is there and will not be handed over. */
+  /** A key that is there and will not be handed over. */
   refuse: string | null = null
 
-  getDirectory = async () => {
+  get = async (key: string): Promise<Uint8Array | null> => {
     if (!this.available) throw new Error('SecurityError: storage is not available')
-    return {
-      getFileHandle: async (name: string, opts?: { create?: boolean }) => {
-        if (this.refuse === name) throw named('InvalidStateError')
-        if (!this.files.has(name) && !opts?.create) throw named('NotFoundError')
-        return {
-          getFile: async () => {
-            const bytes = this.files.get(name) ?? new Uint8Array()
-            return { size: bytes.length, arrayBuffer: async () => bytes.slice().buffer }
-          },
-          createWritable: async () => {
-            if (this.failWritesTo === name) throw new Error('QuotaExceededError')
-            let pending = new Uint8Array()
-            return {
-              write: async (bytes: Uint8Array) => {
-                pending = bytes.slice()
-              },
-              close: async () => {
-                this.files.set(name, pending)
-                this.writes.push(name)
-              },
-            }
-          },
-        }
-      },
-    }
+    if (this.refuse === key) throw named('InvalidStateError')
+    return this.files.get(key)?.slice() ?? null
+  }
+
+  put = async (key: string, bytes: Uint8Array): Promise<void> => {
+    if (!this.available) throw new Error('SecurityError: storage is not available')
+    if (this.failWritesTo === key) throw new Error('QuotaExceededError')
+    this.files.set(key, bytes.slice())
+    this.writes.push(key)
   }
 }
+
+let mockFiles: FakeFiles
+jest.mock('@/storage/idbByteStore.web', () => ({
+  openIdbByteStore: () => mockFiles,
+}))
 
 /** The Web Locks manager, as far as one named lock goes. */
 class FakeLocks {
@@ -136,6 +128,7 @@ beforeEach(() => {
   jest.useFakeTimers({ doNotFake: ['performance'] })
   __resetDatabaseForTests()
   files = new FakeFiles()
+  mockFiles = files
   locks = new FakeLocks()
   local = new Map()
   records = []
@@ -146,7 +139,7 @@ beforeEach(() => {
     ;(listeners[type] ??= []).push(fn)
   }
   define('navigator', {
-    storage: { getDirectory: files.getDirectory, persist: async () => true },
+    storage: { persist: async () => true },
     locks,
   })
   define('document', {
@@ -274,7 +267,7 @@ describe('saving', () => {
   })
 })
 
-describe('a saved file that will not open', () => {
+describe('a saved database that will not open', () => {
   const garbage = new Uint8Array(4096).fill(0x5a)
 
   it('is copied aside, and the app starts on an empty database it can save', async () => {
@@ -305,7 +298,7 @@ describe('a saved file that will not open', () => {
   })
 })
 
-describe('a browser with no private file system', () => {
+describe('a browser whose storage cannot be used', () => {
   it('still runs, says so once, and does not keep trying to save', async () => {
     files.available = false
     await prepareStorage()
@@ -319,7 +312,7 @@ describe('a browser with no private file system', () => {
   })
 })
 
-describe('a saved file that is there and will not be read', () => {
+describe('a saved database that is there and will not be read', () => {
   it('is not mistaken for a first run — and is never saved over', async () => {
     const saved = new Uint8Array([1, 2, 3])
     files.files.set(DB_FILE, saved)
@@ -369,13 +362,13 @@ describe('one tab at a time', () => {
   })
 
   it('takes a browser without Web Locks at its word', async () => {
-    define('navigator', { storage: { getDirectory: files.getDirectory } })
+    define('navigator', { storage: {} })
     await prepareStorage()
     expect(isStorageReady()).toBe(true)
   })
 })
 
-describe('a saved file that has gone missing', () => {
+describe('a saved database that has gone missing', () => {
   it('is said out loud: the last save left a note, and the file is not there', async () => {
     await prepareStorage()
     await afterDelay(SAVE_DELAY_MS)
