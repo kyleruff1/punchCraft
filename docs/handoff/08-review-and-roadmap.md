@@ -1553,6 +1553,9 @@ How to use what it built: `tools/pc/suite/README.md`.
 | N-14: the playback observer reads a browser's player as a browser's | `3d5bd4f3` |
 | CI: sound is judged on a runner as it is on a PC | `6887c5cd` |
 | A call sent as the capture stops is not a call that made no sound | `f666ca2c` |
+| N-18: a round opened by a skip starts its work clock at the skip | `3c1716c9` |
+| N-18: the ring clock is published with the work clock's reading at that instant | `495a67a8` |
+| The tablet's timing tool no longer files the round-1 gap as log latency | `1b272a35` |
 
 The two merged branches (`feat/pc-sync-bench`, `docs/pc-sync-first-run`) are
 deleted on GitHub.
@@ -1637,7 +1640,10 @@ played the countdown whole. **PC only** — the tablet reads its clips from the
 app bundle. It does mean every PC run before `bf1e191f` played a broken
 countdown and nothing noticed, because nothing listened to it.
 
-#### N-18 · A round that opens on a skip starts its work clock up to a tick early · **open — yours to decide; it changes what the tablet does**
+#### N-18 · A round that opens on a skip starts its work clock up to a tick early · **fixed** (`3c1716c9`, `495a67a8`) · **not yet run on a tablet**
+
+*What follows is the finding as written before the fix; "Fixed" at the end
+of it is what was done.*
 
 Round 1 never opens on the clock. The countdown is a cap; the intro ends
 ahead of it and calls `skipCountdown()` (`live.tsx:398`). `skipRest()` is the
@@ -1678,7 +1684,7 @@ Across all 24 captures it is **43 to 87 ms in round 1** and 7 to 22 ms in
 later rounds. In heavy-hands the work clock's zero is 68 ms before the bell
 was even sent.
 
-What that means at the bag, on the tablet, today: in round 1 the rings
+What that meant at the bag, on the tablet, before the fix: in round 1 the rings
 light 43 to 87 ms later, against the calls, than the schedule says —
 against 7 to 22 ms from round 2 on — and a punch thrown on a ring is scored
 that much late against its cue. Round 1 is the round the verifier judges
@@ -1694,13 +1700,82 @@ was heard, and the least gap before a ring was unchanged (370 to 391 ms on
 One-Two). The whole test suite passes with them applied too, snapshots
 unchanged — which also says that no test pins what the skips do today.
 
-**I have not changed it.** The fix is small — move the anchor in the two
-skips, as `resume()` does; publish the ring clock with
-`session.workElapsedAt(now)` — and it has tests waiting to be written. But
-it moves round 1 on the tablet by most of that 43 to 87 ms against
-everything tuned by ear, toward what rounds 2 on already are, so it is your
-call, and it wants one tablet suite run after it. The note in
-`observed-timing.mjs` that explains the gap away should go with it.
+*As first reported,* I had not changed it: the fix moves round 1 on the
+tablet against everything tuned by ear, toward what rounds 2 on already
+are, so it was your call.
+
+**Fixed, on your yes (2026-11-27), in three commits.**
+
+- `3c1716c9` — `skipCountdown()` and `skipRest()` move the clock's anchor
+  to the instant of the skip, as `resume()` does. The time since the last
+  tick goes with the phase it belonged to, and the round runs its whole
+  length (it used to close early by the same head start).
+- `495a67a8` — the ring clock is published through `sharedWorkClockAt()`
+  (`src/domain/timing/SharedWorkClock.ts`): the session's reading *at the
+  instant of the stamp*, by `workElapsedAt`, in place of its reading at the
+  tick that led there.
+- `1b272a35` — the timing tool's note. It stays a note (the boundary record
+  is still written after the bell is sent, and every old capture would
+  otherwise warn), but it no longer says "log site's latency". It says what
+  the figure holds on a build before the fix and on one after. On a copy of
+  September's heavy-hands capture it reads 83.8 ms for round 1 and 10.5 to
+  14.1 ms for the three after it.
+
+*Why no test saw it, and what does now.* Every test that skipped did so on
+a tick, where "now" and "the last tick" are one instant; and on a fake
+clock, sending a bell takes no time. The new tests skip 30 ms after a tick —
+in the domain (both skips; a round's whole length; the last rest) and
+through the real runner (`roundOpening.test.tsx`), where the figure checked
+is the one the tablet's tool prints: a ring token's monotonic stamp less its
+work-clock reading. For the publish, the runner is driven with a bell that
+takes 0, 7 and 22 ms to send. At 0 the old publish passes; at 7 and 22 it
+fails.
+
+*On the PC, the same two workouts before and after* (`final-default-2`
+against a run at `1b272a35`):
+
+| | boundary record after the work clock's zero | round 1's rings painted late, median |
+|---|---|---|
+| One-Two, before | 31.3 ms | 35.0 ms |
+| One-Two, after | 0.9 ms | 5.7 ms |
+| Body Work, before | 48.5 ms | 54.7 ms |
+| Body Work, after | 0.9 ms | 3.8 ms |
+
+*All 22 again with the fix* (`npm run pc:suite` at `1b272a35`, six at a
+time, 22 minutes): 22 of 22 pass, and parity is as it was — 12 the same,
+none different, 10 skipped. 1 467 clips played, 1 451 heard, none silent or
+cut (16 not finished when the capture stopped); 1 379 calls, none under the
+floor or past its ring, least gap 249.5 ms; 66 of 66 bells; 22 of each
+ceremony, whole; 4 758 of 4 758 rings lit.
+
+| round 1, across the 22 drives | before (`f666ca2c`) | after (`1b272a35`) |
+|---|---|---|
+| boundary record after the work clock's zero | 1.5 to 48.8 ms | 0.8 to 1.9 ms |
+| rings painted late, median per drive | 6.3 to 54.7 ms | 3.3 to 6.8 ms |
+
+Nothing else moved: what is said, when it is due and when its ring is due
+are the same dispatch for dispatch, which is what parity compares.
+
+*What it changes on the tablet — worked out from the code and September's
+captures, not seen:*
+
+- **Round 1, against the bell:** the calls, the ring tokens and the scoring
+  start at the bell, not before it, so the calls come later by the old head
+  start.
+- **Every round, against the bell:** the painted rings are no longer behind
+  the work clock by what sending the bell took — 7 to 22 ms, by September's
+  later rounds.
+- **So against the calls, the rings light earlier than they did:** by 43 to
+  87 ms in round 1 and by 7 to 22 ms from round 2 on, to where the schedule
+  always said they were. Round 1 becomes like the others.
+- **A punch thrown on a painted ring** was scored late by those same
+  amounts, and now is not.
+
+The timing tool's breath figures do not move: they run from a call's end to
+its ring *token*, on the work clock, and never saw the painted ring. What
+moves is what the eye gets against what the ear gets. Anything judged by
+eye against the painted ring on the tablet — and anything tuned on round 1
+alone — was judged with this in it. It wants one tablet suite run (§7).
 
 #### N-14 · The playback observer in a browser · **fixed** (`3d5bd4f3`)
 
@@ -1788,8 +1863,9 @@ and **the tablet's real database has not run it** (§7).
 
 ### Still unproven
 
-- **N-18 on the tablet.** The diagnosis rests on the tablet's September
-  captures; no fix has been near it.
+- **The N-18 fix on the tablet.** The diagnosis rests on the tablet's
+  September captures; the fix on fake-clock tests and PC drives. No tablet
+  has run it.
 - **Migration 010 on the tablet's real database** (§7).
 - **The rest, and the rings, on a GitHub runner.** The four runs there
   predate both. A ring painted more than 100 ms late warns, and a shared
@@ -2155,12 +2231,13 @@ by design.
   column on screen; one finished workout, then
   `SELECT COUNT(*), COUNT(session_id) FROM workout_adaptations` is the look:
   the new rows carry a session, the old ones do not.
-- *N-18, if you take the fix.* One tablet suite run. In every
-  `observed-timing-report.md` the note "the work-entered boundary trails
-  the tokenDue fit by … ms" stood at 43 to 87 ms for round 1 in September;
-  it should fall to the 7 to 22 ms the later rounds show, or below. Then
-  round 1 by ear and eye against round 2: today they differ by that much,
-  and after the fix they should not.
-- *N-18, if you do not.* Nothing to run — but round 1 is then the wrong
-  round to tune anything by, because its rings sit 43 to 87 ms late against
-  the calls where every other round's sit 7 to 22.
+- *N-18 — fixed (`3c1716c9`, `495a67a8`), never run on a tablet.* One
+  tablet suite run. In every `observed-timing-report.md`, the work-axis
+  line for round 0 (`disagreement … ms`) stood at 43 to 87 ms in September;
+  it should now read what the later rounds do, 7 to 22 ms. If it does not,
+  the fix has not reached the build — or the fault is back. Then round 1
+  by ear and eye against round 2: they used to differ by that much and
+  should no longer. Expect the rings a little earlier against the calls in
+  every round (7 to 22 ms) and clearly earlier in round 1; if round 1 now
+  feels rushed where it used to feel right, that is this, and it is the
+  rail's breath to look at, not the clock.

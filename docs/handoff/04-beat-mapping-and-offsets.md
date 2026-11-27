@@ -926,6 +926,8 @@ round 3: offset 425112128.084 ms from 213 tokenDue (spread 1.3) · disagreement 
 ```
 **`spread` 1.3–1.6 ms over 200+ tokens per round is the one-grid invariant holding on glass.** Disagreement 11-16 ms is well inside the 250 ms hard gate; round 0's 65.1 ms is over the 50 ms soft gate (bell/first-token alignment).
 
+> **2026-11-27 — round 0's 65.1 ms is not what good looks like.** It was a fault (findings doc §3i, N-18): a round opened by a skip, as round 1 always is, started its work clock at the tick before the skip, so the calls and the scoring ran that far ahead of the bell and the painted rings. Fixed in `3c1716c9` and `495a67a8`. On a build with the fix, round 0 should read like rounds 1 to 3 here; a round 0 well above them is the fault back. No tablet has run the fix yet.
+
 **Breath table** (227 calls) — note `intended` matches `breathForBar` exactly (600/500/300 for `slotMs` 300/400/600):
 ```
 | slot                     |  n | intended | delivered min | median | p95   | shortfall median |
