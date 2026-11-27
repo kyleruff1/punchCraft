@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  # A manual run drives all 22 workouts in the PC suite (see `pc-sync`).
+  workflow_dispatch:
 
 # A newer push to the same pull request makes the older run pointless.
 concurrency:
@@ -88,6 +90,48 @@ jobs:
           cache: 'npm'
       - run: npm ci
       - run: npm run pc:smoke
+
+  # The PC suite (`tools/pc/suite/README.md`): a workout driven in the
+  # runner's own Chrome from the QA link the tablet suite uses, judged by the
+  # tablet's correlator, its sound listened to in the page, and what it said
+  # compared with the tablet's own captures. One workout on a push or a pull
+  # request; all 22 on a manual run of this workflow.
+  #
+  # ADVISORY, like the smoke job and for the same reason: when this was
+  # written it had never run on a runner. Two things are unknown there. A
+  # shared four-processor machine may send clips later than this suite has
+  # ever seen, so what is heard only warns (`--sound-gate warn`) until the
+  # runner's own numbers are in. And a runner has no sound card: if the
+  # browser will not start its audio there, the suite says the sound tap did
+  # not start, warns, and judges the rest.
+  pc-sync:
+    name: pc sync (advisory)
+    runs-on: ubuntu-latest
+    # A workout is five minutes of real time; all 22, two at a time, about an hour.
+    timeout-minutes: ${{ github.event_name == 'workflow_dispatch' && 150 || 30 }}
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - name: Drive the PC suite
+        run: npm run pc:suite -- --sound-gate warn ${{ github.event_name != 'workflow_dispatch' && '--only quick-one-two' || '' }}
+      - name: Compare what it said with the tablet
+        if: ${{ !cancelled() }}
+        run: npm run pc:parity
+      # The captures and reports, whatever the verdict: a failure here is
+      # only worth anything if it can be read afterwards.
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: pc-suite-run
+          path: tools/pc/suite/runs/
+          retention-days: 14
 
   # One stable name for "did CI pass", whatever the jobs above are called or
   # split into later. Runs even when one of them failed, so it reports a
