@@ -100,6 +100,10 @@ describe('qa/run', () => {
       value: Platform.OS,
       class: 'safe',
     })
+    // …and whether that device is an emulator, whose capture the analyzer
+    // refuses too. Not one here; `deviceKind.test.ts` covers the ones that are.
+    expect(logged('workout.qa.run')[0]?.fields.emulator).toEqual({ value: false, class: 'safe' })
+    expect(logged('workout.qa.run')[0]?.fields).toHaveProperty('deviceModel')
 
     // The bug: a re-render with a fresh params object must not cancel the
     // pending navigation.

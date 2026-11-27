@@ -7,6 +7,8 @@ import Constants from 'expo-constants'
 import { Platform } from 'react-native'
 import rnPackage from 'react-native/package.json'
 
+import { describeDevice } from './deviceKind'
+
 export interface BuildInfo {
   appName: string
   appVersion: string
@@ -17,6 +19,10 @@ export interface BuildInfo {
   reactNative: string
   platform: string
   platformVersion: string | number
+  /** `Build.MODEL` on Android — what the device calls itself. */
+  deviceModel?: string
+  /** An Android emulator. Its captures are the PC's, not the tablet's (`deviceKind.ts`). */
+  emulator: boolean
   androidApiLevel?: number
   bundleId?: string
   installationId?: string
@@ -24,6 +30,7 @@ export interface BuildInfo {
 
 export function getBuildInfo(): BuildInfo {
   const extra = (Constants.expoConfig?.extra ?? {}) as Record<string, unknown>
+  const device = describeDevice(Platform.OS, Platform.constants)
   return {
     appName: (Constants.expoConfig?.name as string) ?? 'punchCraft',
     appVersion: (Constants.expoConfig?.version as string) ?? '0.0.0',
@@ -34,6 +41,8 @@ export function getBuildInfo(): BuildInfo {
     reactNative: rnPackage.version ?? 'unknown',
     platform: Platform.OS,
     platformVersion: Platform.Version,
+    deviceModel: device.deviceModel,
+    emulator: device.emulator,
     androidApiLevel: Platform.OS === 'android' ? Number(Platform.Version) : undefined,
     bundleId: Constants.expoConfig?.android?.package,
     installationId: Constants.sessionId,
