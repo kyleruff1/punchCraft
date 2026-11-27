@@ -168,9 +168,12 @@ export class WorkoutSessionClock {
    * finer to skip. Outside `rest` this does nothing: skip is not a general
    * fast-forward, and letting it shorten a *work* interval would silently
    * rewrite the workout.
+   *
+   * The round it opens starts NOW — see `openAtThisInstant`.
    */
   skipRest(): SessionTransition[] {
     if (this.phase !== 'rest') return []
+    this.openAtThisInstant()
     return this.advancePhase(0)
   }
 
@@ -182,9 +185,13 @@ export class WorkoutSessionClock {
    * lands "Let's get started!" the screen skips the remainder. Same
    * philosophy as `skipRest`: deliberate, single-state, never a general
    * fast-forward — outside `countdown` this does nothing.
+   *
+   * Round 1 ALWAYS opens here on the live screen — the intro ends ahead of
+   * its cap — so what this does to the anchor is what round 1 gets.
    */
   skipCountdown(): SessionTransition[] {
     if (this.phase !== 'countdown') return []
+    this.openAtThisInstant()
     return this.advancePhase(0)
   }
 
@@ -254,6 +261,26 @@ export class WorkoutSessionClock {
   }
 
   // -------------------------------------------------------------------------
+
+  /**
+   * Move the anchor to this instant, for a phase that begins between ticks.
+   *
+   * A skip is not synchronised to the tick. Left at the last `advance()`,
+   * the anchor hands everything since that tick to the phase the skip opens:
+   * the next `advance()` counted up to a tick of lead-in or rest as WORK, and
+   * `workElapsedAt` read that much ahead from the first instant. The work
+   * clock schedules the calls and the ring tokens and scores the punches, so
+   * a round opened this way ran that far ahead of its own bell — and of the
+   * rings on screen, which start from the bell — and closed that much before
+   * its time. Measured on the tablet as round 1's rings 43 to 87 ms behind
+   * its calls against 7 to 22 ms in later rounds (findings doc, N-18).
+   *
+   * `resume()` re-anchors for the same reason. What is discarded is the tail
+   * of the phase being left, which is over.
+   */
+  private openAtThisInstant(): void {
+    this.lastAdvanceAtMs = this.clock.now()
+  }
 
   private isRunning(): boolean {
     return this.phase === 'countdown' || this.phase === 'work' || this.phase === 'rest'
