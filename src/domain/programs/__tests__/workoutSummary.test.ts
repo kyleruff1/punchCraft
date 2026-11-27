@@ -18,6 +18,7 @@ import {
 } from '../workoutSummary'
 import { threeRoundFundamentals } from '../../workout/samples'
 import type { GeneratedWorkout } from '../../workout/GeneratedWorkout'
+import type { LiveCounts } from '../liveCounts'
 
 const WORKOUT: GeneratedWorkout = threeRoundFundamentals
 
@@ -278,5 +279,119 @@ describe('edge cases', () => {
     // Three 4-minute rounds (D21): 27 punches over 12 minutes = 2.25/min,
     // reported to one decimal.
     expect(summary().avgRatePerMin).toBe(2.3)
+  })
+})
+
+// ---------------------------------------------------------------------------
+
+describe('a stored session (calculation 1.1.0)', () => {
+  // What a saved session can hand back: the cue results it always had, and —
+  // since migration 009 — what the live screen counted.
+  const live: LiveCounts = {
+    v: 1,
+    total: 61,
+    left: 31,
+    right: 30,
+    extra: 4,
+    adaptations: 2,
+    source: 'tracker',
+    rounds: [
+      { roundIndex: 0, actual: 28, target: 30, left: 14, right: 14 },
+      { roundIndex: 1, actual: 31, target: 30, left: 16, right: 15 },
+    ],
+  }
+
+  it('says its totals are matched punches only when it has no live counts', () => {
+    expect(summary().countBasis).toBe('matched')
+  })
+
+  describe('with the live counts', () => {
+    const stored = () => summary(fixtureRows(), { liveCounts: live })
+
+    it("shows the live counter's total — which the cue results cannot reach", () => {
+      const rowsOnly = summary()
+      const withLive = stored()
+      expect(withLive.countBasis).toBe('live')
+      expect(withLive.totalPunches).toBe(61)
+      // Nine landed rows per round in the fixture: 27. The other 34 were
+      // burst output and extras, which no cue result records.
+      expect(rowsOnly.totalPunches).toBe(27)
+      expect(withLive.leftRightSplit).toEqual({ left: 31, right: 30 })
+    })
+
+    it('takes extras and adaptations from the session, over anything passed beside it', () => {
+      const s = summary(fixtureRows(), {
+        liveCounts: live,
+        extraPunches: 99,
+        adaptations: [{ decidedAtMonotonicMs: 1, boundary: 'round' }],
+      })
+      expect(s.extraPunches).toBe(4)
+      expect(s.adaptationCount).toBe(2)
+    })
+
+    it('lists each round as its bell card showed it, and only the rounds that were reached', () => {
+      const rounds = stored().perRound
+      expect(rounds.map((r) => [r.roundIndex, r.actual, r.target])).toEqual([
+        [0, 28, 30],
+        [1, 31, 30],
+      ])
+      expect(rounds[0]!.leftRight).toEqual({ left: 14, right: 14 })
+      expect(rounds[0]!.theme).toBe(WORKOUT.schedule[0]!.theme)
+      expect(rounds.map((r) => r.grade.outcome)).toEqual(['short', 'over'])
+      expect(stored().completedRounds).toBe(2)
+      expect(stored().mostProductiveRound).toBe(1)
+    })
+
+    it('still takes match percentage and velocity from the cue results', () => {
+      const rowsOnly = summary()
+      const withLive = stored()
+      expect(withLive.handSequenceMatchPercent).toBe(rowsOnly.handSequenceMatchPercent)
+      expect(withLive.avgVelocity).toBe(rowsOnly.avgVelocity)
+      expect(withLive.perRound[0]!.avgVelocity).toBe(rowsOnly.perRound[0]!.avgVelocity)
+    })
+
+    it('ignores a stored round the plan does not have', () => {
+      const s = summary(fixtureRows(), {
+        liveCounts: {
+          ...live,
+          rounds: [...live.rounds, { roundIndex: 9, actual: 5, target: 5, left: 3, right: 2 }],
+        },
+      })
+      expect(s.perRound.map((r) => r.roundIndex)).toEqual([0, 1])
+    })
+  })
+
+  it('works out the rate over the time actually worked, when it is given', () => {
+    // 61 punches in 5 minutes worked is 12.2 a minute. Over the 12 scheduled
+    // minutes — all 1.0.0 knew — a stopped workout would read 5.1.
+    const s = summary(fixtureRows(), { liveCounts: live, activeDurationMs: 5 * 60_000 })
+    expect(s.avgRatePerMin).toBe(12.2)
+    expect(summary(fixtureRows(), { liveCounts: live }).avgRatePerMin).toBe(5.1)
+  })
+
+  describe('with only the blocks that ran — a session from before the live counts', () => {
+    const firstTwoRounds = [...BLOCK_IDS[0]!, ...BLOCK_IDS[1]!]
+    const rows = fixtureRows().filter((r) => firstTwoRounds.includes(r.blockId))
+
+    it('leaves a round nobody reached out, instead of listing it as 0 of N', () => {
+      const s = summary(rows, { reachedBlockIds: firstTwoRounds })
+      expect(s.perRound.map((r) => r.roundIndex)).toEqual([0, 1])
+      expect(s.countBasis).toBe('matched')
+      // Without it, the third round is there with nothing in it.
+      expect(summary(rows).perRound.map((r) => r.actual)).toEqual([9, 9, 0])
+    })
+
+    it('keeps a round that was reached and answered with nothing', () => {
+      const none = rows.map((r) => ({ ...r, outcome: 'missed' as const }))
+      const s = summary(none, { reachedBlockIds: firstTwoRounds })
+      expect(s.perRound.map((r) => r.actual)).toEqual([0, 0])
+    })
+
+    it('names the most productive round by its number, not its place in the list', () => {
+      const onlyLast = fixtureRows().filter((r) => BLOCK_IDS[2]!.includes(r.blockId))
+      const s = summary(onlyLast, { reachedBlockIds: BLOCK_IDS[2]! })
+      expect(s.perRound.map((r) => r.roundIndex)).toEqual([2])
+      expect(s.mostProductiveRound).toBe(2)
+    })
   })
 })

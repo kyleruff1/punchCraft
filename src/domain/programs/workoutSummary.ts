@@ -34,12 +34,18 @@
 import { gradeRound, type RoundGrade } from './roundGrading'
 import { sequenceScoreLabel, type CapabilityTier } from '../workout/capabilityTier'
 import type { GeneratedWorkout } from '../workout/GeneratedWorkout'
+import type { LiveCounts, LiveRoundCount } from './liveCounts'
 
 /**
  * Bumped whenever any figure below changes for the same input. Independent
  * of #117's metrics version on purpose — see the header note.
+ *
+ * 1.1.0 (2026-11-27): given the live counts, the stored active time or the
+ * blocks that ran, the totals, the per-round rows and the rate are worked
+ * out from those — see `ComputeSummaryArgs`. With none of them the figures
+ * are what 1.0.0 produced.
  */
-export const WORKOUT_SUMMARY_CALCULATION_VERSION = '1.0.0'
+export const WORKOUT_SUMMARY_CALCULATION_VERSION = '1.1.0'
 
 /** The six persisted outcomes (spec §17.1 amendment). */
 export type SummaryCueOutcome =
@@ -100,6 +106,15 @@ export interface WorkoutSummaryData {
   capabilityTier: CapabilityTier
   extraPunches: number
   adaptationCount: number
+  /**
+   * What `totalPunches` counts. `live`: every punch the live counter
+   * counted (migration 009). `matched`: only punches that answered a called
+   * combination, plus any extras handed in — all that a session saved before
+   * that migration can offer, and less than the athlete saw whenever the
+   * workout had an open burst. A surface must say which it is showing.
+   */
+  countBasis: 'live' | 'matched'
+  /** Only the rounds that were reached, when that is known. */
   perRound: RoundSummary[]
   recipeName: string
   seed: string
@@ -115,6 +130,27 @@ export interface ComputeSummaryArgs {
   /** Punches with no expectation to answer; counted, never discarded. */
   extraPunches?: number
   recipeName?: string
+  /**
+   * What the live screen counted, when the session kept it. The totals, the
+   * left/right split, each round's count, the extras and the adaptation
+   * count then come from here — the cue results cannot supply them (they
+   * hold no burst output). Match percentage and velocity still come from
+   * the cue results. Overrides `extraPunches` and `adaptations`.
+   */
+  liveCounts?: LiveCounts
+  /**
+   * The session's stored active (work) time. When given, the rate is over
+   * it; otherwise over the scheduled minutes — which is wrong for a workout
+   * that was stopped early, and was all 1.0.0 had.
+   */
+  activeDurationMs?: number
+  /**
+   * The ids of the blocks that ran (the realized stream). When given, a
+   * round none of whose blocks ran is left out of `perRound` rather than
+   * listed as "0 of N": nobody reached it. Not needed with `liveCounts`,
+   * which already lists only the rounds that were reached.
+   */
+  reachedBlockIds?: Iterable<string>
 }
 
 /** Spec §8.5 disclosure strings, keyed by the unit actually stored. */
@@ -129,19 +165,21 @@ const VELOCITY_REPRESENTATION: Record<string, string> = {
 const NO_VELOCITY_DISCLOSURE = 'No velocity was recorded for this workout.'
 
 /** Outcomes that mean a punch actually landed for that expectation. */
-const LANDED: ReadonlySet<SummaryCueOutcome> = new Set<SummaryCueOutcome>([
+export const LANDED_OUTCOMES: readonly SummaryCueOutcome[] = [
   'matched',
   'hand-mismatch',
   'type-mismatch',
   'late',
-])
+]
+const LANDED: ReadonlySet<SummaryCueOutcome> = new Set(LANDED_OUTCOMES)
 
 function round1(value: number): number {
   return Math.round(value * 10) / 10
 }
 
 export function computeWorkoutSummary(args: ComputeSummaryArgs): WorkoutSummaryData {
-  const { workout, cueResults, adaptations = [], extraPunches = 0 } = args
+  const { workout, cueResults, adaptations = [], extraPunches = 0, liveCounts } = args
+  const reached = args.reachedBlockIds === undefined ? undefined : new Set(args.reachedBlockIds)
 
   const scoredRounds = workout.schedule.filter((r) => r.countsTowardGoal)
   const blockToRound = new Map<string, number>()
@@ -151,7 +189,11 @@ export function computeWorkoutSummary(args: ComputeSummaryArgs): WorkoutSummaryD
 
   // -- per round ------------------------------------------------------------
 
-  const perRound: RoundSummary[] = workout.schedule.map((round, roundIndex) => {
+  /** A round as the stored cue results describe it: called punches only. */
+  const roundFromRows = (
+    round: (typeof workout.schedule)[number],
+    roundIndex: number,
+  ): RoundSummary => {
     const rows = cueResults.filter((r) => blockToRound.get(r.blockId) === roundIndex)
     const landed = rows.filter((r) => LANDED.has(r.outcome))
 
@@ -172,14 +214,44 @@ export function computeWorkoutSummary(args: ComputeSummaryArgs): WorkoutSummaryD
         ? { avgVelocity: round1(velocities.reduce((a, b) => a + b, 0) / velocities.length) }
         : {}),
     }
-  })
+  }
+
+  /** A round as the live screen counted it; its velocity still comes from the rows. */
+  const roundFromLive = (count: LiveRoundCount): RoundSummary | null => {
+    const round = workout.schedule[count.roundIndex]
+    if (!round) return null
+    const { avgVelocity } = roundFromRows(round, count.roundIndex)
+    return {
+      roundIndex: count.roundIndex,
+      theme: round.theme,
+      target: count.target,
+      actual: count.actual,
+      grade: gradeRound(count.actual, count.target),
+      leftRight: { left: count.left, right: count.right },
+      ...(avgVelocity === undefined ? {} : { avgVelocity }),
+    }
+  }
+
+  const perRound: RoundSummary[] = liveCounts
+    ? liveCounts.rounds.map(roundFromLive).filter((r): r is RoundSummary => r !== null)
+    : workout.schedule
+        .map(roundFromRows)
+        // A round none of whose blocks ran was never reached: leave it out
+        // rather than list it as "0 of N".
+        .filter(
+          (r) =>
+            reached === undefined ||
+            (workout.schedule[r.roundIndex]?.blocks.some((b) => reached.has(b.id)) ?? false),
+        )
 
   // -- workout totals -------------------------------------------------------
 
   const landedRows = cueResults.filter((r) => LANDED.has(r.outcome))
   // Extras are punches too (doc §21), so they belong in the total the
   // athlete is graded against — the count badge grades what they threw.
-  const totalPunches = landedRows.length + extraPunches
+  // With the live counts, the total is the live counter's: it includes burst
+  // output, which no cue result records.
+  const totalPunches = liveCounts ? liveCounts.total : landedRows.length + extraPunches
   const target = workout.recipe.totalPunchGoal
 
   const velocityRows = cueResults.filter(
@@ -188,7 +260,10 @@ export function computeWorkoutSummary(args: ComputeSummaryArgs): WorkoutSummaryD
   const velocities = velocityRows.map((r) => r.velocityRaw as number)
   const storedUnit = velocityRows[0]?.velocityUnit ?? null
 
-  const activeMinutes = scoredRounds.reduce((sum, r) => sum + r.workDurationMs, 0) / 60_000
+  const activeMinutes =
+    args.activeDurationMs === undefined
+      ? scoredRounds.reduce((sum, r) => sum + r.workDurationMs, 0) / 60_000
+      : args.activeDurationMs / 60_000
 
   // Expected punches are the denominator for the sequence figure; display-
   // only tokens never enter it (D4).
@@ -197,11 +272,13 @@ export function computeWorkoutSummary(args: ComputeSummaryArgs): WorkoutSummaryD
 
   const tier = (cueResults[0]?.capabilityTier ?? 'hand-only') as CapabilityTier
 
-  const mostProductiveRound = perRound.reduce(
-    (best, current) =>
-      current.actual > (perRound[best]?.actual ?? -1) ? current.roundIndex : best,
-    0,
-  )
+  // The first round with the highest count. By entry, not by position:
+  // `perRound` may list only the rounds that were reached.
+  const mostProductiveRound =
+    perRound.reduce<RoundSummary | undefined>(
+      (best, current) => (best === undefined || current.actual > best.actual ? current : best),
+      undefined,
+    )?.roundIndex ?? 0
   const roundsWithVelocity = perRound.filter((r) => r.avgVelocity !== undefined)
   const bestVelocityRound =
     roundsWithVelocity.length > 0
@@ -227,10 +304,12 @@ export function computeWorkoutSummary(args: ComputeSummaryArgs): WorkoutSummaryD
       storedUnit === null
         ? NO_VELOCITY_DISCLOSURE
         : (VELOCITY_REPRESENTATION[storedUnit] ?? VELOCITY_REPRESENTATION['tracker-unit']!),
-    leftRightSplit: {
-      left: landedRows.filter((r) => r.expectedHand === 'left').length,
-      right: landedRows.filter((r) => r.expectedHand === 'right').length,
-    },
+    leftRightSplit: liveCounts
+      ? { left: liveCounts.left, right: liveCounts.right }
+      : {
+          left: landedRows.filter((r) => r.expectedHand === 'left').length,
+          right: landedRows.filter((r) => r.expectedHand === 'right').length,
+        },
     avgRatePerMin: activeMinutes > 0 ? round1(totalPunches / activeMinutes) : 0,
     mostProductiveRound,
     ...(bestVelocityRound === undefined ? {} : { bestVelocityRound }),
@@ -241,8 +320,9 @@ export function computeWorkoutSummary(args: ComputeSummaryArgs): WorkoutSummaryD
       : {}),
     sequenceScoreLabel: sequenceScoreLabel(tier),
     capabilityTier: tier,
-    extraPunches,
-    adaptationCount: adaptations.length,
+    extraPunches: liveCounts ? liveCounts.extra : extraPunches,
+    adaptationCount: liveCounts ? liveCounts.adaptations : adaptations.length,
+    countBasis: liveCounts ? 'live' : 'matched',
     perRound,
     recipeName: args.recipeName ?? workout.id,
     seed: workout.recipe.seed,

@@ -301,6 +301,16 @@ export function storedPlanId(w: GeneratedWorkout): string {
   return `${w.id}@${fingerprint.slice(fingerprint.indexOf(':') + 1)}`
 }
 
+/**
+ * The workout's own id out of a stored plan id (`storedPlanId`'s inverse).
+ * A plan row from before plans were keyed by content has no `@…` suffix, and
+ * its id is the workout's.
+ */
+export function workoutIdOfPlanId(planId: string): string {
+  const at = planId.lastIndexOf('@')
+  return at < 0 ? planId : planId.slice(0, at)
+}
+
 export class WorkoutRepository {
   constructor(private readonly db: SqlPort) {}
 
@@ -657,6 +667,27 @@ export class WorkoutRepository {
     logger.info('storage.workout.cueResults.write', 'cue results written', {
       rowCount: safe(rows.length),
     })
+  }
+
+  /**
+   * For each of these sessions, how many cue results carry one of the given
+   * outcomes. One query for a page of history, rather than one per row.
+   */
+  countCueOutcomes(
+    sessionIds: readonly string[],
+    outcomes: readonly CueOutcome[],
+  ): Map<string, number> {
+    const counts = new Map<string, number>()
+    if (sessionIds.length === 0 || outcomes.length === 0) return counts
+    const rows = this.select<{ session_id: string; n: number }>(
+      `SELECT session_id, COUNT(*) AS n FROM cue_results
+        WHERE session_id IN (${sessionIds.map(() => '?').join(', ')})
+          AND outcome IN (${outcomes.map(() => '?').join(', ')})
+        GROUP BY session_id`,
+      [...sessionIds, ...outcomes],
+    )
+    for (const row of rows) counts.set(row.session_id, row.n)
+    return counts
   }
 
   /** Results in cue order for one session. */
