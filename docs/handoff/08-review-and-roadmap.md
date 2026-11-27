@@ -1505,10 +1505,16 @@ and fails on more.
 
 ### Still unproven
 
-- **The CI job has never run on a runner.** Unknown there: how late a shared
-  four-processor machine sends clips, and whether a browser with no sound
-  card will start its audio at all. If it will not, the suite warns that the
-  sound tap did not start and judges the rest.
+- **The CI job has run twice on a runner, and passed both times** (this
+  paragraph was corrected on 2026-11-27, after the pull request that carried
+  the job; as first written it said the job had never run). Two things were
+  unknown. Whether a browser with no sound card would start its audio at
+  all: it did, and all 81 clips of One-Two were heard. And how late a shared
+  four-processor machine would send clips: the least gap before a ring was
+  365 and 373 ms, against 376 on this PC, and parity was the same in all 81
+  dispatches. Two runs of one workout are not a baseline, so the job stays
+  advisory and what it hears still only warns. **The manual run of all 22
+  has not been tried.**
 - **Whole workouts (`--full`) have not been run**, only round 1 — which is
   what the correlator judges.
 - **Technique names:** one workout driven, correlator only. The 22 above
