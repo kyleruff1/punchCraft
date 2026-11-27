@@ -514,3 +514,41 @@ describe('soundVerdict', () => {
     })
   })
 })
+
+describe('what is and is not a clip being cut', () => {
+  const ready = { type: 'tap-ready', atMs: 1, state: 'running', sampleRate: 48_000 }
+  const stopped = (monoMs) => ({
+    wallMs: 0,
+    monoMs,
+    level: 'info',
+    args: ['[INFO] workout.warn', 'round warning stopped', {}],
+  })
+  const report = (records, events) =>
+    soundReport([...round, ...records], [ready, ...events], LIMITS)
+
+  it('is not cut when the app stopped it and said so', () => {
+    const events = played(7, SENT + 1, { stoppedAt: 300 })
+    const stopAt = events.at(-1).atMs
+    expect(report(call(2_600), events).clips.cutShort).toHaveLength(1)
+    expect(report([...call(2_600), stopped(stopAt + 4)], events).clips.cutShort).toEqual([])
+  })
+
+  it('never takes a bell for a call, though it rang in the same instant', () => {
+    const bell = played(3, SENT + 1).map((e) =>
+      e.type === 'play' ? { ...e, src: 'bell.0123456789abcdef0123456789abcdef.wav' } : e,
+    )
+    const r = report(call(2_600), bell)
+    expect(r.clips.silent).toEqual([expect.objectContaining({ element: null })])
+    expect(r.otherKinds).toEqual({ bell: 1 })
+  })
+
+  it('does not count the source-less element a call’s player starts on as a play of anything', () => {
+    const phantom = [
+      { id: 1, type: 'play', atMs: SENT, src: '' },
+      { id: 1, type: 'emptied', atMs: SENT + 3, positionMs: 0 },
+    ]
+    const r = report(call(2_600, { path: 'fresh' }), [...phantom, ...played(2, SENT + 3)])
+    expect(r.clips).toMatchObject({ heard: 1, silent: [], cutShort: [] })
+    expect(r.otherPlays).toBe(0)
+  })
+})
