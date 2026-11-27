@@ -71,8 +71,16 @@ const call = (
     }),
   ]
 }
-/** The tap's events for one play of element `id`: asked at `at`, sounding from +`startAfter` for `heardMs`. */
-const played = (id, at, { startAfter = 85, heardMs = 980, durationMs = 1_000 } = {}) => [
+/**
+ * The tap's events for one play of element `id`: asked at `at`, sounding from
+ * +`startAfter` for `heardMs`, and stopping with its playhead at `stoppedAt` —
+ * the clip's own end, unless told otherwise.
+ */
+const played = (
+  id,
+  at,
+  { startAfter = 85, heardMs = 980, durationMs = 1_000, stoppedAt = durationMs } = {},
+) => [
   { id, type: 'play', atMs: at, src: 'call.wav', volume: 1, positionMs: 0, durationMs },
   { id, type: 'playing', atMs: at + 3, durationMs },
   ...(heardMs === null
@@ -80,6 +88,13 @@ const played = (id, at, { startAfter = 85, heardMs = 980, durationMs = 1_000 } =
     : [
         { id, type: 'sound-start', atMs: at + startAfter },
         { id, type: 'sound-end', atMs: at + startAfter + heardMs, peak: 0.4 },
+        {
+          id,
+          type: 'pause',
+          atMs: at + startAfter + heardMs + 40,
+          positionMs: stoppedAt,
+          durationMs,
+        },
       ]),
 ]
 const LIMITS = { floorMs: 150, truncationMs: 150 }
@@ -340,13 +355,30 @@ describe('soundReport', () => {
     expect(r.clips).toMatchObject({ played: 1, ducked: 1, silent: [] })
   })
 
-  it('names a clip heard shorter than it is, past the allowance', () => {
-    expect(report(call(2_600), played(7, SENT + 1, { heardMs: 840 })).clips.cutShort).toHaveLength(
-      1,
-    )
-    expect(report(call(2_600), played(7, SENT + 1, { heardMs: 860 })).clips.cutShort).toHaveLength(
-      0,
-    )
+  it('names a clip stopped before its end, past the allowance', () => {
+    const cutAt = (stoppedAt) =>
+      report(call(2_600), played(7, SENT + 1, { stoppedAt })).clips.cutShort
+    expect(cutAt(840)).toEqual([expect.objectContaining({ slot: 'call/1-2', stoppedShortMs: 160 })])
+    expect(cutAt(860)).toEqual([])
+  })
+
+  it('does not call a clip cut for being heard shorter than its file: a quiet head and tail are not a cut', () => {
+    // Played to its end; 200 ms of the file was under the follower's threshold.
+    const r = report(call(2_600), played(7, SENT + 1, { heardMs: 800 }))
+    expect(r.clips.cutShort).toEqual([])
+    expect(r.length.heardMinusStated.minMs).toBe(-200)
+  })
+
+  it('counts a clip cut off by its own element being played again', () => {
+    const events = [
+      ...played(7, SENT + 1, { heardMs: null }),
+      { id: 7, type: 'sound-start', atMs: SENT + 86 },
+      // Asked to play again 400 ms into the clip, before it had stopped.
+      { id: 7, type: 'play', atMs: SENT + 401, positionMs: 400, durationMs: 1_000 },
+    ]
+    expect(report(call(2_600), events).clips.cutShort).toEqual([
+      expect.objectContaining({ stoppedShortMs: 600 }),
+    ])
   })
 
   it('names a call still sounding when its ring was due, and counts those under the floor', () => {
@@ -425,10 +457,10 @@ describe('soundVerdict', () => {
     expect(v.hard).toEqual(['1 clip(s) were played and made no sound — first: call/1-2, round 1'])
   })
 
-  it('fails on a clip heard shorter than it is', () => {
-    const v = verdict(call(2_600), played(7, SENT + 1, { heardMs: 300 }))
+  it('fails on a clip stopped before its end', () => {
+    const v = verdict(call(2_600), played(7, SENT + 1, { heardMs: 300, stoppedAt: 385 }))
     expect(v.hard).toEqual([
-      '1 clip(s) were heard more than 150 ms shorter than they are — first: call/1-2, round 1, 300 of 1000 ms',
+      '1 clip(s) were stopped more than 150 ms before their end — first: call/1-2, round 1, 615 ms of its 1000 left unplayed',
     ])
   })
 

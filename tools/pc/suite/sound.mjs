@@ -18,8 +18,9 @@ import { spread } from './stats.mjs'
  * @property {number | null} durationMs the element's own length, once known
  * @property {number | null} playingAtMs when the element said it was playing
  * @property {{ startMs: number, endMs: number | null, peak: number | null }[]} sound stretches of sound, in order
- * @property {string | null} stoppedBy `pause`, `ended` or `emptied` — whichever came first
+ * @property {string | null} stoppedBy `pause`, `ended`, `emptied`, or `replayed` — whichever came first
  * @property {number | null} stoppedAtMs
+ * @property {number | null} stoppedPositionMs where the element's playhead was when it stopped
  */
 
 /**
@@ -58,6 +59,14 @@ export function playsFrom(events) {
         sound: stillSounding ? [{ startMs: event.atMs, endMs: null, peak: null }] : [],
         stoppedBy: null,
         stoppedAtMs: null,
+        stoppedPositionMs: null,
+      }
+      // Played again before it had stopped: this play's position, taken
+      // before the element restarts, is where the last one was cut off.
+      if (before && before.stoppedBy === null) {
+        before.stoppedBy = 'replayed'
+        before.stoppedAtMs = event.atMs
+        before.stoppedPositionMs = event.positionMs ?? null
       }
       current.set(event.id, play)
       plays.push(play)
@@ -77,8 +86,12 @@ export function playsFrom(events) {
         open.peak = event.peak ?? null
       }
     } else if (event.type === 'pause' || event.type === 'ended' || event.type === 'emptied') {
-      play.stoppedBy ??= event.type
-      play.stoppedAtMs ??= event.atMs
+      if (play.stoppedBy === null) {
+        play.stoppedBy = event.type
+        play.stoppedAtMs = event.atMs
+        play.stoppedPositionMs = event.positionMs ?? null
+        play.durationMs ??= event.durationMs ?? null
+      }
     }
   }
   return plays
@@ -108,6 +121,7 @@ export const LENGTH_MATCH_MS = 300
  * @property {number | null} element the element that played it, or null if none could be found
  * @property {number | null} firstSoundMs
  * @property {number | null} lastSoundMs
+ * @property {number | null} stoppedShortMs how far short of its end the element's playhead was when it stopped
  */
 
 /**
@@ -155,6 +169,11 @@ export function heardClips(records, plays) {
       dispatchMs: f.dispatchMs,
       element: play ? play.id : null,
       ...(play ? heardSpan(play) : { firstSoundMs: null, lastSoundMs: null }),
+      /** How far short of its own end the element's playhead was when it stopped; null if it has not. */
+      stoppedShortMs:
+        play && play.stoppedPositionMs !== null && play.durationMs !== null
+          ? play.durationMs - play.stoppedPositionMs
+          : null,
     })
   }
   return clips
@@ -232,6 +251,7 @@ const brief = (clip) => ({
   path: clip.path,
   breathMs: round1(clip.breathMs),
   heardMs: round1(clip.heardMs),
+  stoppedShortMs: round1(clip.stoppedShortMs),
   statedMs: clip.statedMs,
   dispatchLateMs: clip.dispatchLateMs,
   element: clip.element,
@@ -258,7 +278,13 @@ export function soundReport(records, events, { floorMs, truncationMs }) {
   // Still sounding when the capture stopped: nothing can be said of its end.
   const unfinished = audible.filter((c) => c.firstSoundMs !== null && c.lastSoundMs === null)
   const heard = audible.filter((c) => c.heardMs !== null)
-  const cutShort = heard.filter((c) => c.statedMs - c.heardMs > truncationMs)
+  // Cut short is judged by the playhead, not by the sound: where the element
+  // was in the clip when it stopped. What is heard of a clip that played to
+  // its end is still 60-150 ms less than the file's length — its own quiet
+  // head and tail, under the follower's threshold — and that is not a cut.
+  const cutShort = audible.filter(
+    (c) => c.stoppedShortMs !== null && c.stoppedShortMs > truncationMs,
+  )
   const calls = heard.filter((c) => c.kind === 'call' && c.breathMs !== null)
   const leadIns = heard.filter((c) => c.kind === 'lead-in')
   const underFloor = calls.filter((c) => c.breathMs < floorMs)
@@ -353,7 +379,8 @@ export function renderSoundReport(report, title) {
   list(
     'Cut short',
     clips.cutShort,
-    (c) => `${named(c)} — heard ${cell(c.heardMs)} of ${c.statedMs} ms`,
+    (c) =>
+      `${named(c)} — stopped with ${cell(c.stoppedShortMs)} ms of its ${c.statedMs} left unplayed`,
   )
   list(
     'Still sounding when the ring was due',
@@ -379,7 +406,7 @@ export function renderSoundReport(report, title) {
  *
  * Hard — the coach did something wrong that a person would hear:
  * - a call or lead-in was played at full volume and made no sound;
- * - a clip was heard shorter than it is, past the allowance;
+ * - a clip was stopped before its end, past the allowance;
  * - a call was still sounding when the ring it leads was due.
  *
  * Soft:
@@ -419,7 +446,7 @@ export function soundVerdict(report, { floorRatio }) {
   if (cutShort.length > 0) {
     const c = cutShort[0]
     hard.push(
-      `${cutShort.length} clip(s) were heard more than ${report.length.truncationMs} ms shorter than they are — first: ${named(c)}, ${c.heardMs} of ${c.statedMs} ms`,
+      `${cutShort.length} clip(s) were stopped more than ${report.length.truncationMs} ms before their end — first: ${named(c)}, ${c.stoppedShortMs} ms of its ${c.statedMs} left unplayed`,
     )
   }
   const { pastRing, underFloor, underFloorRatio, n, floorMs, breath } = report.calls
