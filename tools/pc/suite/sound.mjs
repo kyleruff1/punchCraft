@@ -7,6 +7,7 @@
 // modelled: how long before its ring a call stopped sounding.
 import { fitWorkAxis, roundWindows } from '../../analysis/observed-timing.mjs'
 import { fieldsOf, recordsOf } from './capture.mjs'
+import { bellsAt, isCut, isSilent, namedClips } from './ceremonies.mjs'
 import { appStopTimes, clipKind, stopReasonOf } from './plays.mjs'
 import { spread } from './stats.mjs'
 
@@ -295,6 +296,13 @@ export function soundReport(records, events, { floorMs, truncationMs }) {
     stop: clip.play ? stopReasonOf(clip.play, { appStops, truncationMs }) : null,
   }))
   const claimed = new Set(clips.map((clip) => clip.play))
+  // The clips the app plays by name — the bell above all — take their own
+  // element plays out of "everything else".
+  const named = namedClips(records, plays, { claimed, appStops, truncationMs })
+  const boundaries = bellsAt(records, named)
+  const place = (b) => ({ transition: b.transition, roundIndex: b.roundIndex })
+  const otherNamed = named.filter((clip) => clip.asset !== 'bell')
+  const nameOf = (clip) => ({ asset: clip.asset, stoppedShortMs: round1(clip.stoppedShortMs) })
   // Everything else the page played. An element that never had a source is
   // not a play of anything.
   const others = plays.filter((play) => !claimed.has(play) && play.kind !== 'phantom')
@@ -351,6 +359,23 @@ export function soundReport(records, events, { floorMs, truncationMs }) {
         .map(brief),
     },
     leadIns: { n: leadIns.length },
+    /** A bell marks every round start, round end and finish. */
+    bells: {
+      expected: boundaries.length,
+      rung: boundaries.filter((b) => b.bell !== null).length,
+      missing: boundaries.filter((b) => b.bell === null).map(place),
+      silent: boundaries.filter((b) => b.bell !== null && isSilent(b.bell)).map(place),
+      cutShort: boundaries.filter((b) => b.bell !== null && isCut(b.bell)).map(place),
+      /** First sound after the boundary it marks. Reported, not judged. */
+      afterBoundary: spread(boundaries.map((b) => b.soundsAfterMs)),
+    },
+    /** The other clips the app plays by name: lead-ins it speaks from a file, and the like. */
+    named: {
+      played: otherNamed.length,
+      heard: otherNamed.filter((clip) => clip.firstSoundMs !== null).length,
+      silent: otherNamed.filter(isSilent).map(nameOf),
+      cutShort: otherNamed.filter(isCut).map(nameOf),
+    },
     start: {
       afterDispatch: spread(heard.map((c) => c.startAfterDispatchMs)),
       afterSchedule: spread(heard.map((c) => c.startAfterScheduleMs)),
@@ -383,6 +408,8 @@ export function renderSoundReport(report, title) {
     ...tap.failures.map((f) => `- tap failure: ${f}`),
     '',
     `calls and lead-ins: ${clips.played} played · ${clips.heard} heard · ${clips.silent.length} silent · ${clips.cutShort.length} cut short · ${clips.ducked} ducked on purpose · ${clips.unfinished} still sounding when the capture stopped`,
+    `bells: ${report.bells.rung} of ${report.bells.expected} round boundaries rung · ${report.bells.silent.length} silent · ${report.bells.cutShort.length} cut · first sound ${cell(report.bells.afterBoundary.medianMs)} ms after the boundary (most ${cell(report.bells.afterBoundary.maxMs)})`,
+    `clips played by name: ${report.named.played} played · ${report.named.heard} heard · ${report.named.silent.length} silent · ${report.named.cutShort.length} cut`,
     `other plays: ${report.otherPlays}${
       report.otherPlays > 0
         ? ` (${Object.entries(report.otherKinds)
@@ -486,6 +513,35 @@ export function soundVerdict(report, { floorRatio }) {
     const c = cutShort[0]
     hard.push(
       `${cutShort.length} clip(s) were stopped more than ${report.length.truncationMs} ms before their end — first: ${named(c)}, ${c.stoppedShortMs} ms of its ${c.statedMs} left unplayed`,
+    )
+  }
+  const at = (b) => `${b.transition.replace('-entered', '')} of round ${b.roundIndex + 1}`
+  const { bells } = report
+  const byName = report.named
+  if (bells.missing.length > 0) {
+    hard.push(
+      `${bells.missing.length} round boundary(ies) had no bell — first: ${at(bells.missing[0])}`,
+    )
+  }
+  if (bells.silent.length > 0) {
+    hard.push(
+      `${bells.silent.length} bell(s) rang and made no sound — first: ${at(bells.silent[0])}`,
+    )
+  }
+  if (bells.cutShort.length > 0) {
+    hard.push(
+      `${bells.cutShort.length} bell(s) were stopped before their end — first: ${at(bells.cutShort[0])}`,
+    )
+  }
+  if (byName.silent.length > 0) {
+    hard.push(
+      `${byName.silent.length} named clip(s) were played and made no sound — first: ${byName.silent[0].asset}`,
+    )
+  }
+  if (byName.cutShort.length > 0) {
+    const c = byName.cutShort[0]
+    hard.push(
+      `${byName.cutShort.length} named clip(s) were stopped before their end — first: ${c.asset}, ${c.stoppedShortMs} ms left unplayed`,
     )
   }
   const { pastRing, underFloor, underFloorRatio, n, floorMs, breath } = report.calls

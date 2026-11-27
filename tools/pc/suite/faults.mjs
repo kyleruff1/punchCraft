@@ -10,12 +10,15 @@
 //   npm run pc:suite -- --only quick-one-two --fault cut     a call that stops early
 //   npm run pc:suite -- --only quick-one-two --fault late    a call that starts late and runs into its ring
 //
-// A fault touches every fourth play of a short clip that an element already
-// holds — the calls, on their reused players. It has to be installed before
+//   npm run pc:suite -- --only quick-one-two --fault mute-bell   every bell rung in silence
+//
+// The first three touch every fourth play of a call: a short clip on a
+// reused player, played from a downloaded copy — which is how a call is told
+// from a bell or a silence file, both short too. It has to be installed before
 // the sound tap, so that the tap still reports the play at the moment the
 // app asked for it and the fault sits between that and the real `play()`.
 
-export const FAULTS = ['mute', 'cut', 'late']
+export const FAULTS = ['mute', 'cut', 'late', 'mute-bell']
 
 /** A clip shorter than this is a call; lead-ins run to several seconds. */
 export const CALL_MAX_SEC = 2
@@ -53,7 +56,14 @@ export function installFault(scope, kind, how) {
   }
   /** @this {any} the element */
   media.play = function play(...args) {
-    const call = Number.isFinite(this.duration) && this.duration < how.callMaxSec
+    const source = String(this.currentSrc || this.src || '')
+    if (kind === 'mute-bell') {
+      // The build's own file, by name.
+      if (/\/bell\.[^/]*$/.test(source)) this.muted = true
+      return nativePlay.apply(this, args)
+    }
+    const call =
+      Number.isFinite(this.duration) && this.duration < how.callMaxSec && source.startsWith('blob:')
     if (!call) return nativePlay.apply(this, args)
     seen += 1
     if (seen % how.every !== 0) {

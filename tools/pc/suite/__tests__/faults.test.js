@@ -23,8 +23,9 @@ const HOW = {
 function fakePage() {
   const timers = []
   class FakeElement {
-    constructor(duration) {
+    constructor(duration, src = 'blob:http://127.0.0.1/3f2a9c1e-7b4d-4e2a-9c1f-0a1b2c3d4e5f') {
       this.duration = duration
+      this.currentSrc = src
       this.muted = false
       this.played = 0
       this.paused = 0
@@ -127,6 +128,40 @@ describe('installFault', () => {
   })
 })
 
+describe('which clips a fault touches', () => {
+  const BELL = 'http://127.0.0.1/assets/audio/bell.0123456789abcdef0123456789abcdef.wav'
+  const SILENCE = 'http://127.0.0.1/assets/audio/silence-350.0123456789abcdef0123456789abcdef.wav'
+
+  it('the call faults leave a bell and a silence file alone, short as they are', () => {
+    const page = fakePage()
+    installFault(page.scope, 'mute', HOW)
+    const bell = new page.FakeElement(1.18, BELL)
+    const silence = new page.FakeElement(0.35, SILENCE)
+    for (let i = 0; i < 12; i += 1) {
+      bell.play()
+      silence.play()
+    }
+    expect(bell.muted).toBe(false)
+    expect(silence.muted).toBe(false)
+    expect(bell.played).toBe(12)
+  })
+
+  it('mute-bell: every bell is rung in silence, and nothing else is touched', () => {
+    const page = fakePage()
+    installFault(page.scope, 'mute-bell', HOW)
+    const bell = new page.FakeElement(1.18, BELL)
+    const call = page.call()
+    const bellows = new page.FakeElement(1.18, 'http://127.0.0.1/assets/audio/bellows.abc.wav')
+    bell.play()
+    for (let i = 0; i < 8; i += 1) call.play()
+    bellows.play()
+    expect(bell.muted).toBe(true)
+    expect(bell.played).toBe(1)
+    expect(call.muted).toBe(false)
+    expect(bellows.muted).toBe(false)
+  })
+})
+
 describe('faultSource', () => {
   it('is text that runs in a page, for each fault', () => {
     for (const kind of FAULTS) {
@@ -136,6 +171,8 @@ describe('faultSource', () => {
     }
   })
   it('refuses a fault it does not have', () => {
-    expect(() => faultSource('explode')).toThrow(/a fault is one of mute, cut, late, not explode/)
+    expect(() => faultSource('explode')).toThrow(
+      /a fault is one of mute, cut, late, mute-bell, not explode/,
+    )
   })
 })
