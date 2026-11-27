@@ -12,6 +12,7 @@ import {
   lateness,
   parseArgs,
   pooled,
+  observerLine,
   renderSummary,
 } from '../suite.mjs'
 
@@ -396,6 +397,44 @@ describe('renderSummary', () => {
     const md = renderSummary([row({ sound })], meta)
     expect(md).toContain('| 0 | 80 of 81 | 1 / 0 | 351 / 376.8 | — | — | 36 / 44 |')
     expect(md).toMatch(/sound columns are measured/)
+  })
+
+  it('says how the app’s own observer compared with the audio elements, over every drive', () => {
+    const sound = (observer) => ({
+      clips: { played: 81, heard: 81, silent: [], cutShort: [] },
+      calls: { breath: { minMs: 351, medianMs: 376.8 } },
+      observer,
+    })
+    const one = {
+      records: 87,
+      compared: 87,
+      startMs: { minMs: -11.5, maxMs: 8.6 },
+      endMs: { minMs: -1.1, maxMs: 0.5 },
+      unseen: [],
+      unheard: [],
+    }
+    const two = {
+      records: 90,
+      compared: 88,
+      startMs: { minMs: -3, maxMs: 9.2 },
+      endMs: { minMs: -0.4, maxMs: 2 },
+      unseen: [{}],
+      unheard: [],
+    }
+    const md = renderSummary(
+      [row({ sound: sound(one) }), row({ sound: sound(two), vocab: 'techniques' })],
+      meta,
+    )
+    expect(md).toContain('## The app’s own observer')
+    expect(md).toContain('timed 177 plays')
+    expect(md).toContain('175 of them')
+    expect(md).toContain('at most 11.5 ms on when a clip began and 2 ms on when it ended')
+    expect(md).toContain('1 sounded that the observer never saw start')
+  })
+
+  it('leaves the observer out when no drive had anything to compare', () => {
+    expect(renderSummary([row()], meta)).not.toContain('own observer')
+    expect(observerLine([row({ sound: { observer: { compared: 0 } } })])).toBeNull()
   })
 
   it('shows how many rings lit, and how late they were painted', () => {

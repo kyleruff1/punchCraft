@@ -258,6 +258,25 @@ const clock = (elapsedMs) =>
   `${Math.floor(elapsedMs / 60_000)}:${String(Math.round(elapsedMs / 1000) % 60).padStart(2, '0')}`
 
 /**
+ * The app's playback observer against the audio elements, over every drive,
+ * as one paragraph — or null when no drive had anything to compare.
+ *
+ * @param {any[]} rows
+ * @returns {string | null}
+ */
+export function observerLine(rows) {
+  const reports = rows.map((r) => r.sound?.observer).filter((o) => o && o.compared > 0)
+  if (reports.length === 0) return null
+  const sum = (pick) => reports.reduce((n, o) => n + pick(o), 0)
+  // The furthest apart the two were, either way round, in any drive.
+  const apart = (key) => {
+    const ends = reports.flatMap((o) => [o[key].minMs, o[key].maxMs]).filter(Number.isFinite)
+    return ends.length === 0 ? '—' : String(Math.max(...ends.map(Math.abs)))
+  }
+  return `The app timed ${sum((o) => o.records)} plays by its players’ status events, and ${sum((o) => o.compared)} of them could be held against the audio element that played them. The two differ by at most ${apart('startMs')} ms on when a clip began and ${apart('endMs')} ms on when it ended. ${sum((o) => o.unseen.length)} sounded that the observer never saw start; ${sum((o) => o.unheard.length)} it saw start made no sound. Reported, not judged — each drive’s \`sound-report.md\` has its own figures.`
+}
+
+/**
  * `summary.md`. The tablet suite's table is not reused: its columns are the
  * tablet's instruments, and a PC row under those headings would be read as
  * a tablet measurement.
@@ -307,6 +326,8 @@ export function renderSummary(rows, meta) {
     for (const r of explained)
       for (const reason of r.reasons) L.push(`- **${r.workoutId}** (${r.vocab}): ${reason}`)
   }
+  const observer = observerLine(rows)
+  if (observer) L.push('', '## The app’s own observer', '', observer)
   L.push(
     '',
     '## How to read this',

@@ -53,9 +53,13 @@ dispatch. Lateness is shown side by side and never compared.
 
 **No tablet timing constant is ever set from a number in these reports.**
 `tools/analysis/observed-timing.mjs`, the tablet's timing analyzer, refuses a
-capture from here: its figures rest on the tablet's measured start latency,
-and in a browser the app's playback observer reports "started" the moment
-play is requested.
+capture from here: every onset in it is corrected by the tablet's measured
+start latency, and every constant it proposes is the tablet's.
+
+The app's own playback observer does run here, with a reading of a browser's
+player statuses of its own (`src/audio/observedStatus.web.ts`). Each drive's
+`sound-report.md` ends with it held against the audio elements — when each
+says a clip began and ended. That is a report, not a gate.
 
 ## Proving the gate
 

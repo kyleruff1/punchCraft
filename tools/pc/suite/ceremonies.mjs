@@ -17,6 +17,7 @@ export const BELL_TRANSITIONS = ['work-entered', 'rest-entered', 'completed']
 /**
  * @typedef {object} NamedClip a clip the app played by name, and what was heard of it
  * @property {string} asset the name the app logged — `bell`, a lead-in's id, …
+ * @property {string | null} playId the app's id for the play
  * @property {number} dispatchMs when the app sent it to play, on the page's clock
  * @property {number} volume the volume it was played at; 0 is silence on purpose
  * @property {import('./sound.mjs').ElementPlay | null} play the element play that was it
@@ -63,6 +64,7 @@ export function namedClips(records, plays, { claimed, appStops, truncationMs }) 
     if (play) claimed.add(play)
     clips.push({
       asset: f.asset,
+      playId: f.playId ?? null,
       dispatchMs: f.dispatchMs,
       volume: f.volume ?? 1,
       play,
@@ -159,6 +161,7 @@ export const CHAIN_LINK_WINDOW_MS = 250
  * @typedef {object} Ceremony one intro, countdown or rest line, as it was heard
  * @property {string} name `intro`, `countdown` or `rest-line`
  * @property {number} ordinal which one of its kind in the run, from 1
+ * @property {string | null} playId the app's id for the play, when its observer is on
  * @property {number} playingAtMs when the app logged starting it
  * @property {number | null} expectedTracks how many clips the app said it had loaded
  * @property {Track[]} tracks the clips found, in order
@@ -231,6 +234,7 @@ export function ceremoniesOf(records, plays, { claimed, appStops, truncationMs }
       found.push({
         name: kind.name,
         ordinal,
+        playId: fieldsOf(line).playId ?? null,
         playingAtMs: line.monoMs,
         expectedTracks,
         tracks,

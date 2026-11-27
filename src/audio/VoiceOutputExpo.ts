@@ -53,6 +53,7 @@ import {
 import { CALLOUT_CLIPS, type CalloutClipId } from './voiceAssets/calloutManifest'
 import { MetronomePlayer, type MetronomePlayerObserver } from './MetronomePlayer'
 import { releaseAudioPlayer } from './nativeAudioTeardown'
+import { observedStatusReading } from './observedStatus'
 import { PlaybackObserver, type ObservedKind, type ObservedRecord } from './PlaybackObserver'
 import { isTimingObserverEnabled } from '@diagnostics/qaFlags'
 import { MetronomeTransport } from './MetronomeTransport'
@@ -746,6 +747,7 @@ export class VoiceOutputExpo implements VoiceOutputPort {
           schedule: this.schedule,
           cancelScheduled: this.cancelScheduled,
           onObserved: (record) => this.logObserved(record),
+          readStatus: observedStatusReading,
         })
       : null
     this.metronomePlayer = new MetronomePlayer({ timing: this.observer })

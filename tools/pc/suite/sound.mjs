@@ -15,6 +15,7 @@ import {
   isSilent,
   namedClips,
 } from './ceremonies.mjs'
+import { observerReport, renderObserver } from './observer.mjs'
 import { appStopTimes, clipKind, stopReasonOf } from './plays.mjs'
 import { spread } from './stats.mjs'
 
@@ -316,11 +317,18 @@ export function soundReport(records, events, { floorMs, truncationMs }) {
   const otherNamed = named.filter((clip) => clip.asset !== 'bell')
   const nameOf = (clip) => ({ asset: clip.asset, stoppedShortMs: round1(clip.stoppedShortMs) })
   // The intro, each countdown and each rest line: several clips back to back.
-  const ceremonies = ceremonyFindings(
-    ceremoniesOf(records, plays, { claimed, appStops, truncationMs }),
-    boundaries,
-    truncationMs,
-  )
+  const chains = ceremoniesOf(records, plays, { claimed, appStops, truncationMs })
+  const ceremonies = ceremonyFindings(chains, boundaries, truncationMs)
+  // The app's own timing of the same plays, held against these elements.
+  const observer = observerReport(records, [
+    ...clips.map((clip) => ({ playId: clip.playId, first: clip.play, last: clip.play })),
+    ...named.map((clip) => ({ playId: clip.playId, first: clip.play, last: clip.play })),
+    ...chains.map((chain) => ({
+      playId: chain.playId,
+      first: chain.tracks[0]?.play ?? null,
+      last: chain.tracks.at(-1)?.play ?? null,
+    })),
+  ])
   // Everything else the page played. An element that never had a source is
   // not a play of anything.
   const others = plays.filter((play) => !claimed.has(play) && play.kind !== 'phantom')
@@ -418,6 +426,8 @@ export function soundReport(records, events, { floorMs, truncationMs }) {
       armed: byPath('armed'),
     },
     length: { truncationMs, heardMinusStated: spread(heard.map((c) => c.heardMs - c.statedMs)) },
+    /** The app's playback observer against the same elements (`observerReport`). Reported, not judged. */
+    observer,
     otherPlays: others.length,
     /** Those, by what they were: `{ bell: 3, silence: 6, … }`. */
     otherKinds: others.reduce(
@@ -505,6 +515,7 @@ export function renderSoundReport(report, title) {
     (c) =>
       `${named(c)} — ${cell(c.breathMs)} ms before its ring, sent ${cell(c.dispatchLateMs)} ms late`,
   )
+  L.push('', ...renderObserver(report.observer).slice(0, -1))
   L.push(
     '',
     'Measured where the sound enters the browser’s mixer, against the schedule. The speaker is a further, constant delay. These are this PC’s figures; no tablet constant is set from them.',

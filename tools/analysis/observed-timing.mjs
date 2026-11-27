@@ -451,26 +451,33 @@ function tally(items, key) {
 /**
  * Thrown for a capture the tablet did not write.
  *
- * Everything this tool reports rests on two facts about the tablet's audio
- * path: the playback observer's "playing" event means something there, and it
- * runs `OBSERVER_ONSET_SKEW_MS` ahead of the sound. Neither holds in a
- * browser. expo-audio's web player reports "playing" the moment play is
- * requested, and it swaps its audio element under a `downloadFirst` clip,
- * which the observer reads as a play a few milliseconds long.
+ * Everything this tool reports rests on one measured fact about the tablet's
+ * audio path: there, the playback observer's "playing" event runs
+ * `OBSERVER_ONSET_SKEW_MS` ahead of the sound. Every onset is corrected by
+ * that constant, and every proposal is a tablet constant. A browser has a
+ * different audio path and a different latency, and no such figure has been
+ * measured for it — so a PC capture would have the tablet's correction
+ * applied to another machine's numbers, and tablet constants proposed from
+ * the result.
  *
  * Run on a PC capture (2026-11-26, quick-one-two round 1) this tool reported
  * five clips cut short that a direct measurement of the sound showed playing
- * in full, and proposed moving `CALL_DISPATCH_LAG_MS` from 71 to 28.
+ * in full, and proposed moving `CALL_DISPATCH_LAG_MS` from 71 to 28. Part of
+ * that was the observer itself, which then read a browser's statuses as the
+ * tablet's; it has had a reading of its own since 2026-11-27
+ * (`src/audio/observedStatus.web.ts`). The refusal does not rest on that and
+ * did not go with it: what the PC's observer says is checked on the PC, by
+ * the PC suite, against the sound (`tools/pc/suite/observer.mjs`).
  *
  * So it refuses, whole. Hiding only the proposals would leave the findings,
- * and they stand on the same two facts.
+ * and they stand on the same constant.
  */
 export class NotATabletCapture extends Error {
   constructor(platform) {
     super(
       `this capture was written on "${platform}", not on the tablet. observed-timing judges the tablet's audio path: ` +
-        `every figure rests on the tablet's measured start latency (OBSERVER_ONSET_SKEW_MS, ${OBSERVER_ONSET_SKEW_MS} ms), ` +
-        'and anywhere else the playback observer reports "started" the moment play is requested. ' +
+        `every onset is corrected by the tablet's measured start latency (OBSERVER_ONSET_SKEW_MS, ${OBSERVER_ONSET_SKEW_MS} ms) ` +
+        'and every proposal is a tablet constant; neither means anything for another machine. ' +
         'Nothing is reported and no constant is proposed from it.',
     )
     this.name = 'NotATabletCapture'
