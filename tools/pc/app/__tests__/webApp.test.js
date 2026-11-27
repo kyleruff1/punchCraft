@@ -9,7 +9,14 @@ import path from 'node:path'
 
 import { findBrowser } from '../cdp.mjs'
 import { punchesIn } from '../smoke.mjs'
-import { buildWebApp, builtSha, checkoutSha, resolveRequest, serveWebApp } from '../webApp.mjs'
+import {
+  buildWebApp,
+  builtSha,
+  checkoutSha,
+  parseRange,
+  resolveRequest,
+  serveWebApp,
+} from '../webApp.mjs'
 
 /** A real request. (`fetch` under jest-expo is React Native's stand-in.) */
 const get = (url) =>
@@ -186,5 +193,82 @@ describe('which commit a build says it is', () => {
     expect(checkoutSha()).toMatch(/^[0-9a-f]{7,40}$/)
     // Not a git checkout: the same word `app.config.ts` falls back to.
     expect(checkoutSha(out)).toBe('unknown')
+  })
+})
+
+describe('Range requests — how a browser resumes an audio file it suspended', () => {
+  it('reads one range out of a header', () => {
+    expect(parseRange('bytes=0-99', 1000)).toEqual({ start: 0, end: 99 })
+    expect(parseRange('bytes=500-', 1000)).toEqual({ start: 500, end: 999 })
+    expect(parseRange('bytes=-100', 1000)).toEqual({ start: 900, end: 999 })
+    // Past the end is clipped to it; the last bytes of a short file are all of it.
+    expect(parseRange('bytes=900-5000', 1000)).toEqual({ start: 900, end: 999 })
+    expect(parseRange('bytes=-5000', 1000)).toEqual({ start: 0, end: 999 })
+  })
+
+  it('sends the whole file when there is no range it can use', () => {
+    for (const header of [undefined, '', 'bytes=-', 'items=0-5', 'bytes=0-5,10-15', 'bytes=a-b']) {
+      expect(parseRange(header, 1000)).toBeNull()
+    }
+  })
+
+  it('says so when the range is outside the file', () => {
+    expect(parseRange('bytes=1000-', 1000)).toBe('unsatisfiable')
+    expect(parseRange('bytes=600-500', 1000)).toBe('unsatisfiable')
+    expect(parseRange('bytes=-0', 1000)).toBe('unsatisfiable')
+    expect(parseRange('bytes=0-', 0)).toBe('unsatisfiable')
+  })
+
+  describe('from the server', () => {
+    const BYTES = 'abcdefghijklmnopqrstuvwxyz'
+    let served
+    let dir
+    /** A real request with headers. (`fetch` under jest-expo is React Native's stand-in.) */
+    const request = (headers) =>
+      new Promise((resolve, reject) => {
+        http
+          .get(`${served.url}clip.wav`, { headers }, (res) => {
+            let body = ''
+            res.setEncoding('utf8')
+            res.on('data', (chunk) => (body += chunk))
+            res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body }))
+          })
+          .on('error', reject)
+      })
+    beforeAll(async () => {
+      dir = mkdtempSync(path.join(os.tmpdir(), 'pc-app-range-'))
+      writeFileSync(path.join(dir, 'index.html'), '<!doctype html>')
+      writeFileSync(path.join(dir, 'clip.wav'), BYTES)
+      served = await serveWebApp({ root: dir, port: 0 })
+    })
+    afterAll(async () => {
+      await served.close()
+      rmSync(dir, { recursive: true, force: true })
+    })
+
+    it('says how long a file is, and that it takes ranges', async () => {
+      const whole = await request({})
+      expect(whole.status).toBe(200)
+      expect(whole.body).toBe(BYTES)
+      expect(whole.headers['content-length']).toBe('26')
+      expect(whole.headers['accept-ranges']).toBe('bytes')
+    })
+
+    it('answers a range with that part of the file', async () => {
+      const part = await request({ Range: 'bytes=5-9' })
+      expect(part.status).toBe(206)
+      expect(part.body).toBe('fghij')
+      expect(part.headers['content-range']).toBe('bytes 5-9/26')
+      expect(part.headers['content-length']).toBe('5')
+      const rest = await request({ Range: 'bytes=20-' })
+      expect(rest.body).toBe('uvwxyz')
+      expect(rest.headers['content-range']).toBe('bytes 20-25/26')
+    })
+
+    it('refuses a range outside the file, and says how long the file is', async () => {
+      const outside = await request({ Range: 'bytes=26-' })
+      expect(outside.status).toBe(416)
+      expect(outside.headers['content-range']).toBe('bytes */26')
+    })
   })
 })

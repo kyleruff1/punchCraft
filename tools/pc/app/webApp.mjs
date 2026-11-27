@@ -72,6 +72,37 @@ export function resolveRequest(root, pathname) {
 }
 
 /**
+ * The part of a file a `Range` header asks for.
+ *
+ * A browser does not always read an audio file in one go. It fetches enough
+ * to know the clip, suspends, and comes back for the rest when the clip is
+ * played — with a `Range` request. A server that cannot answer one, or that
+ * never said how long the file is, leaves the clip unplayable: the element
+ * reports a "data source error" and sits at zero. Until 2026-11-27 this
+ * server was that server, and the countdown before round 2 lost everything
+ * after its first clip in seven runs of eight on one workout.
+ *
+ * @param {string | undefined} header
+ * @param {number} size the file's length in bytes
+ * @returns {{ start: number, end: number } | 'unsatisfiable' | null} null: send the whole file
+ */
+export function parseRange(header, size) {
+  // One range only. Several at once is legal and rare; the whole file answers it.
+  const match = /^bytes=(\d*)-(\d*)$/.exec(String(header ?? '').trim())
+  if (!match || (match[1] === '' && match[2] === '')) return null
+  if (match[1] === '') {
+    // `bytes=-N`: the last N bytes.
+    const last = Number(match[2])
+    if (last === 0 || size === 0) return 'unsatisfiable'
+    return { start: Math.max(0, size - last), end: size - 1 }
+  }
+  const start = Number(match[1])
+  const end = match[2] === '' ? size - 1 : Math.min(Number(match[2]), size - 1)
+  if (start >= size || start > end) return 'unsatisfiable'
+  return { start, end }
+}
+
+/**
  * Serve a build on the loopback address. Resolves once it is listening.
  *
  * @param {{ root?: string, port?: number }} [options] `port: 0` picks a free one
@@ -86,11 +117,29 @@ export function serveWebApp({ root = OUT_DIR, port = DEFAULT_PORT } = {}) {
       res.end(`${found.status}\n`)
       return
     }
-    res.writeHead(200, {
+    const size = statSync(found.file).size
+    const headers = {
       'Content-Type': TYPES[path.extname(found.file).toLowerCase()] ?? 'application/octet-stream',
       // A rebuild must be what the next reload shows.
       'Cache-Control': 'no-store',
-    })
+      'Accept-Ranges': 'bytes',
+    }
+    const range = parseRange(req.headers.range, size)
+    if (range === 'unsatisfiable') {
+      res.writeHead(416, { ...headers, 'Content-Range': `bytes */${size}` })
+      res.end()
+      return
+    }
+    if (range) {
+      res.writeHead(206, {
+        ...headers,
+        'Content-Range': `bytes ${range.start}-${range.end}/${size}`,
+        'Content-Length': range.end - range.start + 1,
+      })
+      createReadStream(found.file, range).pipe(res)
+      return
+    }
+    res.writeHead(200, { ...headers, 'Content-Length': size })
     createReadStream(found.file).pipe(res)
   })
   return new Promise((resolve, reject) => {
