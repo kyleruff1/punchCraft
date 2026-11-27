@@ -4,7 +4,8 @@
  * running it (`npm run pc:suite`), which a unit test cannot do.
  */
 import { driveState } from '../drive.mjs'
-import { driveVerdict, lateness, parseArgs, renderSummary, spread } from '../suite.mjs'
+import { spread } from '../stats.mjs'
+import { driveVerdict, lateness, parseArgs, renderSummary } from '../suite.mjs'
 
 const record = (code, fields = {}) => ({
   wallMs: 0,
@@ -68,7 +69,14 @@ describe('parseArgs', () => {
       build: true,
       out: null,
       sim: 'captured-jam',
+      sound: true,
+      record: false,
     })
+  })
+  it('listens to the sound unless told not to, and keeps it only when asked', () => {
+    expect(parseArgs(['--no-sound'])).toMatchObject({ sound: false, record: false })
+    expect(parseArgs(['--record'])).toMatchObject({ sound: true, record: true })
+    expect(() => parseArgs(['--record', '--no-sound'])).toThrow(/--record needs the sound tap/)
   })
   it('reads values after the flag or joined to it', () => {
     expect(
@@ -90,6 +98,8 @@ describe('parseArgs', () => {
       build: false,
       out: 'x',
       sim: 'none',
+      sound: true,
+      record: false,
     })
   })
   it('refuses what it does not know rather than running something else', () => {
@@ -101,8 +111,8 @@ describe('parseArgs', () => {
 
 describe('lateness', () => {
   it('gives the median, the 95th percentile and the worst', () => {
-    expect(spread([5, 1, 3])).toEqual({ n: 3, medianMs: 3, p95Ms: 5, maxMs: 5 })
-    expect(spread([])).toEqual({ n: 0, medianMs: null, p95Ms: null, maxMs: null })
+    expect(spread([5, 1, 3])).toEqual({ n: 3, minMs: 1, medianMs: 3, p95Ms: 5, maxMs: 5 })
+    expect(spread([])).toEqual({ n: 0, minMs: null, medianMs: null, p95Ms: null, maxMs: null })
     expect(spread([2, undefined, NaN, 4]).n).toBe(2)
   })
   it('reads dispatch lateness and the ring token’s lateness against its own schedule', () => {
@@ -207,11 +217,22 @@ describe('renderSummary', () => {
       meta,
     )
     expect(md).toContain('**1 PASS · 1 FAIL**')
+    // No sound was listened to in this row: its three columns are dashes.
     expect(md).toContain(
-      '| quick-one-two | numbers | PASS | matched=3 extras=0 reanchor=0 | 0 | 36 / 44 | 39.7 / 45.3 | 4:42 |',
+      '| quick-one-two | numbers | PASS | matched=3 extras=0 reanchor=0 | 0 | — | — | — | 36 / 44 | 39.7 / 45.3 | 4:42 |',
     )
     expect(md).toContain('- **body-work** (numbers): 1 error(s) on the page: x')
     expect(md).toContain('round 1 · simulated punches: captured-jam')
+  })
+
+  it('shows what was heard: clips, losses, and the tightest and the usual gap before a ring', () => {
+    const sound = {
+      clips: { played: 81, heard: 80, silent: [{}], cutShort: [] },
+      calls: { breath: { minMs: 351, medianMs: 376.8 } },
+    }
+    const md = renderSummary([row({ sound })], meta)
+    expect(md).toContain('| 0 | 80 of 81 | 1 / 0 | 351 / 376.8 | 36 / 44 |')
+    expect(md).toMatch(/sound columns are measured/)
   })
 
   it('says whose numbers the lateness columns are', () => {
@@ -234,6 +255,6 @@ describe('renderSummary', () => {
       ],
       meta,
     )
-    expect(md).toContain('| ERROR | — | 0 | — / — | — / — |')
+    expect(md).toContain('| ERROR | — | 0 | — | — | — | — / — | — / — |')
   })
 })

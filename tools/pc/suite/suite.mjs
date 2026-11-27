@@ -5,6 +5,8 @@
 //   npm run pc:suite -- --vocab techniques         (or `both`)
 //   npm run pc:suite -- --full                     whole workouts, not round 1
 //   npm run pc:suite -- --no-build                 serve the build already in dist/
+//   npm run pc:suite -- --no-sound                 do not listen to what the page plays
+//   npm run pc:suite -- --record                   keep what it played, as sound.webm
 //
 // Each workout is driven in a headless browser from the same QA link the
 // tablet suite uses, its log is saved in the tablet's layout, and the
@@ -32,8 +34,12 @@ import {
 } from '../../analysis/verify-suite.mjs'
 import { findBrowser } from '../app/cdp.mjs'
 import { buildWebApp, isBuilt, OUT_DIR, REPO_ROOT, serveWebApp } from '../app/webApp.mjs'
+import { TRUNCATION_MS } from '../../analysis/observed-summary.mjs'
+import { loadTimingConstants } from '../../analysis/timing-constants.mjs'
 import { fieldsOf, recordsOf } from './capture.mjs'
 import { driveState, driveWorkout } from './drive.mjs'
+import { renderSoundReport, soundReport } from './sound.mjs'
+import { spread } from './stats.mjs'
 
 const MANIFESTS_DIR = path.join(REPO_ROOT, 'tools', 'analysis', 'manifests')
 const RUNS_DIR = path.join(REPO_ROOT, 'tools', 'pc', 'suite', 'runs')
@@ -42,10 +48,19 @@ export const DEFAULT_SIM = 'captured-jam'
 
 /**
  * @param {string[]} argv
- * @returns {{ only: string[], vocab: string, full: boolean, build: boolean, out: string | null, sim: string }}
+ * @returns {{ only: string[], vocab: string, full: boolean, build: boolean, out: string | null, sim: string, sound: boolean, record: boolean }}
  */
 export function parseArgs(argv) {
-  const args = { only: [], vocab: 'numbers', full: false, build: true, out: null, sim: DEFAULT_SIM }
+  const args = {
+    only: [],
+    vocab: 'numbers',
+    full: false,
+    build: true,
+    out: null,
+    sim: DEFAULT_SIM,
+    sound: true,
+    record: false,
+  }
   for (let i = 0; i < argv.length; i += 1) {
     const [flag, inline] = argv[i].split(/=(.*)/s)
     const value = () => {
@@ -59,27 +74,15 @@ export function parseArgs(argv) {
     else if (flag === '--out') args.out = value()
     else if (flag === '--full') args.full = true
     else if (flag === '--no-build') args.build = false
+    else if (flag === '--no-sound') args.sound = false
+    else if (flag === '--record') args.record = true
     else throw new Error(`unknown argument: ${argv[i]}`)
   }
   if (!['numbers', 'techniques', 'both'].includes(args.vocab)) {
     throw new Error(`--vocab is numbers, techniques or both, not ${args.vocab}`)
   }
+  if (args.record && !args.sound) throw new Error('--record needs the sound tap: drop --no-sound')
   return args
-}
-
-const sorted = (values) => values.filter((v) => Number.isFinite(v)).sort((a, b) => a - b)
-const round1 = (v) => Math.round(v * 10) / 10
-
-/** Median, 95th percentile and worst of a list of milliseconds; nulls for none. */
-export function spread(values) {
-  const v = sorted(values)
-  if (v.length === 0) return { n: 0, medianMs: null, p95Ms: null, maxMs: null }
-  return {
-    n: v.length,
-    medianMs: round1(v[Math.floor(v.length / 2)]),
-    p95Ms: round1(v[Math.min(v.length - 1, Math.ceil(0.95 * v.length) - 1)]),
-    maxMs: round1(v[v.length - 1]),
-  }
 }
 
 /**
@@ -171,14 +174,18 @@ export function renderSummary(rows, meta) {
     '',
     `**${tally || 'nothing ran'}**`,
     '',
-    '| workout | vocab | verdict | correlator | page errors | dispatch late, median / p95 ms | ring token late, median / p95 ms | took |',
-    '|---|---|---|---|---|---|---|---|',
+    '| workout | vocab | verdict | correlator | page errors | clips heard | silent / cut short | last sound → ring due, least / median ms | dispatch late, median / p95 ms | ring token late, median / p95 ms | took |',
+    '|---|---|---|---|---|---|---|---|---|---|---|',
   ]
   for (const r of rows) {
     const d = r.lateness?.dispatch
     const t = r.lateness?.ringToken
+    const s = r.sound
+    const heard = s ? `${s.clips.heard} of ${s.clips.played}` : '—'
+    const lost = s ? `${s.clips.silent.length} / ${s.clips.cutShort.length}` : '—'
+    const gap = s ? `${ms(s.calls.breath.minMs)} / ${ms(s.calls.breath.medianMs)}` : '—'
     L.push(
-      `| ${r.workoutId} | ${r.vocab} | ${r.verdict} | ${r.stats ?? '—'} | ${r.pageProblems.length} | ${ms(d?.medianMs)} / ${ms(d?.p95Ms)} | ${ms(t?.medianMs)} / ${ms(t?.p95Ms)} | ${clock(r.elapsedMs)} |`,
+      `| ${r.workoutId} | ${r.vocab} | ${r.verdict} | ${r.stats ?? '—'} | ${r.pageProblems.length} | ${heard} | ${lost} | ${gap} | ${ms(d?.medianMs)} / ${ms(d?.p95Ms)} | ${ms(t?.medianMs)} / ${ms(t?.p95Ms)} | ${clock(r.elapsedMs)} |`,
     )
   }
   const explained = rows.filter((r) => r.reasons.length > 0)
@@ -192,11 +199,23 @@ export function renderSummary(rows, meta) {
     '## How to read this',
     '',
     '- **correlator** is the tablet’s own first-round verifier, run on this capture against the same manifest. What is said, in what order and when is code both devices share.',
+    '- **The sound columns are measured**, not modelled: each call and lead-in is listened to in the page, and “last sound → ring due” is the gap between a call’s last sound and the scheduled time of the ring it leads. In this version they are reported, not judged. Each drive’s folder has the full `sound-report.md`.',
     '- **The lateness columns are this PC’s**, under whatever else it was doing. They are reported, not judged, and no tablet constant is ever set from them. The ring token is the runner’s 50 ms loop, not the painted ring.',
     '- **The tablet’s audio path is not judged here.** Its timing analyzer refuses a capture from a browser.',
     '',
   )
   return L.join('\n')
+}
+
+let limits = null
+/**
+ * The two thresholds the sound report is read against. Both are the tablet
+ * gate's own, read from where it keeps them — the floor from the app's
+ * source, the truncation allowance from the tablet's analyzer.
+ */
+function soundLimits() {
+  limits ??= { floorMs: loadTimingConstants().breath.MIN_BREATH_MS, truncationMs: TRUNCATION_MS }
+  return limits
 }
 
 /** Run the tablet's correlator on a saved capture. */
@@ -243,7 +262,23 @@ async function runJob({ job, args, executable, baseUrl, suiteId, suiteDir, hostS
     budgetMs: budget,
     nonce,
     dir,
+    sound: args.sound,
+    record: args.record,
   })
+  // Reported in this version, not judged.
+  const sound = drive.sound ? soundReport(drive.records, drive.sound, soundLimits()) : null
+  if (sound) {
+    writeFileSync(
+      path.join(dir, 'sound-report.json'),
+      JSON.stringify(sound, null, 2) + '\n',
+      'utf8',
+    )
+    writeFileSync(
+      path.join(dir, 'sound-report.md'),
+      renderSoundReport(sound, `${job.workoutId} (${job.vocab})`),
+      'utf8',
+    )
+  }
   // A drive that never reached a round has nothing for the correlator to read.
   const reached = driveState(drive.records).workEntered
   const judged = reached
@@ -279,6 +314,8 @@ async function runJob({ job, args, executable, baseUrl, suiteId, suiteDir, hostS
     visibility: drive.visibility,
     pageProblems: drive.problems,
     lateness: lateness(drive.records),
+    sound,
+    recorded: drive.recorded,
     elapsedMs: drive.elapsedMs,
   }
   writeFileSync(path.join(dir, 'drive.json'), JSON.stringify(row, null, 2) + '\n', 'utf8')
@@ -286,6 +323,12 @@ async function runJob({ job, args, executable, baseUrl, suiteId, suiteDir, hostS
   console.info(
     `   ${verdict}${row.stats ? ` · ${row.stats}` : ''} · dispatch late ${ms(late.medianMs)} / ${ms(late.p95Ms)} ms · ${clock(row.elapsedMs)}`,
   )
+  if (sound) {
+    const gap = sound.calls.breath
+    console.info(
+      `   sound: ${sound.clips.heard} of ${sound.clips.played} clips heard · last sound → ring ${ms(gap.minMs)} least, ${ms(gap.medianMs)} median · ${sound.clips.silent.length} silent · ${sound.clips.cutShort.length} cut short`,
+    )
+  }
   for (const reason of reasons) console.info(`   ! ${reason}`)
   return row
 }

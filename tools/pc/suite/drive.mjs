@@ -10,6 +10,7 @@ import path from 'node:path'
 import { runQuery } from '../../analysis/verify-suite.mjs'
 import { launchBrowser, openPage, sleep } from '../app/cdp.mjs'
 import { codeOf, fieldsOf, logcatText, otherConsoleText } from './capture.mjs'
+import { SOUND_BINDING, soundTapSource } from './soundTap.mjs'
 
 /** Longer than the web database's save delay: the next step reloads the page. */
 export const QA_SWITCH_SETTLE_MS = 2_000
@@ -62,6 +63,8 @@ export function driveState(records, { firstRoundOnly = true } = {}) {
  * @property {string | null} ended the boundary that ended it, or null
  * @property {string | null} reason why it stopped short, or null
  * @property {Record<string, any> | null} staged the QA run record's fields
+ * @property {any[] | null} sound the sound tap's events from the link onwards; null when it was not listening
+ * @property {boolean} recorded whether `sound.webm` was written
  * @property {string} visibility `document.visibilityState` while it ran
  * @property {string} url the page address that was opened
  * @property {number} elapsedMs
@@ -82,7 +85,8 @@ export function driveState(records, { firstRoundOnly = true } = {}) {
  * @param {number} options.budgetMs the most a drive may take from the link to its last bell
  * @param {string} options.nonce
  * @param {string} options.dir
- * @param {Parameters<typeof openPage>[1]} [options.page] more for `openPage` — a measuring script, say
+ * @param {boolean} [options.sound] listen to what the page plays (`soundTap.mjs`)
+ * @param {boolean} [options.record] and keep it, as `sound.webm`
  * @returns {Promise<Drive>}
  */
 export async function driveWorkout({
@@ -94,7 +98,8 @@ export async function driveWorkout({
   budgetMs,
   nonce,
   dir,
-  page: pageOptions = {},
+  sound = false,
+  record = false,
 }) {
   mkdirSync(dir, { recursive: true })
   const startedAt = performance.now()
@@ -108,13 +113,26 @@ export async function driveWorkout({
     ended: null,
     reason: null,
     staged: null,
+    sound: null,
+    recorded: false,
     visibility: 'unknown',
     url,
     elapsedMs: 0,
   }
   let from = 0
+  /** @type {any[]} */
+  const heard = []
+  let heardFrom = 0
   try {
-    page = await openPage(browser.wsUrl, { ...pageOptions, wholeRecords: true })
+    page = await openPage(browser.wsUrl, {
+      wholeRecords: true,
+      ...(sound
+        ? {
+            beforeLoad: [soundTapSource({ record })],
+            receivers: { [SOUND_BINDING]: (payload) => heard.push(JSON.parse(payload)) },
+          }
+        : {}),
+    })
     // QA mode is a setting, switched on in the app as a person would. A link
     // cannot switch it on — that is the route's own rule.
     await page.goto(`${baseUrl}settings`)
@@ -126,6 +144,8 @@ export async function driveWorkout({
     await sleep(QA_SWITCH_SETTLE_MS)
 
     from = page.records.length
+    // The Settings page was a page of its own, with a clock of its own.
+    heardFrom = heard.length
     const linkAt = performance.now()
     await page.goto(url)
     for (;;) {
@@ -144,6 +164,10 @@ export async function driveWorkout({
       await page.evaluate('document.visibilityState').catch(() => 'unknown'),
     )
     if (drive.ended !== null) await sleep(TAIL_MS)
+    if (record) {
+      await page.evaluate('globalThis.__pcStopRecording?.()').catch(() => undefined)
+      await sleep(500)
+    }
   } catch (err) {
     drive.reason = `driver: ${err instanceof Error ? err.message : String(err)}`
   } finally {
@@ -158,5 +182,19 @@ export async function driveWorkout({
   writeFileSync(path.join(dir, 'records.json'), JSON.stringify(drive.records), 'utf8')
   const other = otherConsoleText(drive.records)
   if (other !== '') writeFileSync(path.join(dir, 'console-other.txt'), other + '\n', 'utf8')
+  if (sound) {
+    const events = heard.slice(heardFrom)
+    // The recording arrives in pieces among the events; together they are one file.
+    const pieces = events.filter((event) => event.type === 'recording')
+    drive.sound = events.filter((event) => event.type !== 'recording')
+    writeFileSync(path.join(dir, 'sound-events.json'), JSON.stringify(drive.sound), 'utf8')
+    if (pieces.length > 0) {
+      writeFileSync(
+        path.join(dir, 'sound.webm'),
+        Buffer.concat(pieces.map((piece) => Buffer.from(piece.data, 'base64'))),
+      )
+      drive.recorded = true
+    }
+  }
   return drive
 }
