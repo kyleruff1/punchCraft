@@ -92,7 +92,7 @@ Added 2026-11-25. Everything here runs on the workstation with no tablet.
 | `npm run typecheck:tools` | Type-checks the verifier and guard scripts (`tools/analysis`, `tools/guards`, `tools/dev`, and the `.mjs` under `tools/pc`), which the root `tsconfig.json` does not include. |
 | `npm run pc:glove-check` | Serves the PC glove check on `http://127.0.0.1:8787/` (loopback only; `PORT=` moves it). Open it in Chrome or Edge. See below. |
 | `npm run pc:app` | Builds the app for a browser and serves it on `http://127.0.0.1:8788/` (loopback only; `PORT=` moves it; `-- --no-build` serves the last build). See below. |
-| `npm run pc:smoke` | Builds, then drives the PC app in a headless Chrome or Edge: boot, a workout on simulated punches, stop, save, reload, and the saved database read back out of the browser. Fails on any error on the page. About a minute after the build. Local only — not in CI. |
+| `npm run pc:smoke` | Builds, then drives the PC app in a headless Chrome or Edge: boot, a workout on simulated punches, stop, save, reload, the saved database read back out of the browser, then History and the session's summary. Fails on any error on the page. About a minute after the build. Also runs in CI as an advisory job. |
 | `npm run tablet:reload` | Restarts Metro, cold-restarts the app on the tablet, waits for it to come up. `--no-metro` restarts only the app; `--dry-run` says what it would do. **Not yet proven on the device** — see the script's header. |
 
 **The PC glove check** (added 2026-11-25) is the first piece of the PC
@@ -124,6 +124,8 @@ are worth knowing before changing anything near them:
   (`src/storage/sqlJsPort.ts` has the line). Same schema, same migrations,
   same repositories; the storage suites run against both engines. After
   pulling this in, run `npm install` once — `sql.js` is a new dependency.
+  The database is kept in the browser's IndexedDB
+  (`src/storage/idbByteStore.web.ts`).
 - **`src/ble/gloveSupport.ts` is the one switch** for "this build cannot
   search for gloves". Do not sprinkle `Platform.OS === 'web'` around the
   Bluetooth code; ask `canFindGloves()`.
@@ -132,15 +134,31 @@ are worth knowing before changing anything near them:
 exercises the real WebAssembly engine and the browser's own storage. It
 drives the browser through its debugging port with node's built-in
 WebSocket, so there is nothing to install — but it needs Chrome or Edge on
-the machine, which is why it is not in CI. Run it after touching storage,
-the root layout, anything `*.web.ts`, or the live screen's start-up.
+the machine. CI runs it as an advisory job (`pc smoke (advisory)`), outside
+the `ci` gate until it has been seen green there. Run it yourself after
+touching storage, the root layout, anything `*.web.ts`, the live screen's
+start-up, or the history screens.
 
-One trap when checking the PC app by hand: **the Claude desktop app's
-built-in browser pane empties the private file system of a page left idle
-about ten minutes**, so a saved database vanishes there (findings doc, N-10;
-Chrome itself keeps it). The app logs `storage.web.savedFileMissing` on the
-next load. Use the pane to look, and `pc:smoke` or your own browser to judge
-what is kept.
+One thing to know about the Claude desktop app's built-in browser pane: **it
+empties the origin-private file system of a page left idle about ten
+minutes**, and leaves IndexedDB alone (findings doc, N-10). The PC database
+was first kept in that file system and vanished there twice; it is in
+IndexedDB now and survives. Do not build anything else for the PC version on
+the private file system.
+
+**The verifier's manifests are checked.** `tools/analysis/manifests/*.json`
+is what the first-round verifier judges a drive against, generated from the
+app's own code. `tools/analysis/__tests__/manifests-fresh.test.js` rebuilds
+all 44 in the suite and fails when a committed one is stale — ten had been,
+since September (N-11). When it fails, regenerate and **read the diff**:
+
+```
+node --import ./tools/analysis/wav-stub.mjs --import tsx tools/analysis/first-round-manifest.ts --all
+node --import ./tools/analysis/wav-stub.mjs --import tsx tools/analysis/first-round-manifest.ts --all --vocab=techniques
+```
+
+A change you meant is a regeneration; one you did not is a timing
+regression.
 
 **Mining the captures on disk** (added 2026-11-26). Two read-only scripts
 ask today's questions of logs that were captured for something else:

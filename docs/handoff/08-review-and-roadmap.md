@@ -1235,7 +1235,7 @@ Two things about how it got there are worth more than the result:
 **Verified at this state:** 221 suites / 4,893 tests / 22 snapshots green;
 `npm run check` passes; `npm run pc:smoke` passes.
 
-#### N-9 · A scan that throws leaves its stop timer running · **open, trivial**
+#### N-9 · A scan that throws leaves its stop timer running · **fixed** (`fd1046b9`)
 
 `TrackerScanner.run` arms its stop timer and then calls `facade.scan()`
 outside the `try`. If `scan` throws synchronously the timer is never
@@ -1248,7 +1248,7 @@ middle of an otherwise green full run. It is noise, and it is the kind of
 noise that hides a real failure. Moving the `scan()` call inside the `try`
 fixes both.
 
-#### N-10 · The PC app's saved database vanished, twice · **explained — the browser pane, not the app; one decision left**
+#### N-10 · The PC app's saved database vanished, twice · **fixed** (`00148a43`)
 
 Driving the PC app by hand in the Claude desktop app's built-in browser
 pane, a page load found no saved database where the loads before it had
@@ -1287,14 +1287,103 @@ One thing it showed that is simply how it is: a save started as the page
 goes away does not finish. Closing or reloading the tab within about a
 second of a write loses that write.
 
-**The decision.** IndexedDB survived in the pane where the private file
-system did not. Keeping the saved database there instead is two functions
-and their tests, and would make the PC app keep its data in the pane too.
-Not done: the plan you approved named the private file system, and it
-works where `npm run pc:app` tells you to open it. Until it is decided,
-the pane is for looking at the PC app, not for keeping anything in it.
+**Decided and done (2026-11-27).** The saved database now lives in
+IndexedDB, which survived in the pane where the private file system did
+not. Proven by the test the old storage failed: the database in IndexedDB
+and a canary file in the old place, thirteen idle minutes in the pane — the
+canary was gone, the database intact, and a reload restored it. See §3g.
 
 **Still unproven, and only provable at the tablet or by ear** — added to §7.
+
+---
+
+## 3g. The history-and-groundwork batch
+
+2026-11-27, branch `feat/history-and-groundwork`, cut from `main` after
+PR 394 merged. Three things were asked for: session history (a list and a
+detail view), the discipline groundwork (keys only), and PC upkeep.
+
+**What landed.**
+
+| | Commit |
+|---|---|
+| N-9: a scan that throws no longer leaves its stop timer running | `fd1046b9` |
+| `pc:smoke` runs in CI, as an advisory job | `afdd66b8` |
+| The release APK workflow is marked as passing (it passed twice) | `22bddc49` |
+| N-10: the PC database lives in IndexedDB | `00148a43` |
+| A discipline segment for call clips and avatar frames | `9bba4348` |
+| N-11: ten stale verifier manifests regenerated, and a freshness test | `045e75b9` |
+| Migration 009: what the live screen counted is kept with the session | `19bc725e` |
+| A saved session read back as the summary it would have shown | `56dbce1c` |
+| Session history: the list, the summary by id, "See summary" | `5723b4ce` |
+
+**What the planning turned up, before any code.**
+
+- *The summary screen had never been shown.* I offered "the summary the app
+  already shows at the end of a workout" as the detail view. There was no
+  such thing: the screen was built and tested, nothing routed to it, and
+  the function behind it was called only from tests. History is its first
+  appearance.
+- *A saved session could not reproduce what the athlete saw.* The live
+  counter counts every punch; a saved session kept only the punches that
+  answered a called combination. Punches in an open burst, extras and the
+  bell cards' totals were stored nowhere. This is why the batch has a
+  migration (009, one nullable column) where the survey implied none.
+
+**Corrections to my own plan.**
+
+- I planned to store extra punches in the existing `unmatched_events`
+  column and to tell old sessions from new by a missing start time. A
+  design review pointed out that the column cannot say "unknown", and that
+  one number was not enough anyway — the total itself was wrong for any
+  workout with a burst. Checked against the runner, it was right; the plan
+  became one nullable JSON column holding the live counts.
+- I planned a rule "show the adaptation count when the plan has exactly one
+  run". Unsound: see N-12. The count is taken from the session's own live
+  counts instead.
+- I planned to prove the key refactor by "regenerate the manifests and see
+  an empty diff". The diff was not empty — and that was not my change. See
+  N-11.
+- One mutation was reported as surviving when it had crashed the run. My
+  mutation script read a crash as a pass; it now reads a non-zero exit as
+  a kill.
+
+**Verified at this state:** 232 suites / 5,056 tests / 22 snapshots green;
+`npm run check` passes; `npm run pc:smoke` passes, including the History
+and summary steps.
+
+#### N-11 · Ten of the 44 verifier manifests were stale · **fixed** (`045e75b9`)
+
+`tools/analysis/manifests/*.json` is what the first-round verifier judges a
+suite drive against. It is generated from the app's code, and nothing
+checked that it had been regenerated when that code changed. Bisected: the
+first commit to leave it stale is `0b81c660`, in September, which retimed
+one family of calls on purpose and did not regenerate; later clip re-renders
+moved more. Twenty lead-in start times and one call-bar count, across six
+workouts (`establish-the-jab-20`, `pump-and-coast`, `quick-coast-reset`,
+`quick-hook-line`, `quick-square`, `speed-combos`). Nothing in this cycle of
+work moved them: regenerating at the commit it started from gives the same
+ten differences.
+
+So the next suite drive would have judged those six workouts' lead-ins
+against times the app stopped using two months ago. The files are
+regenerated, and `manifests-fresh.test.js` rebuilds all 44 in the suite and
+names the first value that differs. **If it fails, read the diff before
+regenerating: a change you did not expect is a timing regression, not a
+stale file.**
+
+#### N-12 · A discarded session leaves its adaptation records behind · **open, low**
+
+`workout_adaptations` is keyed by the plan, not the session, and its only
+foreign key is to the plan. Discarding a stopped session deletes the session
+row and everything that cascades from it; the adaptation records stay on
+the plan, and a later session that runs the same plan inherits them. No
+visible effect today — the summary now takes its adaptation count from the
+session's own live counts — but `listAdaptations(planId)` cannot be trusted
+to describe one session. The fix is a nullable `session_id` on the table, by
+migration.
+
+**Still unproven, and only provable at the tablet** — added to §7.
 
 ---
 
@@ -1606,3 +1695,24 @@ by design.
 - *The PC app, by ear.* `npm run pc:app`, sound on, any workout. Calls are
   dispatched on time; nobody has heard whether they are audible, or whether
   they land with the rings.
+
+**From the history-and-groundwork batch (§3g).**
+- *Migration 009 on the tablet's real database.* Installing this build adds
+  one nullable column to `sessions`. It is the safest kind of migration and
+  it passes the upgrade-path tests on both engines — but the tablet's own
+  database has never run it. One look at History after the install is the
+  test: every session already there should be listed.
+- *How History reads there.* Most of what the tablet holds is simulated QA
+  runs, all saved before this build. Expect a long list tagged "Simulated",
+  each showing "matched punches". Decide whether simulated sessions should
+  be hidden behind a switch.
+- *A real workout, end to end.* Finish one: "See summary" on the "Workout
+  complete" overlay, and the number on the summary should be the number the
+  counter showed at the last bell. Then the same workout in History.
+- *A stopped workout's badge.* It is graded against the whole plan, so a
+  workout stopped in round 1 reads "903 SHORT" under a tag that says where
+  it was stopped. True, and harsh. Judge whether a stopped session should
+  show its count ungraded.
+- *The next suite drive.* It judges against the regenerated manifests
+  (N-11). Six workouts' lead-ins that the stale files would have flagged
+  should now read clean; anything still flagged there is real.
