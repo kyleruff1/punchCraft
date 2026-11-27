@@ -71,7 +71,20 @@ describe('parseArgs', () => {
       sim: 'captured-jam',
       sound: true,
       record: false,
+      soundGate: 'fail',
+      fault: null,
     })
+  })
+  it('takes a gate level and a fault, and only ones it knows', () => {
+    expect(parseArgs(['--sound-gate', 'warn', '--fault=cut'])).toMatchObject({
+      soundGate: 'warn',
+      fault: 'cut',
+    })
+    expect(() => parseArgs(['--sound-gate', 'maybe'])).toThrow(/--sound-gate is fail, warn or off/)
+    expect(() => parseArgs(['--fault', 'explode'])).toThrow(/--fault is one of mute, cut, late/)
+    expect(() => parseArgs(['--fault', 'mute', '--no-sound'])).toThrow(
+      /--fault needs the sound tap/,
+    )
   })
   it('listens to the sound unless told not to, and keeps it only when asked', () => {
     expect(parseArgs(['--no-sound'])).toMatchObject({ sound: false, record: false })
@@ -100,6 +113,8 @@ describe('parseArgs', () => {
       sim: 'none',
       sound: true,
       record: false,
+      soundGate: 'fail',
+      fault: null,
     })
   })
   it('refuses what it does not know rather than running something else', () => {
@@ -184,6 +199,46 @@ describe('driveVerdict', () => {
     expect(judged({ visibility: 'hidden' }).verdict).toBe('WARN')
   })
 
+  describe('with the sound gate', () => {
+    const heardBad = {
+      verdict: 'FAIL',
+      hard: ['1 clip(s) were played and made no sound — first: call/1-2, round 1'],
+      soft: [],
+    }
+    const heardTight = {
+      verdict: 'WARN',
+      hard: [],
+      soft: ['3 of 78 calls (3.8%) stopped less than 150 ms before their ring'],
+    }
+    const withSound = (sound, soundGate, verifyExit = 0) =>
+      driveVerdict({
+        drive: drive(),
+        verifyExit,
+        hostSha: 'abc1234',
+        nonce: 'n-1',
+        sound,
+        soundGate,
+      })
+
+    it('fails a drive the correlator passed, when a clip made no sound', () => {
+      expect(withSound(heardBad, 'fail')).toEqual({ verdict: 'FAIL', reasons: heardBad.hard })
+    })
+    it('only warns at the warn level, and says nothing when switched off', () => {
+      expect(withSound(heardBad, 'warn')).toEqual({ verdict: 'WARN', reasons: heardBad.hard })
+      expect(withSound(heardBad, 'off')).toEqual({ verdict: 'PASS', reasons: [] })
+    })
+    it('warns on a soft finding at either level', () => {
+      expect(withSound(heardTight, 'fail').verdict).toBe('WARN')
+      expect(withSound(heardTight, 'warn').verdict).toBe('WARN')
+    })
+    it('cannot rescue a drive the correlator failed', () => {
+      expect(withSound({ verdict: 'PASS', hard: [], soft: [] }, 'fail', 1).verdict).toBe('FAIL')
+    })
+    it('leaves the verdict alone when nothing listened', () => {
+      expect(withSound(null, 'fail')).toEqual({ verdict: 'PASS', reasons: [] })
+    })
+  })
+
   it('never lets a warning soften a failure', () => {
     expect(judged({ visibility: 'hidden' }, 1).verdict).toBe('FAIL')
   })
@@ -233,6 +288,16 @@ describe('renderSummary', () => {
     const md = renderSummary([row({ sound })], meta)
     expect(md).toContain('| 0 | 80 of 81 | 1 / 0 | 351 / 376.8 | 36 / 44 |')
     expect(md).toMatch(/sound columns are measured/)
+  })
+
+  it('says in its heading how the sound was judged, and shouts when a fault was injected', () => {
+    expect(renderSummary([row()], meta)).toContain('· sound gate: fail ·')
+    expect(renderSummary([row()], { ...meta, args: parseArgs(['--no-sound']) })).toContain(
+      '· sound not listened to ·',
+    )
+    const faulted = renderSummary([row()], { ...meta, args: parseArgs(['--fault', 'mute']) })
+    expect(faulted).toContain('**Fault injected on purpose: `mute`.')
+    expect(renderSummary([row()], meta)).not.toContain('Fault injected')
   })
 
   it('says whose numbers the lateness columns are', () => {

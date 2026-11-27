@@ -4,7 +4,14 @@
  * 10 000 on the page's clock, and a call of 1 000 ms that is sent at work
  * 2 600 leads a ring due at work 4 000 — page 14 000.
  */
-import { clipTimings, heardClips, playsFrom, renderSoundReport, soundReport } from '../sound.mjs'
+import {
+  clipTimings,
+  heardClips,
+  playsFrom,
+  renderSoundReport,
+  soundReport,
+  soundVerdict,
+} from '../sound.mjs'
 
 const record = (code, fields) => ({
   wallMs: 0,
@@ -102,13 +109,18 @@ describe('playsFrom', () => {
     ])
   })
 
-  it('closes a stretch still open when the element is played again', () => {
+  it('hands a stretch still open to the next play of the element, which never fell silent', () => {
     const events = [
       { id: 1, type: 'play', atMs: 1_000 },
       { id: 1, type: 'sound-start', atMs: 1_085 },
       { id: 1, type: 'play', atMs: 1_500 },
+      { id: 1, type: 'sound-end', atMs: 2_400, peak: 0.3 },
     ]
-    expect(playsFrom(events)[0].sound).toEqual([{ startMs: 1_085, endMs: 1_500, peak: null }])
+    const [first, second] = playsFrom(events)
+    expect(first.sound).toEqual([{ startMs: 1_085, endMs: 1_500, peak: null }])
+    // No new start was reported — there was no silence to end — but the
+    // second play was heard all the same, from the moment it was asked for.
+    expect(second.sound).toEqual([{ startMs: 1_500, endMs: 2_400, peak: 0.3 }])
   })
 
   it('reads events in time order however they arrived, and ignores any before a play', () => {
@@ -391,5 +403,82 @@ describe('soundReport', () => {
     expect(md).toContain('**still sounding when the ring was due: 1**')
     expect(md).toContain('- call/1-2 · round 1 · “One, two!” — -21 ms')
     expect(md).toContain('no tablet constant is set from them')
+  })
+})
+
+describe('soundVerdict', () => {
+  const ready = { type: 'tap-ready', atMs: 1, state: 'running', sampleRate: 48_000 }
+  const verdict = (records, events, floorRatio = 0.02) =>
+    soundVerdict(soundReport([...round, ...records], [ready, ...events], LIMITS), { floorRatio })
+
+  it('passes a drive where every clip sounded, whole, and clear of its ring', () => {
+    expect(verdict(call(2_600), played(7, SENT + 1))).toEqual({
+      verdict: 'PASS',
+      hard: [],
+      soft: [],
+    })
+  })
+
+  it('fails on a clip that was played and made no sound', () => {
+    const v = verdict(call(2_600), played(7, SENT + 1, { heardMs: null }))
+    expect(v.verdict).toBe('FAIL')
+    expect(v.hard).toEqual(['1 clip(s) were played and made no sound — first: call/1-2, round 1'])
+  })
+
+  it('fails on a clip heard shorter than it is', () => {
+    const v = verdict(call(2_600), played(7, SENT + 1, { heardMs: 300 }))
+    expect(v.hard).toEqual([
+      '1 clip(s) were heard more than 150 ms shorter than they are — first: call/1-2, round 1, 300 of 1000 ms',
+    ])
+  })
+
+  it('fails on a call still sounding when its ring was due, and names the worst', () => {
+    const records = [...call(2_600), ...call(6_600)]
+    const events = [
+      ...played(7, SENT + 1, { startAfter: 400 }),
+      ...played(7, SENT + 4_001, { startAfter: 500 }),
+    ]
+    const v = verdict(records, events)
+    expect(v.verdict).toBe('FAIL')
+    expect(v.hard).toEqual([
+      '2 call(s) were still sounding when their ring was due — worst: call/1-2, round 1, 121 ms past it',
+    ])
+  })
+
+  it('warns, and no more, when too many calls stop under the floor', () => {
+    const v = verdict(call(2_600), played(7, SENT + 1, { startAfter: 250 }))
+    expect(v).toEqual({
+      verdict: 'WARN',
+      hard: [],
+      soft: ['1 of 1 calls (100%) stopped less than 150 ms before their ring — the least 129 ms'],
+    })
+    // The same drive under a share that allows it.
+    expect(verdict(call(2_600), played(7, SENT + 1, { startAfter: 250 }), 1).verdict).toBe('PASS')
+  })
+
+  it('does not fail a drive on a broken instrument — and does not pass it either', () => {
+    const report = soundReport(
+      [...round, ...call(2_600)],
+      [{ type: 'tap-failed', atMs: 1, error: 'no worklet' }],
+      LIMITS,
+    )
+    expect(soundVerdict(report, { floorRatio: 0.02 })).toEqual({
+      verdict: 'WARN',
+      hard: [],
+      soft: ['the sound tap did not start, so no clip was listened to'],
+    })
+    const oneElement = soundReport(
+      [...round, ...call(2_600)],
+      [
+        ready,
+        { id: 3, type: 'tap-failed', atMs: 2, error: 'already connected' },
+        ...played(7, SENT + 1),
+      ],
+      LIMITS,
+    )
+    expect(soundVerdict(oneElement, { floorRatio: 0.02 })).toMatchObject({
+      verdict: 'WARN',
+      soft: ['the sound tap could not listen to 1 element(s): already connected'],
+    })
   })
 })

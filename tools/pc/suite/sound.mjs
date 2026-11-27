@@ -25,7 +25,7 @@ import { spread } from './stats.mjs'
 /**
  * The tap's events as plays. A play runs from one `play()` on an element to
  * the next `play()` on the same element; a stretch of sound still open when
- * the next play begins is closed there.
+ * the next play begins is closed there, and carries on as the new play's.
  *
  * @param {any[]} events
  * @returns {ElementPlay[]}
@@ -42,8 +42,12 @@ export function playsFrom(events) {
   for (const { event } of ordered) {
     if (event.type === 'play') {
       const before = current.get(event.id)
+      // An element played again while it is still sounding never falls
+      // silent, so the follower reports no new start: the stretch is handed
+      // from the old play to the new one at the moment of the play.
       const open = before?.sound.at(-1)
-      if (open && open.endMs === null) open.endMs = event.atMs
+      const stillSounding = open !== undefined && open.endMs === null
+      if (stillSounding) open.endMs = event.atMs
       const play = {
         id: event.id,
         playAtMs: event.atMs,
@@ -51,7 +55,7 @@ export function playsFrom(events) {
         volume: event.volume ?? 1,
         durationMs: event.durationMs ?? null,
         playingAtMs: null,
-        sound: [],
+        sound: stillSounding ? [{ startMs: event.atMs, endMs: null, peak: null }] : [],
         stoppedBy: null,
         stoppedAtMs: null,
       }
@@ -368,4 +372,67 @@ export function renderSoundReport(report, title) {
     '',
   )
   return L.join('\n')
+}
+
+/**
+ * The sound report as a verdict.
+ *
+ * Hard — the coach did something wrong that a person would hear:
+ * - a call or lead-in was played at full volume and made no sound;
+ * - a clip was heard shorter than it is, past the allowance;
+ * - a call was still sounding when the ring it leads was due.
+ *
+ * Soft:
+ * - more than `floorRatio` of the calls stopped under the floor before their
+ *   ring. The floor is a comfort target and the share is the tablet gate's
+ *   own; being past the ring has no tolerance at all.
+ * - the tap did not start, or could not listen to an element. That is a
+ *   broken instrument, not a broken coach: nothing is failed on its word, and
+ *   nothing is passed on its silence either.
+ *
+ * @param {ReturnType<typeof soundReport>} report
+ * @param {{ floorRatio: number }} limits
+ * @returns {{ verdict: 'PASS' | 'WARN' | 'FAIL', hard: string[], soft: string[] }}
+ */
+export function soundVerdict(report, { floorRatio }) {
+  const hard = []
+  const soft = []
+  const named = (c) =>
+    `${c.slot ?? 'a clip with no dispatch record'}, round ${c.roundIndex === null ? '—' : c.roundIndex + 1}`
+  if (!report.tap.ready) {
+    // With no tap every clip reads as silent. Say the one true thing instead.
+    return {
+      verdict: 'WARN',
+      hard,
+      soft: ['the sound tap did not start, so no clip was listened to'],
+    }
+  }
+  if (report.tap.failures.length > 0) {
+    soft.push(
+      `the sound tap could not listen to ${report.tap.failures.length} element(s): ${report.tap.failures[0]}`,
+    )
+  }
+  const { silent, cutShort } = report.clips
+  if (silent.length > 0) {
+    hard.push(`${silent.length} clip(s) were played and made no sound — first: ${named(silent[0])}`)
+  }
+  if (cutShort.length > 0) {
+    const c = cutShort[0]
+    hard.push(
+      `${cutShort.length} clip(s) were heard more than ${report.length.truncationMs} ms shorter than they are — first: ${named(c)}, ${c.heardMs} of ${c.statedMs} ms`,
+    )
+  }
+  const { pastRing, underFloor, underFloorRatio, n, floorMs, breath } = report.calls
+  if (pastRing.length > 0) {
+    const worst = [...pastRing].sort((a, b) => a.breathMs - b.breathMs)[0]
+    hard.push(
+      `${pastRing.length} call(s) were still sounding when their ring was due — worst: ${named(worst)}, ${Math.abs(worst.breathMs)} ms past it`,
+    )
+  }
+  if (n > 0 && underFloorRatio > floorRatio) {
+    soft.push(
+      `${underFloor} of ${n} calls (${Math.round(underFloorRatio * 1000) / 10}%) stopped less than ${floorMs} ms before their ring — the least ${breath.minMs} ms`,
+    )
+  }
+  return { verdict: hard.length > 0 ? 'FAIL' : soft.length > 0 ? 'WARN' : 'PASS', hard, soft }
 }

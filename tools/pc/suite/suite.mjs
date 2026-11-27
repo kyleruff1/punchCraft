@@ -7,6 +7,8 @@
 //   npm run pc:suite -- --no-build                 serve the build already in dist/
 //   npm run pc:suite -- --no-sound                 do not listen to what the page plays
 //   npm run pc:suite -- --record                   keep what it played, as sound.webm
+//   npm run pc:suite -- --sound-gate warn          a sound finding warns instead of failing (or `off`)
+//   npm run pc:suite -- --fault mute               break the app on purpose (see faults.mjs)
 //
 // Each workout is driven in a headless browser from the same QA link the
 // tablet suite uses, its log is saved in the tablet's layout, and the
@@ -35,10 +37,12 @@ import {
 import { findBrowser } from '../app/cdp.mjs'
 import { buildWebApp, isBuilt, OUT_DIR, REPO_ROOT, serveWebApp } from '../app/webApp.mjs'
 import { TRUNCATION_MS } from '../../analysis/observed-summary.mjs'
+import { FLOOR_BREACH_SOFT_RATIO } from '../../analysis/observed-timing.mjs'
 import { loadTimingConstants } from '../../analysis/timing-constants.mjs'
 import { fieldsOf, recordsOf } from './capture.mjs'
 import { driveState, driveWorkout } from './drive.mjs'
-import { renderSoundReport, soundReport } from './sound.mjs'
+import { FAULTS } from './faults.mjs'
+import { renderSoundReport, soundReport, soundVerdict } from './sound.mjs'
 import { spread } from './stats.mjs'
 
 const MANIFESTS_DIR = path.join(REPO_ROOT, 'tools', 'analysis', 'manifests')
@@ -48,7 +52,7 @@ export const DEFAULT_SIM = 'captured-jam'
 
 /**
  * @param {string[]} argv
- * @returns {{ only: string[], vocab: string, full: boolean, build: boolean, out: string | null, sim: string, sound: boolean, record: boolean }}
+ * @returns {{ only: string[], vocab: string, full: boolean, build: boolean, out: string | null, sim: string, sound: boolean, record: boolean, soundGate: string, fault: string | null }}
  */
 export function parseArgs(argv) {
   const args = {
@@ -60,6 +64,8 @@ export function parseArgs(argv) {
     sim: DEFAULT_SIM,
     sound: true,
     record: false,
+    soundGate: 'fail',
+    fault: null,
   }
   for (let i = 0; i < argv.length; i += 1) {
     const [flag, inline] = argv[i].split(/=(.*)/s)
@@ -76,12 +82,22 @@ export function parseArgs(argv) {
     else if (flag === '--no-build') args.build = false
     else if (flag === '--no-sound') args.sound = false
     else if (flag === '--record') args.record = true
+    else if (flag === '--sound-gate') args.soundGate = value()
+    else if (flag === '--fault') args.fault = value()
     else throw new Error(`unknown argument: ${argv[i]}`)
   }
   if (!['numbers', 'techniques', 'both'].includes(args.vocab)) {
     throw new Error(`--vocab is numbers, techniques or both, not ${args.vocab}`)
   }
   if (args.record && !args.sound) throw new Error('--record needs the sound tap: drop --no-sound')
+  if (!['fail', 'warn', 'off'].includes(args.soundGate)) {
+    throw new Error(`--sound-gate is fail, warn or off, not ${args.soundGate}`)
+  }
+  if (args.fault !== null && !FAULTS.includes(args.fault)) {
+    throw new Error(`--fault is one of ${FAULTS.join(', ')}, not ${args.fault}`)
+  }
+  if (args.fault !== null && !args.sound)
+    throw new Error('--fault needs the sound tap: drop --no-sound')
   return args
 }
 
@@ -115,9 +131,18 @@ export function lateness(records) {
  * @param {number | null} input.verifyExit the correlator's exit code, or null if it was not run
  * @param {string} input.hostSha the checkout's commit
  * @param {string} input.nonce the nonce the link carried
+ * @param {{ verdict: string, hard: string[], soft: string[] } | null} [input.sound] the sound gate's word, if it listened
+ * @param {string} [input.soundGate] `fail` (a hard sound finding fails the drive), `warn` or `off`
  * @returns {{ verdict: string, reasons: string[] }}
  */
-export function driveVerdict({ drive, verifyExit, hostSha, nonce }) {
+export function driveVerdict({
+  drive,
+  verifyExit,
+  hostSha,
+  nonce,
+  sound = null,
+  soundGate = 'fail',
+}) {
   const state = driveState(drive.records)
   const broke = (reason) => ({ verdict: 'ERROR', reasons: [reason] })
   if (drive.reason !== null && drive.reason !== 'over-budget') return broke(drive.reason)
@@ -137,6 +162,12 @@ export function driveVerdict({ drive, verifyExit, hostSha, nonce }) {
   }
   if (verdict === 'STALE')
     reasons.push('the build compiled a different timeline than the manifest describes')
+  if (sound && soundGate !== 'off') {
+    // Only ever makes a drive worse: clean sound cannot rescue a drive the
+    // correlator failed.
+    for (const finding of sound.hard) worsen(soundGate === 'fail' ? 'FAIL' : 'WARN', finding)
+    for (const finding of sound.soft) worsen('WARN', finding)
+  }
   if (drive.staged?.gitSha !== hostSha) {
     worsen('WARN', `the build is ${drive.staged?.gitSha}, the checkout is ${hostSha}`)
   }
@@ -170,8 +201,14 @@ export function renderSummary(rows, meta) {
   const L = [
     `# PC suite — ${meta.suiteId}`,
     '',
-    `checkout ${meta.hostSha} · ${meta.args.full ? 'whole workouts' : 'round 1'} · simulated punches: ${meta.args.sim} · ${path.basename(meta.browser)}`,
+    `checkout ${meta.hostSha} · ${meta.args.full ? 'whole workouts' : 'round 1'} · simulated punches: ${meta.args.sim} · sound ${meta.args.sound ? `gate: ${meta.args.soundGate}` : 'not listened to'} · ${path.basename(meta.browser)}`,
     '',
+    ...(meta.args.fault
+      ? [
+          `**Fault injected on purpose: \`${meta.args.fault}\`. This run exists to show the sound gate failing; it says nothing about the app.**`,
+          '',
+        ]
+      : []),
     `**${tally || 'nothing ran'}**`,
     '',
     '| workout | vocab | verdict | correlator | page errors | clips heard | silent / cut short | last sound → ring due, least / median ms | dispatch late, median / p95 ms | ring token late, median / p95 ms | took |',
@@ -199,7 +236,7 @@ export function renderSummary(rows, meta) {
     '## How to read this',
     '',
     '- **correlator** is the tablet’s own first-round verifier, run on this capture against the same manifest. What is said, in what order and when is code both devices share.',
-    '- **The sound columns are measured**, not modelled: each call and lead-in is listened to in the page, and “last sound → ring due” is the gap between a call’s last sound and the scheduled time of the ring it leads. In this version they are reported, not judged. Each drive’s folder has the full `sound-report.md`.',
+    '- **The sound columns are measured**, not modelled: each call and lead-in is listened to in the page, and “last sound → ring due” is the gap between a call’s last sound and the scheduled time of the ring it leads. A clip that makes no sound, one cut short, or a call still sounding when its ring is due fails the drive. Each drive’s folder has the full `sound-report.md`.',
     '- **The lateness columns are this PC’s**, under whatever else it was doing. They are reported, not judged, and no tablet constant is ever set from them. The ring token is the runner’s 50 ms loop, not the painted ring.',
     '- **The tablet’s audio path is not judged here.** Its timing analyzer refuses a capture from a browser.',
     '',
@@ -264,8 +301,8 @@ async function runJob({ job, args, executable, baseUrl, suiteId, suiteDir, hostS
     dir,
     sound: args.sound,
     record: args.record,
+    fault: args.fault,
   })
-  // Reported in this version, not judged.
   const sound = drive.sound ? soundReport(drive.records, drive.sound, soundLimits()) : null
   if (sound) {
     writeFileSync(
@@ -289,6 +326,8 @@ async function runJob({ job, args, executable, baseUrl, suiteId, suiteDir, hostS
     verifyExit: judged.verifyExit,
     hostSha,
     nonce,
+    sound: sound ? soundVerdict(sound, { floorRatio: FLOOR_BREACH_SOFT_RATIO }) : null,
+    soundGate: args.soundGate,
   })
   const row = {
     workoutId: job.workoutId,

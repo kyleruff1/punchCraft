@@ -10,6 +10,7 @@ import path from 'node:path'
 import { runQuery } from '../../analysis/verify-suite.mjs'
 import { launchBrowser, openPage, sleep } from '../app/cdp.mjs'
 import { codeOf, fieldsOf, logcatText, otherConsoleText } from './capture.mjs'
+import { faultSource } from './faults.mjs'
 import { SOUND_BINDING, soundTapSource } from './soundTap.mjs'
 
 /** Longer than the web database's save delay: the next step reloads the page. */
@@ -87,6 +88,7 @@ export function driveState(records, { firstRoundOnly = true } = {}) {
  * @param {string} options.dir
  * @param {boolean} [options.sound] listen to what the page plays (`soundTap.mjs`)
  * @param {boolean} [options.record] and keep it, as `sound.webm`
+ * @param {string | null} [options.fault] break the app on purpose, to prove the gate (`faults.mjs`)
  * @returns {Promise<Drive>}
  */
 export async function driveWorkout({
@@ -100,6 +102,7 @@ export async function driveWorkout({
   dir,
   sound = false,
   record = false,
+  fault = null,
 }) {
   mkdirSync(dir, { recursive: true })
   const startedAt = performance.now()
@@ -128,7 +131,9 @@ export async function driveWorkout({
       wholeRecords: true,
       ...(sound
         ? {
-            beforeLoad: [soundTapSource({ record })],
+            // The fault first: the tap must sit outside it, to report each
+            // play at the moment the app asked for it.
+            beforeLoad: [...(fault ? [faultSource(fault)] : []), soundTapSource({ record })],
             receivers: { [SOUND_BINDING]: (payload) => heard.push(JSON.parse(payload)) },
           }
         : {}),
