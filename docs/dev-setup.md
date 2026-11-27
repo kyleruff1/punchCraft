@@ -54,6 +54,77 @@ Enable Developer Options → USB debugging, then verify:
 adb devices -l
 ```
 
+## An Android emulator, when there is no tablet
+
+A release build of the app runs in an Android emulator on this PC. First
+done 2026-11-27.
+
+**What it is good for:** the app's native path with nothing attached —
+Hermes, the UI-thread ring clock, the native audio players, expo-sqlite and
+its migrations, the QA deep link, and the tablet's own verify suite.
+
+**What it is not:** the tablet.
+
+- No gloves. It has no Bluetooth; the app asks for the permission twice
+  (at launch and on the live screen) and the second prompt holds the workout
+  until it is answered. Decline both.
+- **Every timing figure from it is a PC number.** Its processor and audio
+  path are this PC's. `observed-timing.mjs` does not know that — it accepts
+  the capture and prints proposals for tablet constants (N-19 in the
+  findings doc). Ignore them; no tablet constant is set from an emulator.
+
+**The device.** AVD `punchcraft-emu`: Pixel Tablet profile (2560×1600),
+Android 15 (API 35, Google APIs, x86_64), 4 GB. `helioscape-dev`
+(`emulator-5554`) is another project's — leave it alone.
+
+```bash
+emulator -avd punchcraft-emu -no-window -no-snapshot -no-boot-anim -gpu host -port 5556   # → emulator-5556
+adb -s emulator-5556 emu kill                                                            # stop it
+```
+
+(`emulator` is `%ANDROID_HOME%emulatoremulator.exe`; it is not on the PATH.)
+
+**The build.** x86_64, the emulator's processor — four minutes here.
+
+```bash
+cd android && ./gradlew assembleRelease -PreactNativeArchitectures=x86_64 && cd ..
+adb -s emulator-5556 install -r android/app/build/outputs/apk/release/app-release.apk
+```
+
+*From a worktree:* `android/` is git-ignored and exists only in the main
+checkout. Copy its sources into the worktree — everything except
+`app/build`, `app/.cxx`, `.gradle` and `build` — and build there. Node
+finds `node_modules` by walking up to the main checkout's, so the native
+modules' build output lands there. The first such build also set
+`externalNativeBuild { cmake { buildStagingDirectory 'F:/pcx-n18' } }` in
+the copy's `android { }` block, against Windows's path limit (a worktree's
+root is 43 characters longer); whether it was needed was not tested.
+
+**Driving it.** QA mode must be on — Settings → QA mode, once per install.
+The suite mutes the emulator and restores it.
+
+```bash
+node tools/analysis/verify-suite.mjs --only=quick-one-two --device=emulator-5556 --expect-release --out=tools/analysis/suites/<name>
+```
+
+The verdict, the correlator and the work-axis lines of the timing report
+(`round N: … disagreement … ms`) mean on an emulator what they mean on the
+tablet. Its onset, breath and proposal tables do not.
+
+**Reading the database.** The image is a userdebug one, so:
+
+```bash
+adb -s emulator-5556 root
+adb -s emulator-5556 shell sqlite3 /data/data/com.kyleruff.punchcraft/files/SQLite/punchcraft.db "SELECT id FROM schema_migrations"
+```
+
+**Testing an upgrade.** `artifacts/` in the main checkout holds September's
+release APKs, built for every processor, x86_64 included. Install one, run
+a workout to the end, then install the new build over it (`-r`: same id,
+same debug keystore, so the data stays). The new build's migrations then
+run on a database an old build wrote. An old build's QA link could still
+switch QA mode on, and the switch survives the upgrade.
+
 ## Installing SDK components (after Story 1 lock)
 
 If the spike locks Expo SDK 57 as expected, install what its Android template needs and accept licenses:

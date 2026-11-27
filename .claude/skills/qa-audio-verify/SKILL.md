@@ -124,6 +124,16 @@ The suite mutes the media stream (`cmd media_session volume --stream 3
 --set 0`, keyevent fallback) and restores it on exit and on Ctrl-C. Pass
 `--keep-volume` to leave it alone.
 
+### On an emulator
+
+The same loop runs against an Android emulator with no tablet attached:
+`--device=emulator-5556`, an x86_64 release build. Recipe and limits:
+`docs/dev-setup.md`, "An Android emulator". The verdict, the correlator and
+the work-axis lines mean what they mean on the tablet. **Its timing figures
+are this PC's, and the timing report's proposals from it are to be
+ignored** — the analyzer does not refuse an emulator's capture as it does a
+PC's (N-19 in the findings doc).
+
 ### Single-workout quick check
 
 ```bash

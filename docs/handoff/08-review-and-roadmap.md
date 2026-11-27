@@ -1640,7 +1640,7 @@ played the countdown whole. **PC only** — the tablet reads its clips from the
 app bundle. It does mean every PC run before `bf1e191f` played a broken
 countdown and nothing noticed, because nothing listened to it.
 
-#### N-18 · A round that opens on a skip starts its work clock up to a tick early · **fixed** (`3c1716c9`, `495a67a8`) · **not yet run on a tablet**
+#### N-18 · A round that opens on a skip starts its work clock up to a tick early · **fixed** (`3c1716c9`, `495a67a8`) · **seen fixed on a native Android build in an emulator; not yet run on the tablet**
 
 *What follows is the finding as written before the fix; "Fixed" at the end
 of it is what was done.*
@@ -1756,6 +1756,37 @@ ceremony, whole; 4 758 of 4 758 rings lit.
 Nothing else moved: what is said, when it is due and when its ring is due
 are the same dispatch for dispatch, which is what parity compares.
 
+*On a native Android build, in an emulator* (2026-11-27, after you pointed
+out that this PC has one). Release builds, a tablet-shaped Android 15
+emulator, One-Two start to finish with simulated punches — first the last
+September release APK (`f09ddcfd`, from `artifacts/`), then this branch
+(`bd182ad7`), driven by the tablet's own verify suite. The September build
+shows the fault exactly as the tablet's captures do; this branch does not.
+
+| | September build | this branch |
+|---|---|---|
+| round 1: boundary record after the work clock's zero | 79.8 ms | 11.9 ms |
+| round 2: the same | 6.5 ms | 14.4 ms |
+| round 1: rings painted late, median (least to most) | 84.4 ms (82.4 to 97.7) | 16.8 ms (14.8 to 19.8) |
+| round 2: the same | 17.8 ms (16.1 to 102.8) | 16.5 ms (14.5 to 27.9) |
+
+508 of 508 rings painted in both. On this branch the verify suite passed:
+round 1 correlated clean, every one of 177 plays observed. Round 1 now reads
+as round 2 does — and this is the first time the *painted* ring has been
+measured on a native build at all; the tablet's tool never looked at it.
+
+What this is and is not. It is the app's real native path — Hermes, the
+UI-thread ring clock, the native audio players, real timers — and it rules
+out the fix being something only a browser or a fake clock agrees with. It
+is not the tablet: the processor and the audio path are this PC's, so no
+figure here is a tablet figure. The painted-ring times are taken from log
+stamps (1 ms) and include a frame and the hop from the UI thread to the log;
+both builds were measured the same way. The smaller, every-round part of
+the fix (the publish) cannot be told apart in these figures — the two
+builds are eleven weeks of other changes apart, and round 2's 17.8 and 16.5
+are within what a frame hides. That part rests on its tests. How to do this
+again: `docs/dev-setup.md`, "An Android emulator".
+
 *What it changes on the tablet — worked out from the code and September's
 captures, not seen:*
 
@@ -1801,6 +1832,28 @@ Migration 010: `workout_adaptations.session_id`, nullable, cascading from
 stay with their plan. `listAdaptationsForSession` now describes one session.
 Like 009 it is one `ADD COLUMN`, it passes the upgrade path on both engines,
 and **the tablet's real database has not run it** (§7).
+
+#### N-19 · The tablet's timing tool cannot tell an emulator from the tablet · **open — yours to decide**
+
+`observed-timing.mjs` refuses a capture from the PC version, because every
+onset in it is corrected by the tablet's start latency and every constant
+it proposes is the tablet's. An Android emulator on this PC writes a real
+Android capture, and the tool has no way to know: nothing in the log names
+the device. The verify suite ran it on the emulator's capture and it
+proposed, marked *apply: yes*, `CALL_DISPATCH_LAG_MS` 71 → 28 and
+`CLICK_SCRIPT_PREARM_PAD_MS` 200 → 180 — from this PC's audio path. That
+is the same trap the refusal was written for, by a different door, and I
+opened the door by putting the suite on an emulator.
+
+**Nothing was applied.** `CLAUDE.md`, the runbook and `docs/dev-setup.md`
+now say an emulator's timing figures are a PC's and its proposals are to be
+ignored. That is a sentence, not a guard.
+
+The guard would be small: `workout.qa.run` logs the device's model (React
+Native already has it — no new module), and the tool refuses a capture
+whose model is an emulator's, as it refuses a PC's; the suite would then
+show the verdict and the work-axis lines and no proposals. It touches the
+app's log and the tool's refusal, so it is yours to say.
 
 #### Seen, and not chased
 
@@ -1860,13 +1913,30 @@ and **the tablet's real database has not run it** (§7).
 - **The default drive is longer than "round 1" now.** It runs through the
   first rest, about a minute more a workout, because that is where the
   bell, the rest line and the countdown are.
+- **I installed the app on the wrong emulator first.** The one already
+  running belongs to another project and had that project's app in front.
+  I had put the September build on it before I looked; I removed it without
+  ever launching it, and made a separate emulator (`punchcraft-emu`). Its
+  foreground app never changed.
+- **I said the tablet was the only place left to check the fix.** A release
+  build in an emulator is the same native code, and it was sitting on this
+  PC. It took your saying so.
 
 ### Still unproven
 
 - **The N-18 fix on the tablet.** The diagnosis rests on the tablet's
-  September captures; the fix on fake-clock tests and PC drives. No tablet
-  has run it.
-- **Migration 010 on the tablet's real database** (§7).
+  September captures; the fix on fake-clock tests, PC drives, and one
+  native Android build in an emulator. The tablet itself has not run it,
+  and nothing has been heard or seen by a person.
+- **Migrations 009 and 010 on the tablet's own database** (§7). They have
+  now run on native SQLite, in an emulator, over a database the September
+  release build had written — one finished workout: a session, 166 punches,
+  508 cue results. Both applied, every row was still there, the integrity
+  and foreign-key checks were clean, and the next workout's session carried
+  its live counts. What that did not cover: the tablet's database is older
+  and larger, and `workout_adaptations` was empty, so the new column was
+  added to an empty table and nothing has yet been written through it on a
+  device.
 - **The rest, and the rings, on a GitHub runner.** The four runs there
   predate both. A ring painted more than 100 ms late warns, and a shared
   four-processor machine may do that.
@@ -2230,9 +2300,12 @@ by design.
   tests, and the tablet's own database has never run it. Nothing reads the
   column on screen; one finished workout, then
   `SELECT COUNT(*), COUNT(session_id) FROM workout_adaptations` is the look:
-  the new rows carry a session, the old ones do not.
-- *N-18 — fixed (`3c1716c9`, `495a67a8`), never run on a tablet.* One
-  tablet suite run. In every `observed-timing-report.md`, the work-axis
+  the new rows carry a session, the old ones do not. *2026-11-27:* 009 and
+  010 have run on native SQLite in an emulator over a September-build
+  database (§3i, Still unproven) — the shape of the upgrade is proven, the
+  tablet's own data is not.
+- *N-18 — fixed (`3c1716c9`, `495a67a8`); seen fixed on a native build in
+  an emulator, never run on the tablet.* One tablet suite run. In every `observed-timing-report.md`, the work-axis
   line for round 0 (`disagreement … ms`) stood at 43 to 87 ms in September;
   it should now read what the later rounds do, 7 to 22 ms. If it does not,
   the fix has not reached the build — or the fault is back. Then round 1
