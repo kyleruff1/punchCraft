@@ -1573,9 +1573,9 @@ to learn whether any stored session carries `'puncheokie'` (N-2).
   cold-starts, and the command ends with "the app is up on the new bundle".
   It has never been watched doing this. `--dry-run` first if you want to see
   what it will stop.
-- After the first push to `main` that carries it: the `release apk` workflow
-  goes green and its artifact installs over the tablet's build with
-  `adb install -r`, sessions intact. Expect the workflow to need a fix first.
+- The `release apk` workflow's artifact installs over the tablet's build
+  with `adb install -r`, sessions intact. (The workflow itself went green on
+  2026-11-26, after one fix: `d1a9d718`.)
 
 **The QA suite (T-2).** First switch QA mode on in the app — Settings → QA
 mode — once per install; the link no longer does it, and a drive without it
@@ -1600,8 +1600,9 @@ by design.
   `keepalive.status` (with the bond-gate bit) and
   `keepalive.deviceInformation`. If a link that was holding drops within a
   few seconds of those two records, the reads did it.
-- *The release APK.* Dispatch the `release apk` workflow on this branch. It
-  has never passed; the splash fix is proven only as far as a clean prebuild.
+- *The release APK.* **Done, 2026-11-26:** dispatched on the branch and run
+  again on `main` after the merge, green both times in 12-14 minutes. What
+  is left is installing the artifact on the tablet (above).
 - *The PC app, by ear.* `npm run pc:app`, sound on, any workout. Calls are
   dispatched on time; nobody has heard whether they are audible, or whether
   they land with the rings.

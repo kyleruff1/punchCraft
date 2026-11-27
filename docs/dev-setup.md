@@ -175,12 +175,13 @@ on every push to `main` and on manual dispatch, and kept for seven days as
 the artifact `punchcraft-release-<sha>`. It is signed with the same debug
 keystore every `expo prebuild` generates, so it installs over a locally
 built one with `adb install -r` and the tablet keeps its data. Building
-locally still works exactly as described above. *Its first run on `main`
-failed (2026-11-26): the splash screen was configured with a colour and no
-image, so a clean checkout had no `splashscreen_logo` drawable. That is
-fixed in `app.config.ts` and proven as far as a clean `expo prebuild`
-generating the drawable; the workflow itself has still not been seen to
-pass.*
+locally still works exactly as described above. *It passes as of
+2026-11-26 — once dispatched on a branch, once on `main` — in 12-14
+minutes, with an artifact of about 860 MB. Its first run on `main` had
+failed: the splash screen was configured with a colour and no image, so a
+clean checkout had no `splashscreen_logo` drawable (fixed in
+`app.config.ts`). Not yet done by anyone: installing that artifact over the
+tablet's build.*
 
 ## Bluetooth HCI snoop (M01, only while the official app still connects)
 

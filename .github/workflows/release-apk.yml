@@ -8,10 +8,13 @@ name: release apk
 # locally" was only ever a comment in ci.yml. Local builds still work exactly
 # as before (`docs/dev-setup.md`).
 #
-# NOT YET SEEN GREEN. Written 2026-11-25 and impossible to run before it is
-# on GitHub. Expect the first run or two to need a fix: the likeliest causes
-# are a missing SDK component, runner disk space (the app bundles ~900 MB of
-# audio), or build time.
+# First green on 2026-11-26, on a branch and then on main: 12-14 minutes, an
+# artifact of about 860 MB (the app bundles ~900 MB of audio). Its first run
+# on main had failed at resource linking — the splash screen was configured
+# with a colour and no image, so a clean checkout had no `splashscreen_logo`
+# drawable; `app.config.ts` and its test now pin that. What is still unproven
+# is the last step a person has to do: installing the artifact over the
+# tablet's build with `adb install -r`.
 on:
   push:
     branches: [main]
