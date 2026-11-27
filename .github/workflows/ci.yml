@@ -68,10 +68,12 @@ jobs:
   # and reads the saved database back (`tools/pc/app/README.md`). The only
   # test of the real WebAssembly engine and the browser's own storage.
   #
-  # ADVISORY. It is deliberately NOT in the `ci` gate below: when this was
-  # written it had never run on a runner, and how long the build takes there
-  # is unknown (it copies about 760 MB of audio). Add it to `needs` once it
-  # has been green for a while.
+  # ADVISORY. It is deliberately NOT in the `ci` gate below. When this was
+  # written it had never run on a runner, and how long the build would take
+  # there was unknown (it copies about 760 MB of audio). Since then: it passed
+  # on the last four runs looked at (2026-11-27), in about two and a half
+  # minutes, build included. Add it to `needs` once that has held for a while
+  # longer.
   pc-smoke:
     name: pc smoke (advisory)
     runs-on: ubuntu-latest
@@ -97,13 +99,22 @@ jobs:
   # compared with the tablet's own captures. One workout on a push or a pull
   # request; all 22 on a manual run of this workflow.
   #
-  # ADVISORY, like the smoke job and for the same reason: when this was
-  # written it had never run on a runner. Two things are unknown there. A
-  # shared four-processor machine may send clips later than this suite has
-  # ever seen, so what is heard only warns (`--sound-gate warn`) until the
-  # runner's own numbers are in. And a runner has no sound card: if the
-  # browser will not start its audio there, the suite says the sound tap did
-  # not start, warns, and judges the rest.
+  # ADVISORY, like the smoke job. When this was written it had never run on
+  # a runner, and two things were unknown there: whether a browser with no
+  # sound card would start its audio at all, and how late a shared
+  # four-processor machine would send clips.
+  #
+  # Its first two runs (2026-11-27, on the pull request that added it and on
+  # `main` after the merge) answered both, once each: the audio started, all
+  # 81 clips of the workout were heard, and the least gap before a ring was
+  # 365 and 373 ms — against 376 on a 16-processor PC. Each run took just
+  # under seven minutes.
+  #
+  # Two runs of one workout are not a baseline. So what is heard still only
+  # warns here (`--sound-gate warn`) and the job stays out of the gate until
+  # it has held for a while. If a runner ever will not start its audio, the
+  # suite says the sound tap did not start, warns, and judges the rest. The
+  # manual run of all 22 has not been tried.
   pc-sync:
     name: pc sync (advisory)
     runs-on: ubuntu-latest
