@@ -3142,8 +3142,8 @@
       "clipId": "lt-9c46ec3a",
       "text": "Long set: jabs only, straight time — ten bars. Finish with fast clean jabs. No reaching.",
       "durationMs": 7631,
-      "expectedStartTick": 182110,
-      "expectedStartMs": 189698,
+      "expectedStartTick": 182622,
+      "expectedStartMs": 190231,
       "source": "clickScript.schedule"
     }
   ],

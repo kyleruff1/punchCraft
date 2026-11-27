@@ -3206,8 +3206,8 @@
       "clipId": "li-ddbe9a47",
       "text": "Long set: one-bees only, double-time — eighteen bars. Same lead hand, lower target. Keep your eyes up.",
       "durationMs": 8800,
-      "expectedStartTick": 104092,
-      "expectedStartMs": 108429,
+      "expectedStartTick": 104875,
+      "expectedStartMs": 109245,
       "source": "clickScript.schedule"
     },
     {
@@ -3226,8 +3226,8 @@
       "clipId": "li-dfb302b7",
       "text": "Pump: ones only, time-and-a-half — fifteen bars. Finish the round owning the lead hand. Crisp, not tense.",
       "durationMs": 8414,
-      "expectedStartTick": 185479,
-      "expectedStartMs": 193207,
+      "expectedStartTick": 186121,
+      "expectedStartMs": 193876,
       "source": "clickScript.schedule"
     }
   ],

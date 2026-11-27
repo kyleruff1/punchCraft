@@ -46,8 +46,11 @@ import type {
 
 const MS_PER_TICK = 60_000 / (60 * TRANSPORT_TICKS_PER_PULSE)
 
-const THIS_FILE = fileURLToPath(import.meta.url)
-const REPO_ROOT = resolve(dirname(THIS_FILE), '..', '..')
+// `import.meta.url` is empty when jest loads this file (the freshness test
+// in `__tests__/manifests-fresh.test.js`), and jest runs from the repo root.
+const REPO_ROOT = import.meta.url
+  ? resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
+  : process.cwd()
 const MANIFESTS_DIR = join(REPO_ROOT, 'tools', 'analysis', 'manifests')
 
 interface ExpectedStrike {

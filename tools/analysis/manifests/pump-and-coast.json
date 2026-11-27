@@ -2248,8 +2248,8 @@
       "clipId": "li-34d12a3a",
       "text": "Coast bar — one, empty, empty, empty, straight time, eight bars. One touch, three empty slots. Move, breathe, stay ready.",
       "durationMs": 9241,
-      "expectedStartTick": 40582,
-      "expectedStartMs": 42273,
+      "expectedStartTick": 40491,
+      "expectedStartMs": 42178,
       "source": "clickScript.schedule"
     },
     {
@@ -2258,8 +2258,8 @@
       "clipId": "li-10beb36f",
       "text": "Pump: twos only, double-time — ten bars. Pump the twos in a short burst. Keep the shoulder behind them.",
       "durationMs": 7800,
-      "expectedStartTick": 82311,
-      "expectedStartMs": 85741,
+      "expectedStartTick": 82917,
+      "expectedStartMs": 86372,
       "source": "clickScript.schedule"
     },
     {
@@ -2268,8 +2268,8 @@
       "clipId": "li-f5cdc389",
       "text": "Coast bar — one, empty, two, empty, straight time, fourteen bars. One, empty, two, empty. Let the coast stay active.",
       "durationMs": 8522,
-      "expectedStartTick": 110194,
-      "expectedStartMs": 114785,
+      "expectedStartTick": 110102,
+      "expectedStartMs": 114690,
       "source": "clickScript.schedule"
     },
     {
@@ -2278,8 +2278,8 @@
       "clipId": "li-746b0bd0",
       "text": "Long set: one-bees only, time-and-a-half — twenty bars. Pump the one-bees. Small level change, fast return.",
       "durationMs": 8560,
-      "expectedStartTick": 178146,
-      "expectedStartMs": 185569,
+      "expectedStartTick": 178930,
+      "expectedStartMs": 186385,
       "source": "clickScript.schedule"
     }
   ],
