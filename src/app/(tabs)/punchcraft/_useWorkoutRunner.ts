@@ -41,7 +41,7 @@ import { SlotDispatcher } from '@audio/SlotDispatcher'
 import { compileWorkoutScore } from '@domain/programs/workoutScore'
 import { roundStartTicksFrom, scoreTickAt } from '@domain/programs/scoreClock'
 import type { RoundWalkPlan } from '@/components/workout/useRingBeatClock'
-import { type SharedWorkClock } from '@domain/timing/SharedWorkClock'
+import { sharedWorkClockAt, type SharedWorkClock } from '@domain/timing/SharedWorkClock'
 import { instructionClipFor } from '@audio/voiceAssets/instructionManifest'
 import { findCallClip } from '@audio/voiceAssets/callClips'
 import { findClickScript } from '@audio/voiceAssets/clickScriptManifest'
@@ -1623,17 +1623,19 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
         // discontinuity. Running only while an unpaused WORK phase is on —
         // projecting through rest/pause would advance a clock the session
         // itself holds still.
+        //
+        // The work clock is read NOW, beside the stamp — not taken from the
+        // tick that led here. The bell has already been sent by this line,
+        // and pairing the tick's reading with this later stamp left the
+        // rings that far behind the calls for the whole round (N-18).
         if (args.workClock) {
-          const s = sessionRef.current?.snapshot()
-          args.workClock.value = Object.freeze({
-            roundIndex: s?.roundIndex ?? -1,
-            workElapsedAtPublishMs: s?.workElapsedMs ?? 0,
-            publishFrameTimestampMs:
-              typeof performance !== 'undefined' && typeof performance.now === 'function'
-                ? performance.now()
-                : Date.now(),
-            running: s?.phase === 'work',
-          })
+          args.workClock.value = sharedWorkClockAt(
+            sessionRef.current,
+            clock.now(),
+            typeof performance !== 'undefined' && typeof performance.now === 'function'
+              ? performance.now()
+              : Date.now(),
+          )
         }
         logger.info('workout.round.boundary', 'session phase boundary', {
           transition: safe(transition.type),

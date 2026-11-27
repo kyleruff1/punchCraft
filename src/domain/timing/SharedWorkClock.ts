@@ -28,7 +28,8 @@
  *
  * The publisher re-anchors at every discontinuity — work-entered (with
  * its overflow), paused, resumed, rest-entered — and NEVER per tick, so
- * the UI thread owns smoothness between anchors.
+ * the UI thread owns smoothness between anchors. What it publishes is
+ * `sharedWorkClockAt`, below: the reading and the stamp are one instant.
  *
  * ## Clock domain + atomicity
  *
@@ -39,6 +40,9 @@
  *
  * Pure TypeScript — no Reanimated import; tests run in plain node.
  */
+
+import type { WorkoutSessionClock } from '../session/WorkoutSessionClock'
+import type { MonotonicMs } from '../time/clockDomains'
 
 export interface SharedWorkClock {
   /** Round this clock is counting for; -1 before the first work phase. */
@@ -58,6 +62,46 @@ export const SHARED_WORK_CLOCK_STOPPED: SharedWorkClock = Object.freeze({
   publishFrameTimestampMs: 0,
   running: false,
 })
+
+/**
+ * The struct to publish at a discontinuity: the session's work clock, read
+ * at the instant the stamp beside it is taken.
+ *
+ * **The reading and the stamp are ONE instant.** The publish used to pair
+ * `snapshot().workElapsedMs` — the work clock as of the last `advance()`,
+ * the tick that led here — with a stamp taken later in the same tick, after
+ * the bell had been sent and the phase announced. Whatever that took, the
+ * rings then ran behind the work clock by, for the whole round, while the
+ * calls and the ring tokens went out on the work clock itself. So this asks
+ * the session for its reading at `monotonicNowMs` — `workElapsedAt`, the one
+ * sanctioned conversion — which outside an unpaused work phase is the
+ * frozen reading, exactly what was published before.
+ *
+ * `monotonicNowMs` and `frameTimestampMs` are the same moment on the
+ * runner's clock and on the frame clock, read back to back by the caller.
+ * On a device both are `performance.now()`.
+ *
+ * Plain JS-thread function — never called from a worklet.
+ */
+export function sharedWorkClockAt(
+  session: Pick<WorkoutSessionClock, 'snapshot' | 'workElapsedAt'> | null | undefined,
+  monotonicNowMs: MonotonicMs,
+  frameTimestampMs: number,
+): SharedWorkClock {
+  if (!session) {
+    return Object.freeze({
+      ...SHARED_WORK_CLOCK_STOPPED,
+      publishFrameTimestampMs: frameTimestampMs,
+    })
+  }
+  const snapshot = session.snapshot()
+  return Object.freeze({
+    roundIndex: snapshot.roundIndex,
+    workElapsedAtPublishMs: session.workElapsedAt(monotonicNowMs),
+    publishFrameTimestampMs: frameTimestampMs,
+    running: snapshot.phase === 'work',
+  })
+}
 
 /**
  * Project the current work-elapsed ms. Plain function; when called from a

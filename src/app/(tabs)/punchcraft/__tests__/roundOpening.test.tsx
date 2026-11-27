@@ -283,3 +283,66 @@ describe('the work clock of a round opened between two ticks', () => {
     h.unmount()
   })
 })
+
+/**
+ * Where the RING clock has its zero: the instant at which the struct the
+ * runner published reads a work-elapsed of 0.
+ */
+const ringZero = (r: Ring): number =>
+  r.ringClock.publishFrameTimestampMs - r.ringClock.workElapsedAtPublishMs
+
+describe.each([0, 7, 22])('the ring clock, when sending the bell takes %i ms', (bellCostMs) => {
+  // The publish comes after the bell in the same call. Pairing the work
+  // clock's reading from BEFORE the bell with a stamp taken after it put the
+  // rings behind the calls by whatever the bell cost — invisible at 0, which
+  // is what every other suite runs at.
+  const expectOneZero = (h: Harness, roundIndex: number): void => {
+    const rings = h.rings.filter((r) => r.roundIndex === roundIndex)
+    expect(rings.length).toBeGreaterThan(0)
+    for (const r of rings) {
+      expect(r.ringClock).toMatchObject({ roundIndex, running: true })
+      expect(ringZero(r)).toBe(r.monotonicTimeMs - r.workElapsedMs)
+    }
+  }
+
+  it('counts from the same instant as the work clock in a round opened by a skip', async () => {
+    const h = await mount(bellCostMs)
+    h.start()
+    h.tick(4)
+    h.drift(SINCE_LAST_TICK_MS)
+    const opened = h.clock.now()
+    act(() => {
+      h.runner.skipCountdown()
+    })
+    h.tick(ticksIn(WORK_MS) - 2)
+
+    expectOneZero(h, 0)
+    // And that instant is the skip — the bell — not the tick before it.
+    expect(new Set(h.rings.filter((r) => r.roundIndex === 0).map(ringZero))).toEqual(
+      new Set([opened]),
+    )
+    h.unmount()
+  })
+
+  it('counts from the same instant as the work clock in a round opened on the tick', async () => {
+    const h = await mount(bellCostMs)
+    h.start()
+    h.tick(ticksIn(COUNTDOWN_MS))
+    expect(getLive().phase).toBe('work')
+    h.tick(ticksIn(WORK_MS) - 2)
+
+    expectOneZero(h, 0)
+    h.unmount()
+  })
+
+  it('counts from the same instant again in the round after a rest', async () => {
+    const h = await mount(bellCostMs)
+    h.start()
+    h.tick(ticksIn(COUNTDOWN_MS) + ticksIn(WORK_MS) + ticksIn(REST_MS) + 2)
+    expect(getLive().roundIndex).toBe(1)
+    h.tick(ticksIn(WORK_MS) - 6)
+
+    expectOneZero(h, 1)
+    h.unmount()
+  })
+})
