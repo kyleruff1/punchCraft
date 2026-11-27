@@ -469,6 +469,13 @@ function tally(items, key) {
  * did not go with it: what the PC's observer says is checked on the PC, by
  * the PC suite, against the sound (`tools/pc/suite/observer.mjs`).
  *
+ * An Android emulator on the PC is the same case by another door
+ * (`'android-emulator'`): a real Android capture, and this PC's audio path.
+ * Before the QA run record said which it was, an emulator's capture was
+ * analyzed here as the tablet's (2026-11-27) and `CALL_DISPATCH_LAG_MS` was
+ * proposed at 28 against 71, with `CLICK_SCRIPT_PREARM_PAD_MS` at 180 against
+ * 200 — the same wrong 28 a PC capture had produced the day before.
+ *
  * So it refuses, whole. Hiding only the proposals would leave the findings,
  * and they stand on the same constant.
  */

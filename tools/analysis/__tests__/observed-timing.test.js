@@ -551,6 +551,25 @@ describe('a capture the tablet did not write', () => {
     expect(() => analyze(named, CONSTANTS)).toThrow(NotATabletCapture)
   })
 
+  // The same fixture with the QA run record naming its device.
+  const naming = (...fields) => {
+    const named = capture().replace("gitSha: 'abc1234'", ["gitSha: 'abc1234',", ...fields.map((f) => `08-31 10:00:00.000 I/ReactNativeJS( 8286):   ${f}`)].join('\n'))
+    expect(named).not.toBe(capture())
+    return named
+  }
+  const fromAnEmulator = () => naming("platform: 'android',", 'emulator: true,', "deviceModel: 'sdk_gphone64_x86_64'")
+
+  it('refuses an Android emulator’s capture — a real Android log, and this PC’s audio path', () => {
+    // 2026-11-27: taken for the tablet's, it proposed CALL_DISPATCH_LAG_MS 71 → 28.
+    expect(() => analyze(fromAnEmulator(), CONSTANTS)).toThrow(NotATabletCapture)
+    expect(() => analyze(fromAnEmulator(), CONSTANTS)).toThrow(/written on "android-emulator", not on the tablet/)
+  })
+
+  it('still analyzes a real device that says it is one', () => {
+    const real = naming("platform: 'android',", 'emulator: false,', "deviceModel: 'SM-X200'")
+    expect(analyze(real, CONSTANTS).breath.calls).toBe(analyze(capture(), CONSTANTS).breath.calls)
+  })
+
   it('still analyzes a capture that names the tablet, and one that names nothing', () => {
     const named = capture().replace("gitSha: 'abc1234'", "gitSha: 'abc1234',\n08-31 10:00:00.000 I/ReactNativeJS( 8286):   platform: 'android'")
     expect(named).not.toBe(capture())
@@ -572,6 +591,14 @@ describe('a capture the tablet did not write', () => {
       const result = run(fromThePc())
       expect(result.status).toBe(3)
       expect(result.stderr).toMatch(/not on the tablet/)
+      expect(result.stdout).toBe('')
+      expect(readdirSync(dir)).toEqual(['logcat.txt'])
+    })
+
+    it('does the same for an emulator’s capture', () => {
+      const result = run(fromAnEmulator())
+      expect(result.status).toBe(3)
+      expect(result.stderr).toMatch(/written on "android-emulator", not on the tablet/)
       expect(result.stdout).toBe('')
       expect(readdirSync(dir)).toEqual(['logcat.txt'])
     })
