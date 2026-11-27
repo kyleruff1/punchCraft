@@ -4,8 +4,8 @@
 // The build is Expo's ordinary web export — one page, one script, the assets
 // beside them — written to `dist/pc-app/` (git-ignored). The server is plain
 // node: a static file server with the one rule a single-page app needs.
-import { spawn } from 'node:child_process'
-import { createReadStream, existsSync, statSync } from 'node:fs'
+import { execFileSync, spawn } from 'node:child_process'
+import { createReadStream, existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { rm } from 'node:fs/promises'
 import { createServer } from 'node:http'
 import { createRequire } from 'node:module'
@@ -114,12 +114,60 @@ export function serveWebApp({ root = OUT_DIR, port = DEFAULT_PORT } = {}) {
 }
 
 /**
+ * The commit the checkout is at, spelled as `app.config.ts` spells it for the
+ * build: `git rev-parse --short HEAD`, or `unknown` where there is no git.
+ */
+export function checkoutSha(root = REPO_ROOT) {
+  try {
+    return execFileSync('git', ['rev-parse', '--short', 'HEAD'], {
+      cwd: root,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+  } catch {
+    return 'unknown'
+  }
+}
+
+// The app config sits in the bundle as JSON inside a string, so its quotes
+// may or may not be escaped. Whatever stands between the name and the value,
+// it is not a letter or a digit.
+const BAKED_SHA = /gitSha[^0-9a-zA-Z]{1,6}([0-9a-f]{4,40}|unknown)[^0-9a-zA-Z]/
+
+/**
+ * The commit a build says it is — the `gitSha` baked into its bundle, which is
+ * what the app's own build info and its QA run record report. Null when there
+ * is no build or it says nothing.
+ */
+export function builtSha(outDir = OUT_DIR) {
+  const scripts = path.join(outDir, '_expo', 'static', 'js', 'web')
+  if (!existsSync(scripts)) return null
+  for (const file of readdirSync(scripts)) {
+    if (!file.endsWith('.js')) continue
+    const match = BAKED_SHA.exec(readFileSync(path.join(scripts, file), 'utf8'))
+    if (match) return match[1]
+  }
+  return null
+}
+
+/**
  * Build the app for a browser into `outDir`, replacing what was there.
+ *
+ * The bundler keeps each module's compiled form in a cache, and the app
+ * config — the commit id among it — is compiled into one of them. Nothing
+ * about that module changes when the config does, so a warm build bakes in
+ * whatever commit the cache was filled at: every build from PR 393 until
+ * 2026-11-26 said it was `fbffb896`. So the cache is cleared whenever the
+ * build on disk is not already the checkout's commit, and the result is
+ * checked either way. A build that misnames its commit cannot be tied to the
+ * code it was made from, which is the first thing a capture has to prove.
  *
  * @param {{ outDir?: string, quiet?: boolean }} [options]
  * @returns {Promise<void>} rejects with the exporter's exit code
  */
 export async function buildWebApp({ outDir = OUT_DIR, quiet = false } = {}) {
+  const sha = checkoutSha()
+  const stale = builtSha(outDir) !== sha
   // Old builds leave their hashed files behind; clear them — but only ever
   // inside this repo's own `dist/`.
   const dist = path.join(REPO_ROOT, 'dist') + path.sep
@@ -130,6 +178,7 @@ export async function buildWebApp({ outDir = OUT_DIR, quiet = false } = {}) {
   // The exporter's own entry point, run with this node: no shell, no `npx`.
   const cli = createRequire(path.join(REPO_ROOT, 'package.json')).resolve('expo/bin/cli')
   const args = [cli, 'export', '--platform', 'web', '--output-dir', outDir]
+  if (stale) args.push('--clear')
   await new Promise((resolve, reject) => {
     const child = spawn(process.execPath, args, {
       cwd: REPO_ROOT,
@@ -142,6 +191,10 @@ export async function buildWebApp({ outDir = OUT_DIR, quiet = false } = {}) {
   })
   if (!existsSync(path.join(outDir, 'index.html'))) {
     throw new Error(`expo export finished but wrote no index.html in ${outDir}`)
+  }
+  const baked = builtSha(outDir)
+  if (baked !== sha) {
+    throw new Error(`the build says it is commit ${baked}; the checkout is at ${sha}`)
   }
 }
 

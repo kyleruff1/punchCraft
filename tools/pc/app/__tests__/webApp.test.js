@@ -9,7 +9,7 @@ import path from 'node:path'
 
 import { findBrowser } from '../cdp.mjs'
 import { punchesIn } from '../smoke.mjs'
-import { buildWebApp, resolveRequest, serveWebApp } from '../webApp.mjs'
+import { buildWebApp, builtSha, checkoutSha, resolveRequest, serveWebApp } from '../webApp.mjs'
 
 /** A real request. (`fetch` under jest-expo is React Native's stand-in.) */
 const get = (url) =>
@@ -142,5 +142,49 @@ describe('punchesIn', () => {
     expect(punchesIn('PUNCHES\n0 / 237')).toBe(0)
     expect(punchesIn(undefined)).toBe(0)
     expect(punchesIn('PUNCHES')).toBe(0)
+  })
+})
+
+describe('which commit a build says it is', () => {
+  let out
+  const bundle = (text) => {
+    const scripts = path.join(out, '_expo', 'static', 'js', 'web')
+    mkdirSync(scripts, { recursive: true })
+    writeFileSync(path.join(scripts, 'entry-abc.js'), text)
+  }
+  beforeEach(() => {
+    out = mkdtempSync(path.join(os.tmpdir(), 'pc-app-sha-'))
+  })
+  afterEach(() => rmSync(out, { recursive: true, force: true }))
+
+  it('reads the commit out of the app config baked into the bundle', () => {
+    // As the exporter writes it: JSON inside a string, its quotes escaped.
+    const escaped = JSON.stringify(
+      JSON.stringify({ name: 'punchCraft', extra: { gitSha: '08719905', releaseChannel: 'dev' } }),
+    )
+    bundle(`__d(function(){process.env.APP_MANIFEST=${escaped}})`)
+    expect(builtSha(out)).toBe('08719905')
+  })
+
+  it('reads it whether or not the quotes are escaped', () => {
+    bundle('var config={"extra":{"gitSha":"1a2b3c4"}}')
+    expect(builtSha(out)).toBe('1a2b3c4')
+  })
+
+  it('reads a build made where there was no git', () => {
+    bundle('var config={"extra":{"gitSha":"unknown"}}')
+    expect(builtSha(out)).toBe('unknown')
+  })
+
+  it('says nothing for a folder with no build, or a build that names no commit', () => {
+    expect(builtSha(out)).toBeNull()
+    bundle('console.log("no config here")')
+    expect(builtSha(out)).toBeNull()
+  })
+
+  it('names the checkout’s commit the way the app config does', () => {
+    expect(checkoutSha()).toMatch(/^[0-9a-f]{7,40}$/)
+    // Not a git checkout: the same word `app.config.ts` falls back to.
+    expect(checkoutSha(out)).toBe('unknown')
   })
 })
