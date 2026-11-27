@@ -86,12 +86,23 @@ async function run(page, base, openAnother) {
   await sleep(2_000)
 
   const from = page.consoleLines.length
+  const fromRecord = page.records.length
   await page.goto(`${base}qa/run?workout=${WORKOUT}&sim=alternating-1-2&autostart=1&nonce=smoke`)
   await page.waitFor('the live screen', `location.pathname === '/punchcraft/live'`, 30_000)
   if (page.logged('workout.qa.run.blocked', from)) {
     throw new Error('QA mode did not survive the reload: the setting was not saved')
   }
   step('a setting changed in the app survived a reload')
+
+  // The verifiers read fields a console preview cuts off after the fifth.
+  // `platform` is the QA record's twentieth, and it is what stops the
+  // tablet's timing analyzer judging a capture from here.
+  const staged = page.records.slice(fromRecord).find((r) => r.args[0] === '[INFO] workout.qa.run')
+  const platform = staged?.args[2]?.platform
+  if (platform !== 'web') {
+    throw new Error(`the QA run record should name the platform "web"; it says ${platform}`)
+  }
+  step('the log arrives whole: the QA run record names its platform')
 
   await page.waitFor(
     'the workout to start itself',
@@ -192,7 +203,7 @@ async function main() {
   let page
   let failure = null
   try {
-    page = await openPage(browser.wsUrl)
+    page = await openPage(browser.wsUrl, { wholeRecords: true })
     console.info(`PC smoke test: ${served.url}`)
     await run(page, served.url, () => openPage(browser.wsUrl))
   } catch (err) {

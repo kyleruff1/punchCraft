@@ -11,6 +11,8 @@ import os from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
 
+import { RECORD_BINDING, RECORD_TAP_SOURCE } from './recordTap.mjs'
+
 /**
  * Where Chrome or Edge is installed, or null. `PC_SMOKE_BROWSER` wins.
  *
@@ -71,6 +73,12 @@ export async function launchBrowser(executable) {
       // without this every clip is refused as autoplay.
       '--autoplay-policy=no-user-gesture-required',
       '--mute-audio',
+      // A browser slows the timers of a page it thinks nobody is watching,
+      // and a headless one has nobody. The workout runs on a 50 ms loop and
+      // on animation frames; throttled, it is a different workout.
+      '--disable-background-timer-throttling',
+      '--disable-backgrounding-occluded-windows',
+      '--disable-renderer-backgrounding',
       '--window-size=1280,800',
       // A CI runner's kernel refuses Chrome the user namespaces its sandbox
       // is built from ("No usable sandbox!"), and it exits before opening a
@@ -114,9 +122,25 @@ export async function launchBrowser(executable) {
  * exceptions and unhandled rejections, anything written with `console.error`
  * (the app's own `logger.error` among them), and failed requests.
  *
+ * Three options, for a driver that measures rather than smoke-tests:
+ *
+ * - `wholeRecords` keeps every console call complete in `records`. Without
+ *   it there is only `consoleLines`, where an object is a preview of its
+ *   first five fields (see `recordTap.mjs`).
+ * - `beforeLoad` is scripts to run in every page before its own.
+ * - `receivers` plants a function in the page under each name; whatever
+ *   string the page passes it arrives at the function given here.
+ *
  * @param {string} wsUrl the browser's debugging address, from `launchBrowser`
+ * @param {object} [options]
+ * @param {boolean} [options.wholeRecords]
+ * @param {string[]} [options.beforeLoad]
+ * @param {Record<string, (payload: string) => void>} [options.receivers]
  */
-export async function openPage(wsUrl) {
+export async function openPage(
+  wsUrl,
+  { wholeRecords = false, beforeLoad = [], receivers = {} } = {},
+) {
   const socket = new WebSocket(wsUrl)
   await new Promise((resolve, reject) => {
     socket.addEventListener('open', resolve, { once: true })
@@ -165,6 +189,16 @@ export async function openPage(wsUrl) {
    * @type {string[]}
    */
   const withheld = []
+  /** @type {import('./recordTap.mjs').PageRecord[]} every console call, whole — when asked for */
+  const records = []
+  /** @type {Record<string, (payload: string) => void>} */
+  const receive = { ...receivers }
+  const scripts = [...beforeLoad]
+  if (wholeRecords) {
+    receive[RECORD_BINDING] = (payload) => records.push(JSON.parse(payload))
+    // First, so that nothing a later script logs is missed.
+    scripts.unshift(RECORD_TAP_SOURCE)
+  }
   // An object argument arrives as a preview of its fields — which, for the
   // app's log records, is the part worth reading.
   const text = (arg) =>
@@ -176,6 +210,8 @@ export async function openPage(wsUrl) {
       const line = params.args.map(text).join(' ')
       consoleLines.push(line)
       if (params.type === 'error') problems.push(`console.error: ${line}`)
+    } else if (method === 'Runtime.bindingCalled') {
+      receive[params.name]?.(params.payload)
     } else if (method === 'Runtime.exceptionThrown') {
       const details = params.exceptionDetails
       problems.push(`${details.text} ${details.exception?.description ?? ''}`.trim())
@@ -188,6 +224,9 @@ export async function openPage(wsUrl) {
   await send('Runtime.enable')
   await send('Log.enable')
   await send('Page.enable')
+  // Both outlive a navigation: every page this target loads gets them.
+  for (const name of Object.keys(receive)) await send('Runtime.addBinding', { name })
+  for (const source of scripts) await send('Page.addScriptToEvaluateOnNewDocument', { source })
 
   /** Run an expression in the page; a promise it returns is awaited. */
   const evaluate = async (expression) => {
@@ -219,6 +258,7 @@ export async function openPage(wsUrl) {
 
   return {
     consoleLines,
+    records,
     problems,
     withheld,
     evaluate,
