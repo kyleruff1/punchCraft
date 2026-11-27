@@ -28,6 +28,7 @@
 import { measuresPerRep, rowMeasures } from '../../src/domain/workout/samples/clickMaps.ts'
 import { allClickMaps } from '../../src/domain/workout/samples/allClickMaps.ts'
 import { CLICK_SCRIPT_CLIPS } from '../../src/audio/voiceAssets/clickScriptManifest.ts'
+import { callSlot } from '../../src/domain/coach/callSlot.ts'
 
 // Every map the app plays — the literal ten and the composed quick twelve.
 const CLICK_MAPS = allClickMaps()
@@ -40,7 +41,7 @@ const BELL_CLEAR_MS = 1000
 const slots = (motif) => motif.split('-').length
 
 function openerCallMaxMs(motif) {
-  const slot = `call/${motif}`
+  const slot = callSlot(motif)
   const clips = CLICK_SCRIPT_CLIPS.filter((c) => c.kind === 'call' && c.slots.includes(slot))
   if (clips.length === 0) return null
   return { maxMs: Math.max(...clips.map((c) => c.durationMs)), count: clips.length }

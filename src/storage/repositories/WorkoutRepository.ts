@@ -33,6 +33,7 @@ import {
   type GeneratedWorkout,
 } from '@/domain/workout/GeneratedWorkout'
 import { hashTimelineContent } from '@/domain/programs/timelineHash'
+import { BOXING, disciplineOf, isDisciplineSlug } from '@/domain/workout/discipline'
 import type { ProgramRound, WorkoutToken } from '@/domain/workout/WorkoutTokens'
 import { RECIPE_SCHEMA_VERSION } from '@/domain/workout/versions'
 import type { WorkoutRecipe } from '@/domain/workout/WorkoutRecipe'
@@ -170,6 +171,8 @@ interface BlocksPayload {
    * A row without it predates that, and its row id IS the workout id.
    */
   workoutId?: string
+  /** Written only when it is not boxing (`discipline.ts`). */
+  discipline?: unknown
 }
 
 /* ------------------------------------------------------------- row mapping */
@@ -264,6 +267,9 @@ function blocksPayloadOf(w: GeneratedWorkout): BlocksPayload {
     warnings: w.warnings,
     coachPath: coachPathOf(w),
     workoutId: w.id,
+    // Only when it is not boxing: a boxing plan's payload — and so its
+    // stored id, which is a hash of it — is what it was before the field.
+    ...(disciplineOf(w) === BOXING ? {} : { discipline: disciplineOf(w) }),
   }
 }
 
@@ -725,6 +731,11 @@ export class WorkoutRepository {
       warnings: blocks.warnings ?? [],
       // Only the marked path is a field on the workout; `score` is its absence.
       ...(blocks.coachPath === 'click-script' ? { coachPath: 'click-script' as const } : {}),
+      // Likewise boxing is the absence of a discipline. A stored value that
+      // is not a slug is dropped rather than trusted into a clip path.
+      ...(isDisciplineSlug(blocks.discipline) && blocks.discipline !== BOXING
+        ? { discipline: blocks.discipline }
+        : {}),
     }
   }
 

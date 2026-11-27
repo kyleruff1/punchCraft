@@ -37,7 +37,10 @@ const AnimatedImage = ((Animated as { Image?: unknown }).Image ??
     ? Animated.createAnimatedComponent(Image)
     : Image)) as typeof Animated.Image
 
-import { GUARD_FRAME, findPunchAvatar, type PunchAvatarFrames } from './punchAvatarManifest'
+import type { Discipline } from '@domain/workout/discipline'
+
+import { avatarFramesFor } from './avatarFrames'
+import { GUARD_FRAME, type PunchAvatarFrames } from './punchAvatarManifest'
 import { colors } from '@/theme/colors'
 import { useAvatarFrameClock } from './useAvatarFrameClock'
 import type { CueInstance } from '@domain/programs/CueTimeline'
@@ -102,11 +105,14 @@ export function requestedFor(
   cue: CueInstance | undefined,
   tokenIndex: number,
   lastPunchIndex: number,
+  discipline?: Discipline,
 ): { key: string; frames: PunchAvatarFrames; windowMs: number; isLast: boolean } | null {
   if (!cue || tokenIndex < 0) return null
   const token = cue.tokens[tokenIndex]
   if (!token || token.kind !== 'punch') return null
-  const frames = findPunchAvatar(token.number, token.body)
+  // A discipline with no art of its own has no frames, and the card stays in
+  // guard — see `avatarFrames.ts`.
+  const frames = avatarFramesFor(token.number, token.body, discipline)
   if (!frames) return null
   // The same due times the rings fire on. Phase 5-ii retired the V1c
   // `phraseTokenTimesMs` rail override; only the beat grid remains.
@@ -159,8 +165,10 @@ export function PunchAvatarCard(props: {
    * `useAvatarFrameClock.ts`.
    */
   anchor?: SharedValue<SharedTransportAnchor>
+  /** Whose art to show. Absent means boxing. */
+  discipline?: Discipline
 }): React.JSX.Element | null {
-  const { cue, activeTokenIndex, reducedMotion = false, anchor } = props
+  const { cue, activeTokenIndex, reducedMotion = false, anchor, discipline } = props
 
   // Every punch in the combination, in order. The card walks these.
   const punchIndexes = useMemo(
@@ -185,7 +193,7 @@ export function PunchAvatarCard(props: {
   const engineLit = activeTokenIndex >= 0 && punchIndexes.includes(activeTokenIndex)
   const tokenIndex = engineLit ? activeTokenIndex : -1
   const lastPunchIndex = punchIndexes.at(-1) ?? -1
-  const requested = requestedFor(cue, tokenIndex, lastPunchIndex)
+  const requested = requestedFor(cue, tokenIndex, lastPunchIndex, discipline)
   // The identity the effect actually keys off; the object itself is rebuilt
   // every render, so it travels by ref instead of through the deps array.
   const requestedKey = requested?.key ?? null

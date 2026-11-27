@@ -32,10 +32,13 @@ import {
   type SampleWorkoutKey,
 } from '../../src/domain/workout/samples'
 import { findComboAnnounceById } from '../../src/audio/voiceAssets/comboAnnounceManifest'
+import { findCallClip } from '../../src/audio/voiceAssets/callClips'
 import { findClickScript } from '../../src/audio/voiceAssets/clickScriptManifest'
 import { TRANSPORT_TICKS_PER_PULSE } from '../../src/domain/timing/TimingEngine'
 import { expandTimeline } from '../../src/domain/programs/CueTimeline'
 import { callDispatchAtMs, leadInDispatchAtMs } from '../../src/domain/coach/callPlacement'
+import { motifOf } from '../../src/domain/coach/callSlot'
+import { disciplineOf } from '../../src/domain/workout/discipline'
 import type {
   CompiledCoachSlot,
   CompiledScoreStrike,
@@ -150,12 +153,6 @@ function tickToMs(tick: number): number {
 }
 
 /** The bar's call slot name: punches as digits (`b` for body), rests as dots. */
-function motifOf(cue: { tokens: readonly { kind: string; number?: number; body?: boolean }[] }): string {
-  return cue.tokens
-    .map((t) => (t.kind === 'punch' ? `${t.number}${t.body ? 'b' : ''}` : '.'))
-    .join('-')
-}
-
 function toExpectedStrike(strike: CompiledScoreStrike): ExpectedStrike {
   return {
     eventId: strike.eventId,
@@ -200,6 +197,9 @@ export function buildFirstRoundManifest(
 ): FirstRoundManifest {
   const sample = getSampleWorkout(workoutId)
   const workout = sample.workout
+  // Absent on every workout shipped today, which is boxing — see
+  // `src/domain/workout/discipline.ts`.
+  const discipline = disciplineOf(workout)
   const bpm = bpmForRecipe(workout.recipe)
   const compiled = compileWorkoutScore(workout, {
     stance: 'orthodox',
@@ -325,15 +325,14 @@ export function buildFirstRoundManifest(
       // so every lead-in of every quick workout was flagged as mismatched
       // on drives where the runtime had placed it exactly right. Both sides
       // now compute it from `@domain/coach/callPlacement`.
-      const callMotif = motifOf(cue)
-      const callClip = findClickScript(`call/${callMotif}`, vocabulary)
-      const rep0Call = callClip
+      const call = findCallClip(motifOf(cue.tokens), vocabulary, discipline)
+      const rep0Call = call
         ? callDispatchAtMs({
             cue,
             scheduledStartMs: cue.scheduledStartMs,
             vocabulary,
-            slot: `call/${callMotif}`,
-            clipDurationMs: callClip.durationMs,
+            slot: call.slot,
+            clipDurationMs: call.clip.durationMs,
           })
         : undefined
       const { dispatchAtMs: expectedStartMs } = leadInDispatchAtMs({
@@ -369,9 +368,9 @@ export function buildFirstRoundManifest(
       .filter((e) => e.kind === 'lead-in')
       .map((e) => ({ start: e.expectedStartMs - 500, end: e.expectedStartMs + e.durationMs }))
     for (const cue of round0.cues) {
-      const motif = motifOf(cue)
-      const clip = findClickScript(`call/${motif}`, vocabulary)
-      if (!clip) continue
+      const call = findCallClip(motifOf(cue.tokens), vocabulary, discipline)
+      if (!call) continue
+      const { clip } = call
       // Rep-0 bars are CALLED since W3 (mid-round sections) and Variant B
       // (the round opener rides its authored setupMeasures pad,
       // 2026-09-04). They are firstRep entries in the runner — exempt

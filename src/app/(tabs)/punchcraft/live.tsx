@@ -47,6 +47,7 @@ import { fonts, sizes, weights } from '@/theme/typography'
 import { nextRoundPreview } from '@domain/session/restPhases'
 import { systemMonotonicClock } from '@domain/time/MonotonicClock'
 import { getSampleWorkout } from '@domain/workout/samples'
+import { disciplineOf } from '@domain/workout/discipline'
 import { coachPathOf } from '@domain/workout/GeneratedWorkout'
 import { generateWorkout } from '@domain/workout/generateWorkout'
 import {
@@ -894,6 +895,7 @@ export default function LiveScreen(): React.JSX.Element {
               {...(cues.freeWork ? { idleLabel: 'Free work — keep your hands moving' } : {})}
               reducedMotion={reducedMotion}
               avatarAnchor={avatarAnchor}
+              discipline={disciplineOf(workout)}
               workClock={workClock}
               {...(cues.walkPlan ? { walkPlan: cues.walkPlan } : {})}
             />

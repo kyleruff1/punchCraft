@@ -43,6 +43,7 @@ import { roundStartTicksFrom, scoreTickAt } from '@domain/programs/scoreClock'
 import type { RoundWalkPlan } from '@/components/workout/useRingBeatClock'
 import { type SharedWorkClock } from '@domain/timing/SharedWorkClock'
 import { instructionClipFor } from '@audio/voiceAssets/instructionManifest'
+import { findCallClip } from '@audio/voiceAssets/callClips'
 import { findClickScript } from '@audio/voiceAssets/clickScriptManifest'
 import {
   avatarTargetIndex,
@@ -56,6 +57,7 @@ import { asWorkElapsedMs, type WorkElapsedMs } from '@domain/time/clockDomains'
 import { systemMonotonicClock, type MonotonicClock } from '@domain/time/MonotonicClock'
 import { WorkoutSessionClock, type SessionTransition } from '@domain/session/WorkoutSessionClock'
 import { RoundResultFreeze } from '@domain/session/restPhases'
+import { disciplineOf } from '@domain/workout/discipline'
 import { coachPathOf, type GeneratedWorkout } from '@domain/workout/GeneratedWorkout'
 import type { PunchEventSource } from '@domain/punch/PunchEventSource'
 import type { TrackerPunchEvent } from '@domain/punch/PunchEvent'
@@ -66,6 +68,7 @@ import type { TokenVisualState } from '@components/workout/tokenVisuals'
 import type { CueView } from '@components/workout/CueStage'
 import { logger, safe } from '@diagnostics/logger'
 import { VizForensics, type VizRecord } from '@diagnostics/vizForensics'
+import { motifOf } from '@domain/coach/callSlot'
 import { CueAnnouncer, deliveryForCadence } from '@domain/coach/CueAnnouncer'
 import { selectPerformanceState } from '@domain/coach/performanceState'
 import { AUDIO_PRIORITY, type VoiceOutputPort } from '@domain/coach/VoiceOutputPort'
@@ -686,6 +689,9 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
   const clickVocabularyRef = useRef<'numbers' | 'techniques'>(
     voice?.policy.vocabulary === 'names' ? 'techniques' : 'numbers',
   )
+  // A string, so the callback below depends on a value and not on the
+  // workout object's identity.
+  const discipline = disciplineOf(workout)
   const buildLeadInSchedule = useCallback(
     (roundIndex: number): void => {
       const vocabulary = clickVocabularyRef.current
@@ -704,12 +710,12 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
       // section's rep-0 call so the collision filter leaves it beside its
       // lead-in.
       const buildCall = (cue: CueInstance, firstRep: boolean): Entry | null => {
-        const motif = cue.tokens
-          .map((t) => (t.kind === 'punch' ? `${t.number}${t.body ? 'b' : ''}` : '.'))
-          .join('-')
-        const slot = `call/${motif}`
-        const clip = findClickScript(slot, vocabulary)
-        if (!clip) return null
+        // The key and the lookup are shared with the verifier's manifest
+        // generator (`callSlot.ts`, `callClips.ts`), so the two cannot
+        // disagree about which clip a bar is called with.
+        const found = findCallClip(motifOf(cue.tokens), vocabulary, discipline)
+        if (!found) return null
+        const { slot, clip } = found
         // The placement itself lives in the domain (`callPlacement`) so the
         // manifest generator computes the identical number instead of its own.
         const { dispatchAtMs, firstNodeMs, breathMs } = callDispatchAtMs({
@@ -822,7 +828,7 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
         bpm,
       )
     },
-    [workout.id, voice, bpm],
+    [workout.id, voice, bpm, discipline],
   )
   /**
    * Round-scoped audible-metronome schedule (W2, Kyle 2026-09-04 "roll

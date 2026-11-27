@@ -583,3 +583,19 @@ describe('PunchAvatarCard — under the live re-render cadence', () => {
     expect(sawStrike).toBe(true)
   })
 })
+
+describe('the card, by discipline (`avatarFrames.ts`)', () => {
+  const jab = cue([{ kind: 'punch', number: 1, body: false, beatOffset: 0 }], {
+    tokenOffsetsMs: [0],
+  } as Partial<CueInstance>)
+
+  it("shows boxing's frames when no discipline is given", () => {
+    const frames = requestedFor(jab, 0, 0)?.frames
+    expect(frames).toBeDefined()
+    expect(requestedFor(jab, 0, 0, 'boxing')?.frames).toBe(frames)
+  })
+
+  it('stays in guard for a discipline with no art of its own', () => {
+    expect(requestedFor(jab, 0, 0, 'reaction')).toBeNull()
+  })
+})
