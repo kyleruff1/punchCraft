@@ -70,6 +70,7 @@ describe('create / getById', () => {
       leftCalibrationId: 'cal-left-1',
       rightCalibrationId: 'cal-right-1',
       notes: 'first real run',
+      liveCountsJson: '{"v":1,"total":12}',
     })
 
     expect(repo.getById('s1')).toEqual(created)
@@ -95,6 +96,8 @@ describe('create / getById', () => {
         malformedEvents: 0,
       },
       createdAt: expect.any(String),
+      // Stored as given; `parseLiveCounts` is what checks it.
+      liveCountsJson: '{"v":1,"total":12}',
     })
   })
 

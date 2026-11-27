@@ -134,6 +134,15 @@ describe('RoundResultFreeze — the numbers stop at the bell', () => {
     expect(freeze.isOpen).toBe(false)
   })
 
+  it('says which round is open — so a workout that ends inside one can close it', () => {
+    const freeze = new RoundResultFreeze()
+    expect(freeze.openRoundIndex).toBeUndefined()
+    freeze.beginRound(2)
+    expect(freeze.openRoundIndex).toBe(2)
+    freeze.freeze(10)
+    expect(freeze.openRoundIndex).toBeUndefined()
+  })
+
   it('cannot be frozen twice, so a duplicate bell keeps the first result', () => {
     const freeze = openRound()
     freeze.observePunch({ hand: 'left' })

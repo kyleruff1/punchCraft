@@ -56,7 +56,12 @@ import { resolveCapabilityTier, sequenceScoreLabel } from '@domain/workout/capab
 import { asWorkElapsedMs, type WorkElapsedMs } from '@domain/time/clockDomains'
 import { systemMonotonicClock, type MonotonicClock } from '@domain/time/MonotonicClock'
 import { WorkoutSessionClock, type SessionTransition } from '@domain/session/WorkoutSessionClock'
-import { RoundResultFreeze } from '@domain/session/restPhases'
+import { RoundResultFreeze, type FrozenRoundResult } from '@domain/session/restPhases'
+import {
+  LIVE_COUNTS_VERSION,
+  type LiveCounts,
+  type LiveRoundCount,
+} from '@domain/programs/liveCounts'
 import { disciplineOf } from '@domain/workout/discipline'
 import { coachPathOf, type GeneratedWorkout } from '@domain/workout/GeneratedWorkout'
 import type { PunchEventSource } from '@domain/punch/PunchEventSource'
@@ -224,6 +229,17 @@ export const STORE_THROTTLE_MS = 250
  * more than needed even at flurry cadence.
  */
 export const RECENT_EVENT_WINDOW = 256
+
+/** What of a frozen round is kept with the saved session (`liveCounts.ts`). */
+function roundCountOf(frozen: FrozenRoundResult): LiveRoundCount {
+  return {
+    roundIndex: frozen.roundIndex,
+    actual: frozen.actual,
+    target: frozen.target,
+    left: frozen.left,
+    right: frozen.right,
+  }
+}
 
 /**
  * `SessionTransition` → `SessionPhaseEvent`.
@@ -940,6 +956,8 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
    * cannot answer "what did this round do".
    */
   const freezeRef = useRef<RoundResultFreeze>(new RoundResultFreeze())
+  /** Each round's count as its bell card showed it — saved with the session. */
+  const roundCountsRef = useRef<LiveRoundCount[]>([])
 
   const capability = useMemo(
     () => resolveCapabilityTier({ capability: source.capability }),
@@ -1469,6 +1487,28 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
 
       try {
         const repos = persistence ?? getWorkoutPersistence()
+        // The round in progress when the workout ended — the last round of a
+        // finished workout, or the one the athlete stopped in — has had no
+        // bell to freeze it. Close it here so its count is kept too.
+        const openRound = freezeRef.current.openRoundIndex
+        if (openRound !== undefined) {
+          const last = freezeRef.current.freeze(workout.schedule[openRound]?.targetPunches ?? 0)
+          if (last) roundCountsRef.current.push(roundCountOf(last))
+        }
+        // What the athlete saw on the counter. The cue results below cover
+        // only punches that answered a called combination; burst output,
+        // extras and the per-round totals exist nowhere else once this
+        // returns (migration 009).
+        const liveCounts: LiveCounts = {
+          v: LIVE_COUNTS_VERSION,
+          total: countsRef.current.total,
+          left: countsRef.current.left,
+          right: countsRef.current.right,
+          extra: extrasRef.current,
+          adaptations: adaptationsRef.current.length,
+          source: source.id === 'sim' ? 'simulated' : 'tracker',
+          rounds: roundCountsRef.current,
+        }
         const session = persistWorkoutSession({
           db: repos.db,
           sessions: repos.sessions,
@@ -1485,6 +1525,7 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
           // Work time only — rests and pauses are not the workout.
           activeDurationMs: Math.round(activeElapsedSecondsRef.current * 1000),
           cancelled,
+          liveCounts,
         })
         writtenSessionRef.current = { sessionId: session.sessionId, sessions: repos.sessions }
         report({ status: 'persisted', cancelled, session })
@@ -1496,7 +1537,7 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
         report({ status: 'failed', cancelled, error })
       }
     },
-    [clock, onSessionEnded, persistence, workout],
+    [clock, onSessionEnded, persistence, source.id, workout],
   )
 
   const applyTransitions = useCallback(
@@ -1644,7 +1685,10 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
             // punches reach a closed accumulator and change nothing (doc §23).
             const target = workout.schedule[transition.roundIndex]?.targetPunches ?? 0
             const frozen = freezeRef.current.freeze(target)
-            if (frozen) setLive({ frozenRoundResult: frozen })
+            if (frozen) {
+              roundCountsRef.current.push(roundCountOf(frozen))
+              setLive({ frozenRoundResult: frozen })
+            }
 
             engine.onSessionPhase({ type: 'rest-entered', nowMs: clock.now() })
             stopMetronome()

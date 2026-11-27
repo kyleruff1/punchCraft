@@ -61,6 +61,12 @@ export interface SessionRow {
   notes: string | null
   quality: SessionQualityCounters
   createdAt: string
+  /**
+   * What the live screen counted, as stored (migration 009). Null on a
+   * session saved before that column existed. Read it through
+   * `parseLiveCounts` — it is JSON, and is checked there.
+   */
+  liveCountsJson: string | null
 }
 
 export interface SessionCreateInput {
@@ -77,6 +83,7 @@ export interface SessionCreateInput {
   leftCalibrationId?: string | null
   rightCalibrationId?: string | null
   notes?: string | null
+  liveCountsJson?: string | null
 }
 
 export interface SessionEndInput {
@@ -229,6 +236,7 @@ interface RawSession {
   unmatched_events: number
   malformed_events: number
   created_at: string
+  live_counts_json: string | null
 }
 
 function mapSession(r: RawSession): SessionRow {
@@ -254,6 +262,7 @@ function mapSession(r: RawSession): SessionRow {
       malformedEvents: r.malformed_events,
     },
     createdAt: r.created_at,
+    liveCountsJson: r.live_counts_json ?? null,
   }
 }
 
@@ -423,8 +432,8 @@ export class SessionRepository {
       `INSERT INTO sessions
          (id, mode, status, started_at, ended_at, started_monotonic_ms, ended_monotonic_ms,
           active_duration_ms, timer_config_json, generated_workout_id, spotify_playlist_id,
-          left_calibration_id, right_calibration_id, notes, created_at)
-       VALUES (?, ?, ?, ?, NULL, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          left_calibration_id, right_calibration_id, notes, created_at, live_counts_json)
+       VALUES (?, ?, ?, ?, NULL, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         input.mode,
@@ -439,6 +448,7 @@ export class SessionRepository {
         input.rightCalibrationId ?? null,
         input.notes ?? null,
         createdAt,
+        input.liveCountsJson ?? null,
       ],
     )
     logger.info('storage.session.create', 'session created', {

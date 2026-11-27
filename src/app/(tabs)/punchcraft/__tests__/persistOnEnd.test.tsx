@@ -35,6 +35,7 @@ import type { GeneratedWorkout } from '@domain/workout/GeneratedWorkout'
 import type { PunchEventSource } from '@domain/punch/PunchEventSource'
 import type { TrackerPunchEvent, PunchHand } from '@domain/punch/PunchEvent'
 import type { ProgramRound } from '@domain/workout/WorkoutTokens'
+import { parseLiveCounts, type LiveCounts } from '@domain/programs/liveCounts'
 
 const WORK_MS = 2_000
 const REST_MS = 1_000
@@ -80,7 +81,6 @@ const WORKOUT: GeneratedWorkout = {
 }
 
 class FakeSource implements PunchEventSource {
-  readonly id = 'fake'
   readonly capability = {
     hand: true,
     timestamp: true,
@@ -90,7 +90,11 @@ class FakeSource implements PunchEventSource {
   private listeners: Array<(event: TrackerPunchEvent) => void> = []
   private seq = 0
 
-  constructor(private readonly clock: FakeClock) {}
+  constructor(
+    private readonly clock: FakeClock,
+    /** `sim` is how the runner knows punches were simulated. */
+    readonly id: string = 'fake',
+  ) {}
 
   subscribe(listener: (event: TrackerPunchEvent) => void): () => void {
     this.listeners.push(listener)
@@ -149,9 +153,9 @@ interface Harness {
   unmount(): void
 }
 
-function mount(persistence: WorkoutPersistence | null): Harness {
+function mount(persistence: WorkoutPersistence | null, sourceId?: string): Harness {
   const clock = createFakeClock()
-  const source = new FakeSource(clock)
+  const source = new FakeSource(clock, sourceId)
   const ref = React.createRef<WorkoutRunner>()
   const outcomes: SessionEndOutcome[] = []
   const onSessionEnded = (outcome: SessionEndOutcome): void => {
@@ -628,6 +632,95 @@ describe('discarding a stopped session', () => {
       h.runner.emergencyStop()
     })
     expect(h.runner.discardSession()).toBe(false)
+    h.unmount()
+  })
+})
+
+describe('what the live screen counted is kept with the session (migration 009)', () => {
+  // A saved session used to keep only the punches that answered a called
+  // combination. Everything else on the counter — and every bell card — was
+  // gone the moment the workout ended.
+  const countsOf = (p: TestPersistence, h: Harness): LiveCounts => {
+    const outcome = h.outcomes[0]
+    if (outcome?.status !== 'persisted') throw new Error('expected a persisted session')
+    const counts = parseLiveCounts(p.sessions.getById(outcome.session.sessionId)?.liveCountsJson)
+    if (!counts) throw new Error('no live counts were stored, or they did not parse')
+    return counts
+  }
+
+  it('stores the total the athlete saw, the split, and each round as its bell showed it', () => {
+    const p = realPersistence()
+    const h = mount(p)
+    h.begin()
+    h.emit('left')
+    h.emit('right')
+    h.emit('left')
+    h.step(WORK_MS)
+    // In the rest: it counts toward the session, as it always has, and
+    // belongs to no round.
+    h.emit('right')
+    h.step(REST_MS)
+    h.emit('left')
+    h.step(WORK_MS + TICK_INTERVAL_MS * 4)
+
+    const counts = countsOf(p, h)
+    expect(counts).toMatchObject({ total: 5, left: 3, right: 2, source: 'tracker', adaptations: 0 })
+    expect(counts.total).toBe(useLiveStore.getState().live.counts.total)
+    expect(counts.rounds.map((r) => [r.roundIndex, r.actual])).toEqual([
+      [0, 3],
+      // The last round has no bell after it; it is closed when the workout is.
+      [1, 1],
+    ])
+    for (const round of counts.rounds) {
+      expect(round.target).toBe(WORKOUT.schedule[round.roundIndex]?.targetPunches)
+    }
+    h.unmount()
+  })
+
+  it('keeps the round a stopped workout was in, and no round it never reached', () => {
+    const p = realPersistence()
+    const h = mount(p)
+    h.begin()
+    h.emit('left')
+    h.emit('left')
+    h.step(500)
+    act(() => {
+      h.runner.emergencyStop()
+    })
+
+    const counts = countsOf(p, h)
+    expect(counts.total).toBe(2)
+    expect(counts.rounds).toEqual([expect.objectContaining({ roundIndex: 0, actual: 2, left: 2 })])
+    h.unmount()
+  })
+
+  it('says so when the punches were simulated', () => {
+    const p = realPersistence()
+    const h = mount(p, 'sim')
+    runToEnd(h)
+    expect(countsOf(p, h).source).toBe('simulated')
+    h.unmount()
+  })
+
+  it('counts the punches the cue results do not — that is the point', () => {
+    const p = realPersistence()
+    const h = mount(p)
+    h.begin()
+    for (let i = 0; i < 12; i += 1) h.emit(i % 2 === 0 ? 'left' : 'right')
+    h.step(WORK_MS + REST_MS + WORK_MS + TICK_INTERVAL_MS * 4)
+
+    const counts = countsOf(p, h)
+    const landedRows = (
+      p.raw
+        .prepare(
+          "SELECT COUNT(*) AS n FROM cue_results WHERE outcome IN ('matched','hand-mismatch','type-mismatch','late')",
+        )
+        .get() as { n: number }
+    ).n
+    expect(counts.total).toBe(12)
+    // Twelve punches in a burst cannot all answer an expectation.
+    expect(landedRows).toBeLessThan(12)
+    expect(counts.extra).toBeGreaterThan(0)
     h.unmount()
   })
 })
