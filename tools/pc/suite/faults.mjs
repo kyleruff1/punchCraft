@@ -11,6 +11,7 @@
 //   npm run pc:suite -- --only quick-one-two --fault late    a call that starts late and runs into its ring
 //
 //   npm run pc:suite -- --only quick-one-two --fault mute-bell   every bell rung in silence
+//   npm run pc:suite -- --only quick-one-two --fault cut-countdown   each countdown clip stopped half a second in
 //
 // The first three touch every fourth play of a call: a short clip on a
 // reused player, played from a downloaded copy — which is how a call is told
@@ -18,7 +19,7 @@
 // the sound tap, so that the tap still reports the play at the moment the
 // app asked for it and the fault sits between that and the real `play()`.
 
-export const FAULTS = ['mute', 'cut', 'late', 'mute-bell']
+export const FAULTS = ['mute', 'cut', 'late', 'mute-bell', 'cut-countdown']
 
 /** A clip shorter than this is a call; lead-ins run to several seconds. */
 export const CALL_MAX_SEC = 2
@@ -60,6 +61,13 @@ export function installFault(scope, kind, how) {
     if (kind === 'mute-bell') {
       // The build's own file, by name.
       if (/\/bell\.[^/]*$/.test(source)) this.muted = true
+      return nativePlay.apply(this, args)
+    }
+    if (kind === 'cut-countdown') {
+      // The countdown's own clips, by name. A stopped clip never ends, so
+      // the app's playlist never starts the next one either.
+      if (/\/warn-[^/]*$/.test(source))
+        scope.setTimeout(() => nativePause.call(this), how.cutAfterMs)
       return nativePlay.apply(this, args)
     }
     const call =

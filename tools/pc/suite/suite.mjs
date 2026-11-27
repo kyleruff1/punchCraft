@@ -232,7 +232,7 @@ export function renderSummary(rows, meta) {
   const L = [
     `# PC suite — ${meta.suiteId}`,
     '',
-    `checkout ${meta.hostSha} · ${meta.args.full ? 'whole workouts' : 'round 1'} · ${meta.args.jobs ?? 1} at a time · simulated punches: ${meta.args.sim} · sound ${meta.args.sound ? `gate: ${meta.args.soundGate}` : 'not listened to'} · ${path.basename(meta.browser)}`,
+    `checkout ${meta.hostSha} · ${meta.args.full ? 'whole workouts' : 'round 1 and its rest'} · ${meta.args.jobs ?? 1} at a time · simulated punches: ${meta.args.sim} · sound ${meta.args.sound ? `gate: ${meta.args.soundGate}` : 'not listened to'} · ${path.basename(meta.browser)}`,
     '',
     ...(meta.args.fault
       ? [
@@ -318,7 +318,9 @@ async function runJob({ job, args, executable, baseUrl, suiteId, suiteDir, hostS
   const dir = path.join(suiteDir, job.dirName)
   const manifestPath = path.join(MANIFESTS_DIR, job.manifestFile)
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
-  const budget = budgetMs(manifest, { firstRoundOnly: !args.full })
+  // A round-1 run goes on through the rest that follows, to the next bell.
+  const firstRest = args.full ? 0 : (manifest.scheduleMs?.[0]?.restMs ?? 0)
+  const budget = budgetMs(manifest, { firstRoundOnly: !args.full }) + firstRest
   const nonce = `pc-${suiteId}-${job.dirName}`
   // Several drives run at once, so a drive's lines are kept and printed
   // together when it is done; only its start is announced as it happens.
@@ -467,7 +469,7 @@ async function main() {
   const served = await serveWebApp({ port: 0 })
   args.jobs ??= defaultJobs()
   console.info(
-    `PC suite ${suiteId}: ${jobs.length} drive(s), ${args.full ? 'whole workouts' : 'round 1'}, ${args.jobs} at a time → ${suiteDir}`,
+    `PC suite ${suiteId}: ${jobs.length} drive(s), ${args.full ? 'whole workouts' : 'round 1 and its rest'}, ${args.jobs} at a time → ${suiteDir}`,
   )
   let rows
   try {

@@ -68,6 +68,7 @@ export const APP_STOP_WINDOW_MS = 100
 /**
  * Why a play stopped.
  *
+ * - `failed` — its element reported a media error: it could not play;
  * - `ended` — it reached its own end, to within the allowance;
  * - `app-stopped` — short of its end, at a moment the app logged stopping it;
  * - `run-ended` — it had not stopped when the capture did;
@@ -75,12 +76,14 @@ export const APP_STOP_WINDOW_MS = 100
  * - `unknown` — it stopped, and its length or position was never reported;
  * - `unexplained` — short of its end, and nothing in the log says why.
  *
- * Only the last two of the short ones are a clip being cut.
+ * A failed clip never played. Of the ones that stopped short, only
+ * `replayed` and `unexplained` are a clip being cut.
  *
  * @param {import('./sound.mjs').ElementPlay} play
  * @param {{ appStops: number[], truncationMs: number }} context
  */
 export function stopReasonOf(play, { appStops, truncationMs }) {
+  if (play.error) return 'failed'
   if (play.stoppedBy === null) return 'run-ended'
   const known = play.durationMs !== null && play.stoppedPositionMs !== null
   if (known && play.durationMs - play.stoppedPositionMs <= truncationMs) return 'ended'

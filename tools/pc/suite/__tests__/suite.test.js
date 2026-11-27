@@ -13,7 +13,8 @@ const record = (code, fields = {}) => ({
   level: 'info',
   args: [`[INFO] ${code}`, 'message', fields],
 })
-const boundary = (transition) => record('workout.round.boundary', { transition, roundIndex: 0 })
+const boundary = (transition, roundIndex = 0) =>
+  record('workout.round.boundary', { transition, roundIndex })
 const staged = (fields = {}) =>
   record('workout.qa.run', { nonce: 'n-1', gitSha: 'abc1234', platform: 'web', ...fields })
 const aRound = [
@@ -22,6 +23,7 @@ const aRound = [
   boundary('countdown-entered'),
   boundary('work-entered'),
   boundary('rest-entered'),
+  boundary('work-entered', 1),
 ]
 
 describe('driveState', () => {
@@ -39,7 +41,9 @@ describe('driveState', () => {
       ended: null,
     })
     expect(driveState(aRound.slice(0, 4))).toMatchObject({ workEntered: true, ended: null })
-    expect(driveState(aRound)).toMatchObject({ ended: 'rest-entered', staged: { nonce: 'n-1' } })
+    // The end of round 1 is not the end of the run: the rest after it is in it.
+    expect(driveState(aRound.slice(0, 5)).ended).toBeNull()
+    expect(driveState(aRound)).toMatchObject({ ended: 'work-entered', staged: { nonce: 'n-1' } })
   })
 
   it('does not stop a whole workout at its first rest', () => {
@@ -51,7 +55,9 @@ describe('driveState', () => {
 
   it('ends on a stop as well as on a bell, and keeps the first ending it saw', () => {
     expect(driveState([...aRound.slice(0, 4), boundary('cancelled')]).ended).toBe('cancelled')
-    expect(driveState([...aRound, boundary('completed')]).ended).toBe('rest-entered')
+    expect(driveState([...aRound, boundary('completed', 1)]).ended).toBe('work-entered')
+    // A one-round workout has no second bell; it completes.
+    expect(driveState([...aRound.slice(0, 4), boundary('completed')]).ended).toBe('completed')
   })
 
   it('says why a link was refused', () => {
@@ -188,7 +194,7 @@ describe('driveVerdict', () => {
   const drive = (over = {}) => ({
     records: aRound,
     problems: [],
-    ended: 'rest-entered',
+    ended: 'work-entered',
     reason: null,
     staged: { nonce: 'n-1', gitSha: 'abc1234' },
     visibility: 'visible',
@@ -320,9 +326,9 @@ describe('renderSummary', () => {
       '| quick-one-two | numbers | PASS | matched=3 extras=0 reanchor=0 | 0 | — | — | — | 36 / 44 | 39.7 / 45.3 | 4:42 |',
     )
     expect(md).toContain('- **body-work** (numbers): 1 error(s) on the page: x')
-    expect(md).toContain('round 1 · 1 at a time · simulated punches: captured-jam')
+    expect(md).toContain('round 1 and its rest · 1 at a time · simulated punches: captured-jam')
     const six = renderSummary([row()], { ...meta, args: { ...meta.args, jobs: 6 } })
-    expect(six).toContain('round 1 · 6 at a time ·')
+    expect(six).toContain('round 1 and its rest · 6 at a time ·')
   })
 
   it('shows what was heard: clips, losses, and the tightest and the usual gap before a ring', () => {

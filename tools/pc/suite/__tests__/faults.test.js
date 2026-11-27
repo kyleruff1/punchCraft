@@ -162,6 +162,23 @@ describe('which clips a fault touches', () => {
   })
 })
 
+describe('cut-countdown', () => {
+  it('stops each countdown clip part-way, and nothing else', () => {
+    const page = fakePage()
+    installFault(page.scope, 'cut-countdown', HOW)
+    const opener = new page.FakeElement(2.6, 'http://127.0.0.1/assets/audio/warn-opener-15.abc.wav')
+    const call = page.call()
+    const bell = new page.FakeElement(1.18, 'http://127.0.0.1/assets/audio/bell.abc.wav')
+    opener.play()
+    for (let i = 0; i < 8; i += 1) call.play()
+    bell.play()
+    expect(page.timers).toEqual([{ fn: expect.any(Function), ms: CUT_AFTER_MS }])
+    page.timers[0].fn()
+    expect(opener.paused).toBe(1)
+    expect(call.paused + bell.paused).toBe(0)
+  })
+})
+
 describe('faultSource', () => {
   it('is text that runs in a page, for each fault', () => {
     for (const kind of FAULTS) {
@@ -172,7 +189,7 @@ describe('faultSource', () => {
   })
   it('refuses a fault it does not have', () => {
     expect(() => faultSource('explode')).toThrow(
-      /a fault is one of mute, cut, late, mute-bell, not explode/,
+      /a fault is one of mute, cut, late, mute-bell, cut-countdown, not explode/,
     )
   })
 })

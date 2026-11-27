@@ -7,7 +7,14 @@
 // modelled: how long before its ring a call stopped sounding.
 import { fitWorkAxis, roundWindows } from '../../analysis/observed-timing.mjs'
 import { fieldsOf, recordsOf } from './capture.mjs'
-import { bellsAt, isCut, isSilent, namedClips } from './ceremonies.mjs'
+import {
+  bellsAt,
+  ceremoniesOf,
+  ceremonyFindings,
+  isCut,
+  isSilent,
+  namedClips,
+} from './ceremonies.mjs'
 import { appStopTimes, clipKind, stopReasonOf } from './plays.mjs'
 import { spread } from './stats.mjs'
 
@@ -24,6 +31,7 @@ import { spread } from './stats.mjs'
  * @property {string | null} stoppedBy `pause`, `ended`, `emptied`, or `replayed` — whichever came first
  * @property {number | null} stoppedAtMs
  * @property {number | null} stoppedPositionMs where the element's playhead was when it stopped
+ * @property {string | null} error the media error the element reported while playing it, if it did
  */
 
 /**
@@ -64,6 +72,7 @@ export function playsFrom(events) {
         stoppedBy: null,
         stoppedAtMs: null,
         stoppedPositionMs: null,
+        error: null,
       }
       // Played again before it had stopped: this play's position, taken
       // before the element restarts, is where the last one was cut off.
@@ -81,6 +90,9 @@ export function playsFrom(events) {
     if (event.type === 'playing') {
       play.playingAtMs ??= event.atMs
       play.durationMs ??= event.durationMs ?? null
+    } else if (event.type === 'error') {
+      // The element's own word that it could not play: a media error.
+      play.error ??= event.error ?? 'a media error'
     } else if (event.type === 'sound-start') {
       play.sound.push({ startMs: event.atMs, endMs: null, peak: null })
     } else if (event.type === 'sound-end') {
@@ -303,6 +315,12 @@ export function soundReport(records, events, { floorMs, truncationMs }) {
   const place = (b) => ({ transition: b.transition, roundIndex: b.roundIndex })
   const otherNamed = named.filter((clip) => clip.asset !== 'bell')
   const nameOf = (clip) => ({ asset: clip.asset, stoppedShortMs: round1(clip.stoppedShortMs) })
+  // The intro, each countdown and each rest line: several clips back to back.
+  const ceremonies = ceremonyFindings(
+    ceremoniesOf(records, plays, { claimed, appStops, truncationMs }),
+    boundaries,
+    truncationMs,
+  )
   // Everything else the page played. An element that never had a source is
   // not a play of anything.
   const others = plays.filter((play) => !claimed.has(play) && play.kind !== 'phantom')
@@ -369,6 +387,16 @@ export function soundReport(records, events, { floorMs, truncationMs }) {
       /** First sound after the boundary it marks. Reported, not judged. */
       afterBoundary: spread(boundaries.map((b) => b.soundsAfterMs)),
     },
+    /** The intro, the countdowns and the rest lines (`ceremonyFindings`). */
+    ceremonies: {
+      found: ceremonies.found,
+      broken: ceremonies.broken,
+      cutByApp: ceremonies.cutByApp,
+      talkedOver: ceremonies.talkedOver,
+      mixedVolumes: ceremonies.mixedVolumes,
+      /** A countdown's last word to the first sound of its bell. Reported, not judged. */
+      countdownToBell: spread(ceremonies.countdownToBellMs),
+    },
     /** The other clips the app plays by name: lead-ins it speaks from a file, and the like. */
     named: {
       played: otherNamed.length,
@@ -409,6 +437,11 @@ export function renderSoundReport(report, title) {
     '',
     `calls and lead-ins: ${clips.played} played · ${clips.heard} heard · ${clips.silent.length} silent · ${clips.cutShort.length} cut short · ${clips.ducked} ducked on purpose · ${clips.unfinished} still sounding when the capture stopped`,
     `bells: ${report.bells.rung} of ${report.bells.expected} round boundaries rung · ${report.bells.silent.length} silent · ${report.bells.cutShort.length} cut · first sound ${cell(report.bells.afterBoundary.medianMs)} ms after the boundary (most ${cell(report.bells.afterBoundary.maxMs)})`,
+    `intro, countdowns and rest lines: ${
+      Object.entries(report.ceremonies.found)
+        .map(([kind, n]) => `${n} ${kind}`)
+        .join(', ') || 'none'
+    } · ${report.ceremonies.broken.length} did not play whole · ${report.ceremonies.cutByApp.length} cut off by the app · countdown’s last word → bell ${cell(report.ceremonies.countdownToBell.medianMs)} ms (least ${cell(report.ceremonies.countdownToBell.minMs)})`,
     `clips played by name: ${report.named.played} played · ${report.named.heard} heard · ${report.named.silent.length} silent · ${report.named.cutShort.length} cut`,
     `other plays: ${report.otherPlays}${
       report.otherPlays > 0
@@ -543,6 +576,31 @@ export function soundVerdict(report, { floorRatio }) {
     hard.push(
       `${byName.cutShort.length} named clip(s) were stopped before their end — first: ${c.asset}, ${c.stoppedShortMs} ms left unplayed`,
     )
+  }
+  const { broken, cutByApp, talkedOver, mixedVolumes } = report.ceremonies
+  if (broken.length > 0) {
+    hard.push(
+      `${broken.length} ceremony(ies) did not play as the app said — first: ${broken[0].label}: ${broken[0].why}`,
+    )
+  }
+  for (const cut of cutByApp) {
+    const lost =
+      cut.clipsUnreached > 0
+        ? `${cut.clipsUnreached} of its clips never started`
+        : `${cut.unplayedMs} ms of it was never heard`
+    const how =
+      cut.name === 'countdown'
+        ? 'the bell cut the'
+        : cut.name === 'intro'
+          ? 'the round began over the'
+          : 'the rest ended over the'
+    soft.push(`${how} ${cut.label}: ${lost}`)
+  }
+  for (const over of talkedOver) {
+    soft.push(`the rest line was still sounding ${over.overlapMs} ms into ${over.label}`)
+  }
+  for (const mixed of mixedVolumes) {
+    soft.push(`${mixed.label} played its clips at different volumes (${mixed.volumes.join(', ')})`)
   }
   const { pastRing, underFloor, underFloorRatio, n, floorMs, breath } = report.calls
   if (pastRing.length > 0) {

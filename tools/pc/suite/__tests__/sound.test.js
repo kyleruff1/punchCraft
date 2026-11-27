@@ -677,3 +677,62 @@ describe('bells', () => {
     ])
   })
 })
+
+describe('the intro, the countdown and the rest line in the verdict', () => {
+  const ready = { type: 'tap-ready', atMs: 1, state: 'running', sampleRate: 48_000 }
+  const HASH = '0123456789abcdef0123456789abcdef'
+  const said = (code, message, fields, monoMs) => ({
+    wallMs: 0,
+    monoMs,
+    level: 'info',
+    args: [`[INFO] ${code}`, message, fields],
+  })
+  const clip = (id, name, atMs, durationMs, stoppedAt = durationMs) => [
+    { id, type: 'play', atMs, src: `${name}.${HASH}.wav`, volume: 1, positionMs: 0, durationMs },
+    { id, type: 'sound-start', atMs: atMs + 70 },
+    { id, type: 'sound-end', atMs: atMs + stoppedAt - 20, peak: 0.4 },
+    { id, type: 'pause', atMs: atMs + stoppedAt, positionMs: stoppedAt, durationMs },
+  ]
+  const countdown = (tracks) => [
+    said('workout.warn', 'round warning prepared', { tracks }, 100_000),
+    said('workout.warn', 'round warning playing', {}, 142_603),
+  ]
+  const judged = (records, events) =>
+    soundVerdict(
+      soundReport(
+        [...round, bellRecord, ...call(2_600), ...records],
+        [ready, ...bellEvents, ...played(7, SENT + 1), ...events],
+        LIMITS,
+      ),
+      { floorRatio: 0.02 },
+    )
+
+  it('passes a countdown that played whole', () => {
+    expect(judged(countdown(1), clip(60, 'warn-round-2', 142_603, 5_419))).toEqual({
+      verdict: 'PASS',
+      hard: [],
+      soft: [],
+    })
+  })
+
+  it('fails one that did not play as the app said it would', () => {
+    const v = judged(countdown(3), clip(60, 'warn-opener-08', 142_603, 2_261))
+    expect(v.verdict).toBe('FAIL')
+    expect(v.hard).toEqual([
+      '1 ceremony(ies) did not play as the app said — first: countdown 1: 1 of its 3 clips played: nothing followed warn-opener-08',
+    ])
+  })
+
+  it('warns, and no more, when the bell cut the countdown', () => {
+    const cut = clip(60, 'warn-round-2', 142_603, 5_419, 4_000)
+    const v = judged(
+      [...countdown(1), said('workout.warn', 'round warning stopped', {}, 146_605)],
+      cut,
+    )
+    expect(v).toEqual({
+      verdict: 'WARN',
+      hard: [],
+      soft: ['the bell cut the countdown 1: 1419 ms of it was never heard'],
+    })
+  })
+})
