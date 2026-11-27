@@ -371,6 +371,13 @@ export function soundReport(records, events, { floorMs, truncationMs }) {
       underFloorRatio:
         calls.length === 0 ? 0 : Math.round((underFloor.length / calls.length) * 1000) / 1000,
       pastRing: calls.filter((c) => c.breathMs <= 0).map(brief),
+      /** The same gap, round by round: `[{ roundIndex, n, minMs, medianMs, … }]`. */
+      byRound: [...new Set(calls.map((c) => c.roundIndex))]
+        .sort((a, b) => a - b)
+        .map((roundIndex) => ({
+          roundIndex,
+          ...spread(calls.filter((c) => c.roundIndex === roundIndex).map((c) => c.breathMs)),
+        })),
       tightest: [...calls]
         .sort((a, b) => a.breathMs - b.breathMs)
         .slice(0, 5)
@@ -460,6 +467,12 @@ export function renderSoundReport(report, title) {
     row('first sound after its scheduled send', start.afterSchedule),
     row('heard length − stated length', length.heardMinusStated),
     '',
+    ...(calls.byRound.length > 1
+      ? [
+          `gap before the ring, round by round (least / median ms): ${calls.byRound.map((r) => `round ${r.roundIndex + 1}: ${cell(r.minMs)} / ${cell(r.medianMs)} over ${r.n}`).join(' · ')}`,
+          '',
+        ]
+      : []),
     `intended gap before the ring: ${calls.intendedBreathMs.join(' / ') || '—'} ms · floor ${calls.floorMs} ms: ${calls.underFloor} of ${calls.n} under · **still sounding when the ring was due: ${calls.pastRing.length}**`,
   ]
   const list = (heading, items, line) => {

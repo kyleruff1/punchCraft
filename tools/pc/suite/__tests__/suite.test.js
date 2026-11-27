@@ -5,7 +5,15 @@
  */
 import { driveState } from '../drive.mjs'
 import { spread } from '../stats.mjs'
-import { defaultJobs, driveVerdict, lateness, parseArgs, pooled, renderSummary } from '../suite.mjs'
+import {
+  admissions,
+  defaultJobs,
+  driveVerdict,
+  lateness,
+  parseArgs,
+  pooled,
+  renderSummary,
+} from '../suite.mjs'
 
 const record = (code, fields = {}) => ({
   wallMs: 0,
@@ -303,6 +311,37 @@ describe('driveVerdict', () => {
       const late = { hard: [], soft: ['2 ring(s) were painted more than 100 ms after their time'] }
       expect(withRings(late).verdict).toBe('WARN')
       expect(withRings({ hard: [], soft: [] }, 1).verdict).toBe('FAIL')
+    })
+  })
+
+  describe('what the app itself admitted', () => {
+    const failed = record('workout.voice.playFailed', {
+      asset: 'li-2ba7c178',
+      error: 'no such file',
+    })
+    const missing = record('workout.voice.clipMissing', { asset: 'call-9-9' })
+    const skipped = record('workout.clickScript.skipped', { slot: 'call/1-2' })
+
+    it('counts the clips it logged it could not play, and the calls it chose to skip', () => {
+      expect(admissions([...aRound, failed, missing, skipped, skipped])).toEqual({
+        couldNotPlay: ['voice.playFailed: li-2ba7c178', 'voice.clipMissing: call-9-9'],
+        skipped: 2,
+        deferred: 0,
+      })
+    })
+
+    it('fails the drive on a clip the app could not play — in any round, whatever the correlator said', () => {
+      const result = judged({ records: [...aRound, failed] }, 0)
+      expect(result).toEqual({
+        verdict: 'FAIL',
+        reasons: [
+          'the app logged 1 clip(s) it could not play — first: voice.playFailed: li-2ba7c178',
+        ],
+      })
+    })
+
+    it('does not fail it on a call the app chose to skip', () => {
+      expect(judged({ records: [...aRound, skipped] }, 0).verdict).toBe('PASS')
     })
   })
 

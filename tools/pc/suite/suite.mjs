@@ -134,6 +134,32 @@ export function parseArgs(argv) {
 }
 
 /**
+ * What the app itself said went wrong, across the whole capture.
+ *
+ * `couldNotPlay` is every clip it logged failing to play or failing to find:
+ * a fault in any round. `skipped` and `deferred` are calls it chose not to
+ * make — the coach lane was busy — which is the app working as designed, and
+ * is counted.
+ *
+ * @param {import('../app/recordTap.mjs').PageRecord[]} records
+ */
+export function admissions(records) {
+  const named = (code, key) =>
+    recordsOf(records, code).map(
+      (r) => `${code.replace('workout.', '')}: ${fieldsOf(r)[key] ?? fieldsOf(r).text ?? '?'}`,
+    )
+  return {
+    couldNotPlay: [
+      ...named('workout.voice.playFailed', 'asset'),
+      ...named('workout.voice.clipMissing', 'asset'),
+      ...named('workout.slotDispatcher.assetMissing', 'assetId'),
+    ],
+    skipped: recordsOf(records, 'workout.clickScript.skipped').length,
+    deferred: recordsOf(records, 'workout.slotDispatcher.deferred').length,
+  }
+}
+
+/**
  * How late this machine ran the workout's own loop — reported, never judged.
  *
  * `dispatch` is how long after its scheduled time each clip was sent to play;
@@ -191,6 +217,15 @@ export function driveVerdict({
     reasons.push(reason)
   }
   if (drive.reason === 'over-budget') worsen('ERROR', 'the round did not end within its budget')
+  // What the app itself logged it could not do, in any round. The correlator
+  // reads these for round 1 only; nothing else reads them at all.
+  const { couldNotPlay } = admissions(drive.records)
+  if (couldNotPlay.length > 0) {
+    worsen(
+      'FAIL',
+      `the app logged ${couldNotPlay.length} clip(s) it could not play — first: ${couldNotPlay[0]}`,
+    )
+  }
   if (drive.problems.length > 0) {
     worsen('FAIL', `${drive.problems.length} error(s) on the page: ${drive.problems[0]}`)
   }
@@ -279,6 +314,7 @@ export function renderSummary(rows, meta) {
     '- **correlator** is the tablet’s own first-round verifier, run on this capture against the same manifest. What is said, in what order and when is code both devices share.',
     '- **The sound columns are measured**, not modelled: each call and lead-in is listened to in the page, and “last sound → ring due” is the gap between a call’s last sound and the scheduled time of the ring it leads. A clip that makes no sound, one cut short, or a call still sounding when its ring is due fails the drive. Each drive’s folder has the full `sound-report.md`.',
     '- **The lateness columns are this PC’s**, under whatever else it was doing. They are reported, not judged, and no tablet constant is ever set from them. The ring token is the runner’s 50 ms loop, not the painted ring.',
+    '- **Rounds after the first have no independent check.** The correlator and its manifests cover round 1. In later rounds the suite judges what the app played — that it sounded, whole, clear of its ring — and fails a clip the app itself logged it could not play. Nothing says what a later round should have played.',
     '- **The tablet’s audio path is not judged here.** Its timing analyzer refuses a capture from a browser.',
     '',
   )
@@ -402,6 +438,7 @@ async function runJob({ job, args, executable, baseUrl, suiteId, suiteDir, hostS
     visibility: drive.visibility,
     pageProblems: drive.problems,
     lateness: lateness(drive.records),
+    admissions: admissions(drive.records),
     sound,
     rings,
     recorded: drive.recorded,

@@ -736,3 +736,61 @@ describe('the intro, the countdown and the rest line in the verdict', () => {
     })
   })
 })
+
+describe('round by round', () => {
+  it('gives the gap before the ring for each round, and prints it when there is more than one', () => {
+    const ready = { type: 'tap-ready', atMs: 1, state: 'running', sampleRate: 48_000 }
+    const secondRound = [
+      record('workout.round.boundary', {
+        transition: 'rest-entered',
+        roundIndex: 0,
+        monotonicTimeMs: 250_000,
+      }),
+      record('workout.round.boundary', {
+        transition: 'work-entered',
+        roundIndex: 1,
+        workElapsedMs: 0,
+        monotonicTimeMs: 310_000,
+      }),
+      record('workout.cue.tokenDue', {
+        roundIndex: 1,
+        workElapsedMs: 4_040,
+        monotonicTimeMs: 314_040,
+        scheduledMs: 4_000,
+      }),
+      record('workout.clickScript.dispatch', {
+        kind: 'call',
+        slot: 'call/1-2',
+        traceId: 'call/1-2#2600',
+        dispatchAtMs: 2_600,
+        lateMs: 10,
+        durationMs: 1_000,
+        firstNodeMs: 4_000,
+        breathMs: 400,
+        monotonicTimeMs: 312_610,
+      }),
+      record('workout.voice.play', {
+        kind: 'click-script',
+        text: 'One, two!',
+        durationMs: 1_000,
+        volume: 1,
+        path: 'armed',
+        dispatchMs: 312_610,
+        traceId: 'call/1-2#2600',
+        playId: 'p-r2',
+      }),
+    ]
+    const report = soundReport(
+      [...round, bellRecord, ...call(2_600), ...secondRound],
+      [ready, ...bellEvents, ...played(7, SENT + 1), ...played(7, 312_611)],
+      LIMITS,
+    )
+    expect(report.calls.byRound.map((r) => [r.roundIndex, r.n, r.minMs])).toEqual([
+      [0, 1, 294],
+      [1, 1, 324],
+    ])
+    expect(renderSoundReport(report, 'x')).toContain(
+      'gap before the ring, round by round (least / median ms): round 1: 294 / 294 over 1 · round 2: 324 / 324 over 1',
+    )
+  })
+})
