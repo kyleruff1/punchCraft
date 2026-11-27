@@ -288,6 +288,24 @@ describe('driveVerdict', () => {
     })
   })
 
+  describe('with the ring check', () => {
+    const withRings = (rings, verifyExit = 0) =>
+      driveVerdict({ drive: drive(), verifyExit, hostSha: 'abc1234', nonce: 'n-1', rings })
+
+    it('fails a drive where a bar did not light all its rings', () => {
+      const unlit = {
+        hard: ['1 bar(s) did not light all their rings — first: q121-b1#0 reached ring 1 of 2'],
+        soft: [],
+      }
+      expect(withRings(unlit)).toEqual({ verdict: 'FAIL', reasons: unlit.hard })
+    })
+    it('warns on a late ring, and cannot rescue a drive the correlator failed', () => {
+      const late = { hard: [], soft: ['2 ring(s) were painted more than 100 ms after their time'] }
+      expect(withRings(late).verdict).toBe('WARN')
+      expect(withRings({ hard: [], soft: [] }, 1).verdict).toBe('FAIL')
+    })
+  })
+
   it('never lets a warning soften a failure', () => {
     expect(judged({ visibility: 'hidden' }, 1).verdict).toBe('FAIL')
   })
@@ -323,7 +341,7 @@ describe('renderSummary', () => {
     expect(md).toContain('**1 PASS · 1 FAIL**')
     // No sound was listened to in this row: its three columns are dashes.
     expect(md).toContain(
-      '| quick-one-two | numbers | PASS | matched=3 extras=0 reanchor=0 | 0 | — | — | — | 36 / 44 | 39.7 / 45.3 | 4:42 |',
+      '| quick-one-two | numbers | PASS | matched=3 extras=0 reanchor=0 | 0 | — | — | — | — | — | 36 / 44 | 39.7 / 45.3 | 4:42 |',
     )
     expect(md).toContain('- **body-work** (numbers): 1 error(s) on the page: x')
     expect(md).toContain('round 1 and its rest · 1 at a time · simulated punches: captured-jam')
@@ -337,8 +355,15 @@ describe('renderSummary', () => {
       calls: { breath: { minMs: 351, medianMs: 376.8 } },
     }
     const md = renderSummary([row({ sound })], meta)
-    expect(md).toContain('| 0 | 80 of 81 | 1 / 0 | 351 / 376.8 | 36 / 44 |')
+    expect(md).toContain('| 0 | 80 of 81 | 1 / 0 | 351 / 376.8 | — | — | 36 / 44 |')
     expect(md).toMatch(/sound columns are measured/)
+  })
+
+  it('shows how many rings lit, and how late they were painted', () => {
+    const rings = { lit: 194, rings: 194, paintedLate: { medianMs: 54.4, maxMs: 67.8 } }
+    expect(renderSummary([row({ rings })], meta)).toContain(
+      '| — | 194 of 194 | 54.4 / 67.8 | 36 / 44 |',
+    )
   })
 
   it('says in its heading how the sound was judged, and shouts when a fault was injected', () => {
@@ -371,6 +396,6 @@ describe('renderSummary', () => {
       ],
       meta,
     )
-    expect(md).toContain('| ERROR | — | 0 | — | — | — | — / — | — / — |')
+    expect(md).toContain('| ERROR | — | 0 | — | — | — | — | — | — / — | — / — |')
   })
 })

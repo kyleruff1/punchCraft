@@ -11,6 +11,7 @@ import {
   FAULTS,
   installFault,
   LATE_BY_MS,
+  LATE_FRAME_MS,
 } from '../faults.mjs'
 
 const HOW = {
@@ -179,17 +180,90 @@ describe('cut-countdown', () => {
   })
 })
 
+describe('late-rings', () => {
+  function framePage() {
+    let now = 0
+    const frames = []
+    const timers = []
+    const cancelled = []
+    const scope = {
+      Map,
+      performance: { now: () => now },
+      requestAnimationFrame: (callback) => frames.push(callback),
+      cancelAnimationFrame: (id) => cancelled.push(id),
+      setTimeout: (fn, ms) => timers.push({ fn, ms }),
+      clearTimeout: (id) => cancelled.push(`timer ${id}`),
+    }
+    installFault(scope, 'late-rings', { ...HOW, lateFrameMs: LATE_FRAME_MS })
+    return { scope, frames, timers, cancelled, at: (ms) => (now = ms) }
+  }
+
+  it('holds every frame back by the same amount, so none overtakes another', () => {
+    const page = framePage()
+    const order = []
+    page.scope.requestAnimationFrame(() => order.push('first'))
+    page.at(4_000)
+    page.scope.requestAnimationFrame(() => order.push('second'))
+    // Neither has been passed on yet: both are waiting out the hold.
+    expect(page.frames).toHaveLength(0)
+    expect(page.timers.map((t) => t.ms)).toEqual([LATE_FRAME_MS, LATE_FRAME_MS])
+    for (const timer of page.timers) timer.fn()
+    for (const frame of page.frames) frame(0)
+    expect(order).toEqual(['first', 'second'])
+  })
+
+  it('still lets the page cancel a frame: while it is held, after it is passed on, or never held', () => {
+    const page = framePage()
+    page.at(10)
+    const held = page.scope.requestAnimationFrame(() => {})
+    page.scope.cancelAnimationFrame(held)
+    expect(page.cancelled).toEqual(['timer 1'])
+    // A second one, let through to the browser and then cancelled: the
+    // browser's own frame is what has to be cancelled, by the browser's id.
+    const passedOn = page.scope.requestAnimationFrame(() => {})
+    page.timers[1].fn()
+    page.scope.cancelAnimationFrame(passedOn)
+    page.scope.cancelAnimationFrame(7)
+    expect(page.cancelled).toEqual(['timer 1', 1, 7])
+  })
+
+  it('runs a held frame once, with the browser’s timestamp', () => {
+    const page = framePage()
+    page.at(10)
+    const seen = []
+    page.scope.requestAnimationFrame((timestamp) => seen.push(timestamp))
+    page.timers[0].fn()
+    page.frames[0](1234)
+    expect(seen).toEqual([1234])
+  })
+
+  it('touches no audio: it never reaches for the media elements', () => {
+    // A page with no media prototype at all would throw if it did.
+    expect(() => framePage()).not.toThrow()
+  })
+})
+
 describe('faultSource', () => {
   it('is text that runs in a page, for each fault', () => {
     for (const kind of FAULTS) {
       const page = fakePage()
+      const frame = () => 0
+      Object.assign(page.scope, {
+        Map,
+        performance: { now: () => 0 },
+        requestAnimationFrame: frame,
+        cancelAnimationFrame: () => undefined,
+        clearTimeout: () => undefined,
+      })
       new Function('globalThis', faultSource(kind))(page.scope)
-      expect(page.scope.HTMLMediaElement.prototype.play.name).toBe('play')
+      // Each fault wraps the one thing it breaks: the frames, or play().
+      if (kind === 'late-rings') expect(page.scope.requestAnimationFrame).not.toBe(frame)
+      else expect(page.scope.HTMLMediaElement.prototype.play.name).toBe('play')
     }
   })
   it('refuses a fault it does not have', () => {
     expect(() => faultSource('explode')).toThrow(
-      /a fault is one of mute, cut, late, mute-bell, cut-countdown, not explode/,
+      /a fault is one of mute, cut, late, mute-bell, cut-countdown, late-rings, not explode/,
     )
   })
 })

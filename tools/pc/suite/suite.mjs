@@ -44,6 +44,7 @@ import { loadTimingConstants } from '../../analysis/timing-constants.mjs'
 import { fieldsOf, recordsOf } from './capture.mjs'
 import { driveState, driveWorkout } from './drive.mjs'
 import { FAULTS } from './faults.mjs'
+import { ringReport, ringVerdict } from './rings.mjs'
 import { renderSoundReport, soundReport, soundVerdict } from './sound.mjs'
 import { spread } from './stats.mjs'
 
@@ -164,6 +165,7 @@ export function lateness(records) {
  * @param {string} input.nonce the nonce the link carried
  * @param {{ verdict: string, hard: string[], soft: string[] } | null} [input.sound] the sound gate's word, if it listened
  * @param {string} [input.soundGate] `fail` (a hard sound finding fails the drive), `warn` or `off`
+ * @param {{ hard: string[], soft: string[] } | null} [input.rings] the ring check's word
  * @returns {{ verdict: string, reasons: string[] }}
  */
 export function driveVerdict({
@@ -173,6 +175,7 @@ export function driveVerdict({
   nonce,
   sound = null,
   soundGate = 'fail',
+  rings = null,
 }) {
   const state = driveState(drive.records)
   const broke = (reason) => ({ verdict: 'ERROR', reasons: [reason] })
@@ -198,6 +201,10 @@ export function driveVerdict({
     // correlator failed.
     for (const finding of sound.hard) worsen(soundGate === 'fail' ? 'FAIL' : 'WARN', finding)
     for (const finding of sound.soft) worsen('WARN', finding)
+  }
+  if (rings) {
+    for (const finding of rings.hard) worsen('FAIL', finding)
+    for (const finding of rings.soft) worsen('WARN', finding)
   }
   if (drive.staged?.gitSha !== hostSha) {
     worsen('WARN', `the build is ${drive.staged?.gitSha}, the checkout is ${hostSha}`)
@@ -242,8 +249,8 @@ export function renderSummary(rows, meta) {
       : []),
     `**${tally || 'nothing ran'}**`,
     '',
-    '| workout | vocab | verdict | correlator | page errors | clips heard | silent / cut short | last sound → ring due, least / median ms | dispatch late, median / p95 ms | ring token late, median / p95 ms | took |',
-    '|---|---|---|---|---|---|---|---|---|---|---|',
+    '| workout | vocab | verdict | correlator | page errors | clips heard | silent / cut short | last sound → ring due, least / median ms | rings lit | ring painted late, median / most ms | dispatch late, median / p95 ms | ring token late, median / p95 ms | took |',
+    '|---|---|---|---|---|---|---|---|---|---|---|---|---|',
   ]
   for (const r of rows) {
     const d = r.lateness?.dispatch
@@ -252,8 +259,11 @@ export function renderSummary(rows, meta) {
     const heard = s ? `${s.clips.heard} of ${s.clips.played}` : '—'
     const lost = s ? `${s.clips.silent.length} / ${s.clips.cutShort.length}` : '—'
     const gap = s ? `${ms(s.calls.breath.minMs)} / ${ms(s.calls.breath.medianMs)}` : '—'
+    const g = r.rings
+    const lit = g ? `${g.lit} of ${g.rings}` : '—'
+    const painted = g ? `${ms(g.paintedLate.medianMs)} / ${ms(g.paintedLate.maxMs)}` : '—'
     L.push(
-      `| ${r.workoutId} | ${r.vocab} | ${r.verdict} | ${r.stats ?? '—'} | ${r.pageProblems.length} | ${heard} | ${lost} | ${gap} | ${ms(d?.medianMs)} / ${ms(d?.p95Ms)} | ${ms(t?.medianMs)} / ${ms(t?.p95Ms)} | ${clock(r.elapsedMs)} |`,
+      `| ${r.workoutId} | ${r.vocab} | ${r.verdict} | ${r.stats ?? '—'} | ${r.pageProblems.length} | ${heard} | ${lost} | ${gap} | ${lit} | ${painted} | ${ms(d?.medianMs)} / ${ms(d?.p95Ms)} | ${ms(t?.medianMs)} / ${ms(t?.p95Ms)} | ${clock(r.elapsedMs)} |`,
     )
   }
   const explained = rows.filter((r) => r.reasons.length > 0)
@@ -352,6 +362,8 @@ async function runJob({ job, args, executable, baseUrl, suiteId, suiteDir, hostS
       'utf8',
     )
   }
+  const rings = ringReport(drive.records)
+  writeFileSync(path.join(dir, 'rings-report.json'), JSON.stringify(rings, null, 2) + '\n', 'utf8')
   // A drive that never reached a round has nothing for the correlator to read.
   const reached = driveState(drive.records).workEntered
   const judged = reached
@@ -364,6 +376,7 @@ async function runJob({ job, args, executable, baseUrl, suiteId, suiteDir, hostS
     nonce,
     sound: sound ? soundVerdict(sound, { floorRatio: FLOOR_BREACH_SOFT_RATIO }) : null,
     soundGate: args.soundGate,
+    rings: reached ? ringVerdict(rings) : null,
   })
   const row = {
     workoutId: job.workoutId,
@@ -390,6 +403,7 @@ async function runJob({ job, args, executable, baseUrl, suiteId, suiteDir, hostS
     pageProblems: drive.problems,
     lateness: lateness(drive.records),
     sound,
+    rings,
     recorded: drive.recorded,
     elapsedMs: drive.elapsedMs,
   }
@@ -404,6 +418,9 @@ async function runJob({ job, args, executable, baseUrl, suiteId, suiteDir, hostS
       `   sound: ${sound.clips.heard} of ${sound.clips.played} clips heard · last sound → ring ${ms(gap.minMs)} least, ${ms(gap.medianMs)} median · ${sound.clips.silent.length} silent · ${sound.clips.cutShort.length} cut short`,
     )
   }
+  lines.push(
+    `   rings: ${rings.lit} of ${rings.rings} lit · painted ${ms(rings.paintedLate.medianMs)} ms after their time (most ${ms(rings.paintedLate.maxMs)})`,
+  )
   for (const reason of reasons) lines.push(`   ! ${reason}`)
   console.info(lines.join('\n'))
   return row
