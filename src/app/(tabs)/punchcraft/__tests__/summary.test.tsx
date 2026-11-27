@@ -9,6 +9,9 @@
 import React from 'react'
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer'
 
+/** What the route was opened with — `summary?id=…`. */
+let mockParams: { id?: string } = {}
+
 jest.mock('expo-router', () => {
   function Stack() {
     return null
@@ -17,12 +20,23 @@ jest.mock('expo-router', () => {
     return null
   }
   Stack.Screen = Screen
-  return { Stack, useRouter: () => ({ back: jest.fn() }) }
+  return {
+    Stack,
+    useRouter: () => ({ back: jest.fn() }),
+    useLocalSearchParams: () => mockParams,
+  }
 })
 
-import SummaryScreen, { SHORT_COUNT_NOTE } from '../summary'
+import SummaryScreen, { MATCHED_ONLY_NOTE, NOT_RECORDED, SHORT_COUNT_NOTE } from '../summary'
 import { computeWorkoutSummary, type SummaryCueResult } from '@domain/programs/workoutSummary'
 import { threeRoundFundamentals } from '@domain/workout/samples'
+import type { LiveCounts } from '@domain/programs/liveCounts'
+import { formatSessionWhen } from '@domain/session/sessionDisplay'
+import { createMigratedDb } from '@storage/__tests__/helpers/memoryDb'
+import { __setWorkoutPersistenceForTests } from '@storage/getWorkoutPersistence'
+import { persistWorkoutSession } from '@storage/persistWorkoutSession'
+import { SessionRepository } from '@storage/repositories/SessionRepository'
+import { WorkoutRepository } from '@storage/repositories/WorkoutRepository'
 
 const WORKOUT = threeRoundFundamentals
 const BLOCK = WORKOUT.schedule[0]!.blocks[0]!.id
@@ -61,6 +75,8 @@ afterEach(() => {
   act(() => {
     for (const tree of mounted.splice(0)) tree.unmount()
   })
+  mockParams = {}
+  __setWorkoutPersistenceForTests(null)
 })
 
 function textOf(node: ReactTestInstance): string {
@@ -209,5 +225,127 @@ describe('adaptations are explained, not hidden', () => {
     })
     mounted.push(tree)
     expect(textOf(tree.root.findByProps({ testID: 'adaptation-note' }))).toContain('2 times')
+  })
+})
+
+// ---------------------------------------------------------------------------
+
+describe('a saved session, opened by its id (`summary?id=…`)', () => {
+  const LIVE: LiveCounts = {
+    v: 1,
+    total: 61,
+    left: 31,
+    right: 30,
+    extra: 4,
+    adaptations: 0,
+    source: 'tracker',
+    rounds: [
+      { roundIndex: 0, actual: 28, target: 30, left: 14, right: 14 },
+      { roundIndex: 1, actual: 31, target: 30, left: 16, right: 15 },
+    ],
+  }
+
+  /** A real database with one saved session in it, as the runner writes one. */
+  function saved(over: { cancelled?: boolean; liveCounts?: LiveCounts | null } = {}): {
+    id: string
+    forgetLiveCounts(): void
+  } {
+    const db = createMigratedDb()
+    const repos = { db, sessions: new SessionRepository(db), workouts: new WorkoutRepository(db) }
+    __setWorkoutPersistenceForTests(repos)
+    const { sessionId } = persistWorkoutSession({
+      ...repos,
+      workout: WORKOUT,
+      realized: [0, 1].map((round) => ({
+        blockId: WORKOUT.schedule[round]!.blocks[0]!.id,
+        tokens: WORKOUT.schedule[round]!.blocks[0]!.tokens,
+      })),
+      cueResults: rows(3).map((r) => ({
+        ...r,
+        repeatIndex: 0,
+        expectedType: null,
+        observedEventId: null,
+        velocityCalibrated: null,
+        decoderVersion: '1.0.0',
+        calculationVersion: '1.1.0',
+      })),
+      startedMonotonicMs: 0,
+      endedMonotonicMs: 300_000,
+      activeDurationMs: 300_000,
+      endedAtIso: '2026-11-26T15:07:00.000Z',
+      cancelled: over.cancelled ?? false,
+      ...(over.liveCounts === null ? {} : { liveCounts: over.liveCounts ?? LIVE }),
+    })
+    return {
+      id: sessionId,
+      forgetLiveCounts: () =>
+        db.prepareSync('UPDATE sessions SET live_counts_json = NULL').executeSync([]),
+    }
+  }
+
+  function open(id: string): ReactTestRenderer {
+    mockParams = { id }
+    let tree!: ReactTestRenderer
+    act(() => {
+      tree = create(<SummaryScreen />)
+    })
+    mounted.push(tree)
+    return tree
+  }
+
+  it('reads the session from the database and shows what the live screen counted', () => {
+    const tree = open(saved().id)
+    expect(allText(tree)).toContain('Three-Round Fundamentals')
+    expect(allText(tree)).toContain('61')
+    expect(textOf(nodes(tree, 'summary-when')[0]!)).toBe(
+      formatSessionWhen('2026-11-26T15:07:00.000Z'),
+    )
+    expect(textOf(nodes(tree, 'summary-extras')[0]!)).toContain('4')
+    // Only the two rounds that ran.
+    expect(nodes(tree, 'round-0')).toHaveLength(1)
+    expect(nodes(tree, 'round-1')).toHaveLength(1)
+    expect(nodes(tree, 'round-2')).toHaveLength(0)
+    expect(nodes(tree, 'summary-basis')).toHaveLength(0)
+    expect(nodes(tree, 'summary-stopped')).toHaveLength(0)
+    expect(nodes(tree, 'summary-simulated')).toHaveLength(0)
+  })
+
+  it('says a stopped session was stopped, and where — and does not blame the trackers', () => {
+    const tree = open(saved({ cancelled: true }).id)
+    expect(textOf(nodes(tree, 'summary-stopped')[0]!)).toBe('Stopped in round 2 of 3')
+    expect(allText(tree)).not.toContain(SHORT_COUNT_NOTE)
+  })
+
+  it('says so when the punches were simulated', () => {
+    const tree = open(saved({ liveCounts: { ...LIVE, source: 'simulated' } }).id)
+    expect(textOf(nodes(tree, 'summary-simulated')[0]!)).toBe('Simulated punches')
+  })
+
+  it('labels an older session’s count as matched punches, and its extras as not recorded', () => {
+    const session = saved()
+    session.forgetLiveCounts()
+    const tree = open(session.id)
+    expect(textOf(nodes(tree, 'summary-basis')[0]!)).toBe('Matched punches')
+    expect(allText(tree)).toContain(MATCHED_ONLY_NOTE)
+    expect(textOf(nodes(tree, 'summary-extras')[0]!)).toContain(NOT_RECORDED)
+    expect(textOf(nodes(tree, 'summary-extras')[0]!)).not.toContain('0')
+    // The count is short because it is partial, not because of the trackers.
+    expect(allText(tree)).not.toContain(SHORT_COUNT_NOTE)
+  })
+
+  it('says a session it cannot find is not saved here', () => {
+    saved()
+    const tree = open('ses_missing')
+    expect(textOf(nodes(tree, 'summary-empty')[0]!)).toBe('That session is not saved here.')
+  })
+
+  it('says the same when the database cannot be read at all', () => {
+    __setWorkoutPersistenceForTests({
+      get sessions(): never {
+        throw new Error('database unavailable')
+      },
+    } as never)
+    const tree = open('ses_any')
+    expect(textOf(nodes(tree, 'summary-empty')[0]!)).toBe('That session is not saved here.')
   })
 })

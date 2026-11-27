@@ -131,6 +131,18 @@ export default function PunchCraftLanding() {
           </Link>
         </View>
 
+        {/* Every saved workout, newest first (`history.tsx`). */}
+        <Link href="/(tabs)/punchcraft/history" asChild>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Workout history"
+            style={({ pressed }) => [styles.historyAction, pressed && styles.randomActionPressed]}
+            testID="open-history"
+          >
+            <Text style={styles.historyActionText}>History</Text>
+          </Pressable>
+        </Link>
+
         {/* Throwaway M32-05 spike entry (#182); removed when the spike closes. */}
         <Link href="/(tabs)/punchcraft/orientation-spike" asChild>
           <Pressable accessibilityRole="button" style={styles.spikeAction} testID="open-spike">
@@ -245,6 +257,15 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 3,
   },
+  historyAction: {
+    marginTop: 8,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    alignItems: 'center',
+  },
+  historyActionText: { ...recipes.buttonSubtle, color: colors.textPrimary },
   spikeAction: {
     marginTop: 8,
     paddingVertical: 12,
