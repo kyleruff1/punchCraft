@@ -206,7 +206,9 @@ export function persistWorkoutSession(args: PersistWorkoutSessionArgs): Persiste
     }
 
     for (const adaptation of adaptations) {
-      workouts.appendAdaptation({ ...adaptation, generatedWorkoutId })
+      // With the session it was made in, so that it leaves with the session
+      // if the session is discarded (migration 010).
+      workouts.appendAdaptation({ ...adaptation, generatedWorkoutId, sessionId: session.id })
     }
 
     db.execSync('COMMIT')

@@ -157,6 +157,36 @@ describe('upgrading a database that already holds sessions (004 → current)', (
     for (const row of rows) expect(row.live_counts_json).toBeNull()
   })
 
+  it('gives every existing adaptation an empty session — it stays under its plan, as before (010)', () => {
+    const rows = db.query<{ session_id: string | null }>(
+      'SELECT session_id FROM workout_adaptations',
+    )
+    expect(rows).toHaveLength(1)
+    expect(rows[0]?.session_id).toBeNull()
+  })
+
+  it('sends a new adaptation out with its session, and leaves an old one where it was (010)', () => {
+    const workouts = new WorkoutRepository(db)
+    workouts.appendAdaptation({
+      generatedWorkoutId: 'w1',
+      sessionId: 's1',
+      decidedAtMonotonicMs: 5,
+      boundary: 'rest',
+      inputs: {},
+      decision: {},
+    })
+    expect(workouts.listAdaptationsForSession('s1')).toHaveLength(1)
+    expect(db.count('SELECT COUNT(*) AS n FROM workout_adaptations')).toBe(2)
+
+    new SessionRepository(db).delete('s1')
+
+    expect(workouts.listAdaptationsForSession('s1')).toEqual([])
+    // The one written before the migration names no session: it is still
+    // there, under its plan.
+    expect(db.count('SELECT COUNT(*) AS n FROM workout_adaptations')).toBe(1)
+    expect(db.query('PRAGMA foreign_key_check')).toEqual([])
+  })
+
   it('leaves no dangling reference and a sound file', () => {
     expect(db.query('PRAGMA foreign_key_check')).toEqual([])
     expect(db.query('PRAGMA integrity_check')).toEqual([{ integrity_check: 'ok' }])
@@ -205,6 +235,8 @@ describe('a shipped migration is append-only', () => {
     8: '5a15032a09306812',
     // Added with the migration, 2026-11-27 (sessions.live_counts_json).
     9: '970ae00214bdacbd',
+    // Added with the migration, 2026-11-27 (workout_adaptations.session_id).
+    10: '8bf8d9895fc2fd77',
   }
 
   /** Whitespace and SQL comments do not change a schema; everything else does. */

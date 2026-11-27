@@ -127,6 +127,8 @@ describe('schema shape', () => {
   })
 
   it('creates workout_adaptations with the §17.1 columns', () => {
+    // `session_id` is 010's addition, and the fixture runs every migration —
+    // this asserts the shape a device actually ends up with.
     expect(columnsOf(db, 'workout_adaptations')).toEqual([
       'id',
       'generated_workout_id',
@@ -134,6 +136,7 @@ describe('schema shape', () => {
       'boundary',
       'inputs_json',
       'decision_json',
+      'session_id',
     ])
   })
 

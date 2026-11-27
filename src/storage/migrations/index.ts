@@ -23,6 +23,7 @@ import { MIGRATION_006 } from '@/storage/migrations/006_app_settings'
 import { MIGRATION_007 } from '@/storage/migrations/007_workout_runs'
 import { MIGRATION_008 } from '@/storage/migrations/008_punch_acceleration'
 import { MIGRATION_009 } from '@/storage/migrations/009_session_live_counts'
+import { MIGRATION_010 } from '@/storage/migrations/010_adaptation_session'
 
 export interface Migration {
   id: number
@@ -32,8 +33,8 @@ export interface Migration {
 
 // Ids are permanent: never renumber a migration that has landed, and never
 // reuse an id another branch has already claimed. 008 adds
-// punch_events.acceleration_raw and 009 adds sessions.live_counts_json; the
-// next branch takes 010.
+// punch_events.acceleration_raw, 009 adds sessions.live_counts_json and 010
+// adds workout_adaptations.session_id; the next branch takes 011.
 const MIGRATIONS: readonly Migration[] = [
   MIGRATION_001,
   MIGRATION_002,
@@ -44,6 +45,7 @@ const MIGRATIONS: readonly Migration[] = [
   MIGRATION_007,
   MIGRATION_008,
   MIGRATION_009,
+  MIGRATION_010,
 ]
 
 /**

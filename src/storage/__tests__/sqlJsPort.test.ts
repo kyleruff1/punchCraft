@@ -95,6 +95,33 @@ describe('an upgrade on this engine', () => {
       JSON.parse(REALIZED_S1),
     )
   })
+
+  it('sends an adaptation out with its session on this engine too (010)', () => {
+    const db = open()
+    runMigrations(asSqlite(db), { through: 4 })
+    seedAsOfMigration004(db)
+    runMigrations(asSqlite(db))
+    const count = (): number =>
+      query<{ n: number }>(db, 'SELECT COUNT(*) AS n FROM workout_adaptations')[0]!.n
+    const before = count()
+    const workouts = new WorkoutRepository(db)
+    workouts.appendAdaptation({
+      generatedWorkoutId: 'w1',
+      sessionId: 's1',
+      decidedAtMonotonicMs: 5,
+      boundary: 'rest',
+      inputs: {},
+      decision: {},
+    })
+    expect(count()).toBe(before + 1)
+
+    db.execSync(`DELETE FROM sessions WHERE id = 's1'`)
+
+    // The new row left with its session; what was there before stayed.
+    expect(count()).toBe(before)
+    expect(workouts.listAdaptationsForSession('s1')).toEqual([])
+    expect(query(db, 'PRAGMA foreign_key_check')).toEqual([])
+  })
 })
 
 describe('the repositories', () => {
