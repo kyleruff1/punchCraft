@@ -3,9 +3,19 @@
  *
  * In a browser, `play()` on a media element returns a promise, and that
  * promise rejects with `AbortError` when a `pause()` or a new load overtakes
- * it. expo-audio's web player calls `play()` and drops the promise, so every
- * clip the coach cuts short — which it does on purpose — surfaces as
- * "Uncaught (in promise)". One or two per workout, seen 2026-11-26.
+ * it. expo-audio's web player calls `play()` and drops the promise, so each
+ * one surfaces as "Uncaught (in promise)".
+ *
+ * Where they come from, measured 2026-11-27 by listening to the page: a
+ * player made for a clip it has yet to download starts on an `<audio>` with
+ * no source, and swaps to a second element once the clip arrives. The app
+ * has already asked the first to play; the swap pauses it; that is the
+ * rejection. **No clip is lost** — it plays, whole, on the second element.
+ * One per first-time clip: five in a round of One-Two.
+ *
+ * (This comment first said the coach was cutting clips short on purpose,
+ * and the log line said "a clip was cut short before it began". Neither was
+ * what was happening.)
  *
  * The play/pause sequences in this directory are measured against the
  * tablet's player, which has no such promise. Rather than reshape them to
@@ -39,8 +49,12 @@ export function ignoreInterruptedPlay(source: RejectionSource): void {
     if (!isInterruptedPlay(event.reason)) return
     event.preventDefault()
     count += 1
-    logger.debug('audio.web.playInterrupted', 'a clip was cut short before it began', {
-      count: safe(count),
-    })
+    logger.debug(
+      'audio.web.playInterrupted',
+      'a play request was dropped as the player swapped audio elements; the clip plays on the new one',
+      {
+        count: safe(count),
+      },
+    )
   })
 }
