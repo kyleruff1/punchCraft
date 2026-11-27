@@ -24,6 +24,8 @@
     "pc:glove-check": "node tools/pc/glove-check/serve.mjs",
     "pc:app": "node tools/pc/app/serve.mjs",
     "pc:smoke": "node tools/pc/app/smoke.mjs",
+    "pc:suite": "node tools/pc/suite/suite.mjs",
+    "pc:parity": "node tools/pc/suite/parity.mjs",
     "test": "jest",
     "test:watch": "jest --watch",
     "guard:velocity-terminology": "node tools/guards/velocity-terminology.mjs",

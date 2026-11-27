@@ -1,0 +1,96 @@
+{
+ "workoutId": "quick-square",
+ "vocab": "numbers",
+ "timelineHash": "v2:e78ff779",
+ "source": {
+  "suite": "post-floor",
+  "capturedOn": "2026-09-08",
+  "device": "tablet",
+  "build": "b8e72bc5",
+  "simulatedPunches": "captured-jam",
+  "verdict": "WARN",
+  "correlator": "matched=3 extras=0 reanchor=0"
+ },
+ "round1": {
+  "dispatches": [
+   { "kind": "call", "slot": "call/1-4-2-3", "dispatchAtMs": 2706, "durationMs": 1723, "firstNodeMs": 4800, "text": "One, four, two, three!" },
+   { "kind": "call", "slot": "call/1-4-2-3", "dispatchAtMs": 7506, "durationMs": 1723, "firstNodeMs": 9600, "text": "One, four, two, three!" },
+   { "kind": "call", "slot": "call/1-4-2-3", "dispatchAtMs": 12306, "durationMs": 1723, "firstNodeMs": 14400, "text": "One, four, two, three!" },
+   { "kind": "call", "slot": "call/1-4-2-3", "dispatchAtMs": 17106, "durationMs": 1723, "firstNodeMs": 19200, "text": "One, four, two, three!" },
+   { "kind": "call", "slot": "call/1-4-2-3", "dispatchAtMs": 21906, "durationMs": 1723, "firstNodeMs": 24000, "text": "One, four, two, three!" },
+   { "kind": "call", "slot": "call/1-4-2-3", "dispatchAtMs": 26706, "durationMs": 1723, "firstNodeMs": 28800, "text": "One, four, two, three!" },
+   { "kind": "call", "slot": "call/1-4-2-3", "dispatchAtMs": 31506, "durationMs": 1723, "firstNodeMs": 33600, "text": "One, four, two, three!" },
+   { "kind": "call", "slot": "call/1-4-2-3", "dispatchAtMs": 36306, "durationMs": 1723, "firstNodeMs": 38400, "text": "One, four, two, three!" },
+   {
+    "kind": "lead-in",
+    "slot": "lead-in/quick-square/r1s2",
+    "dispatchAtMs": 42077,
+    "durationMs": 8471,
+    "text": "One, two, three, four — straight time, nine bars. Same corners, walked in order. Feet under you."
+   },
+   { "kind": "call", "slot": "call/1-2-3-4", "dispatchAtMs": 50798, "durationMs": 1631, "firstNodeMs": 52800, "text": "One, two, three, four!" },
+   { "kind": "call", "slot": "call/1-2-3-4", "dispatchAtMs": 55598, "durationMs": 1631, "firstNodeMs": 57600, "text": "One, two, three, four!" },
+   { "kind": "call", "slot": "call/1-2-3-4", "dispatchAtMs": 60398, "durationMs": 1631, "firstNodeMs": 62400, "text": "One, two, three, four!" },
+   { "kind": "call", "slot": "call/1-2-3-4", "dispatchAtMs": 65198, "durationMs": 1631, "firstNodeMs": 67200, "text": "One, two, three, four!" },
+   { "kind": "call", "slot": "call/1-2-3-4", "dispatchAtMs": 69998, "durationMs": 1631, "firstNodeMs": 72000, "text": "One, two, three, four!" },
+   { "kind": "call", "slot": "call/1-2-3-4", "dispatchAtMs": 74798, "durationMs": 1631, "firstNodeMs": 76800, "text": "One, two, three, four!" },
+   { "kind": "call", "slot": "call/1-2-3-4", "dispatchAtMs": 79598, "durationMs": 1631, "firstNodeMs": 81600, "text": "One, two, three, four!" },
+   { "kind": "call", "slot": "call/1-2-3-4", "dispatchAtMs": 84398, "durationMs": 1631, "firstNodeMs": 86400, "text": "One, two, three, four!" },
+   {
+    "kind": "lead-in",
+    "slot": "lead-in/quick-square/r1s3",
+    "dispatchAtMs": 90107,
+    "durationMs": 8149,
+    "text": "One, four, two, three — time-and-a-half, fourteen bars. The square, quicker. Do not cut the corners."
+   },
+   { "kind": "call", "slot": "call/1-4-2-3", "dispatchAtMs": 98506, "durationMs": 1723, "firstNodeMs": 100800, "text": "One, four, two, three!" },
+   { "kind": "call", "slot": "call/1-4-2-3", "dispatchAtMs": 100906, "durationMs": 1723, "firstNodeMs": 103200, "text": "One, four, two, three!" },
+   { "kind": "call", "slot": "call/1-4-2-3", "dispatchAtMs": 103306, "durationMs": 1723, "firstNodeMs": 105600, "text": "One, four, two, three!" },
+   { "kind": "call", "slot": "call/1-4-2-3", "dispatchAtMs": 105706, "durationMs": 1723, "firstNodeMs": 108000, "text": "One, four, two, three!" },
+   { "kind": "call", "slot": "call/1-4-2-3", "dispatchAtMs": 108106, "durationMs": 1723, "firstNodeMs": 110400, "text": "One, four, two, three!" },
+   { "kind": "call", "slot": "call/1-4-2-3", "dispatchAtMs": 110506, "durationMs": 1723, "firstNodeMs": 112800, "text": "One, four, two, three!" },
+   { "kind": "call", "slot": "call/1-4-2-3", "dispatchAtMs": 112906, "durationMs": 1723, "firstNodeMs": 115200, "text": "One, four, two, three!" },
+   { "kind": "call", "slot": "call/1-4-2-3", "dispatchAtMs": 115306, "durationMs": 1723, "firstNodeMs": 117600, "text": "One, four, two, three!" },
+   { "kind": "call", "slot": "call/1-4-2-3", "dispatchAtMs": 117706, "durationMs": 1723, "firstNodeMs": 120000, "text": "One, four, two, three!" },
+   { "kind": "call", "slot": "call/1-4-2-3", "dispatchAtMs": 120106, "durationMs": 1723, "firstNodeMs": 122400, "text": "One, four, two, three!" },
+   {
+    "kind": "lead-in",
+    "slot": "lead-in/quick-square/r1s4",
+    "dispatchAtMs": 124237,
+    "durationMs": 11480,
+    "text": "Big phrase — two pages: one, two, three, two, one, four, three, two. Straight time, fourteen times through. Page one is the four-count. Page two crosses the square."
+   },
+   { "kind": "call", "slot": "call/1-2-3-2-1-4-3-2", "dispatchAtMs": 135967, "durationMs": 2862, "firstNodeMs": 139200, "text": "One, two, three, two, one, four, three, two!" },
+   { "kind": "call", "slot": "call/1-2-3-2-1-4-3-2", "dispatchAtMs": 143167, "durationMs": 2862, "firstNodeMs": 146400, "text": "One, two, three, two, one, four, three, two!" },
+   { "kind": "call", "slot": "call/1-2-3-2-1-4-3-2", "dispatchAtMs": 150367, "durationMs": 2862, "firstNodeMs": 153600, "text": "One, two, three, two, one, four, three, two!" },
+   { "kind": "call", "slot": "call/1-2-3-2-1-4-3-2", "dispatchAtMs": 157567, "durationMs": 2862, "firstNodeMs": 160800, "text": "One, two, three, two, one, four, three, two!" },
+   { "kind": "call", "slot": "call/1-2-3-2-1-4-3-2", "dispatchAtMs": 164767, "durationMs": 2862, "firstNodeMs": 168000, "text": "One, two, three, two, one, four, three, two!" },
+   { "kind": "call", "slot": "call/1-2-3-2-1-4-3-2", "dispatchAtMs": 171967, "durationMs": 2862, "firstNodeMs": 175200, "text": "One, two, three, two, one, four, three, two!" },
+   { "kind": "call", "slot": "call/1-2-3-2-1-4-3-2", "dispatchAtMs": 179167, "durationMs": 2862, "firstNodeMs": 182400, "text": "One, two, three, two, one, four, three, two!" },
+   { "kind": "call", "slot": "call/1-2-3-2-1-4-3-2", "dispatchAtMs": 186367, "durationMs": 2862, "firstNodeMs": 189600, "text": "One, two, three, two, one, four, three, two!" },
+   { "kind": "call", "slot": "call/1-2-3-2-1-4-3-2", "dispatchAtMs": 193567, "durationMs": 2862, "firstNodeMs": 196800, "text": "One, two, three, two, one, four, three, two!" },
+   { "kind": "call", "slot": "call/1-2-3-2-1-4-3-2", "dispatchAtMs": 200767, "durationMs": 2862, "firstNodeMs": 204000, "text": "One, two, three, two, one, four, three, two!" },
+   { "kind": "call", "slot": "call/1-2-3-2-1-4-3-2", "dispatchAtMs": 207967, "durationMs": 2862, "firstNodeMs": 211200, "text": "One, two, three, two, one, four, three, two!" },
+   { "kind": "call", "slot": "call/1-2-3-2-1-4-3-2", "dispatchAtMs": 215167, "durationMs": 2862, "firstNodeMs": 218400, "text": "One, two, three, two, one, four, three, two!" },
+   { "kind": "call", "slot": "call/1-2-3-2-1-4-3-2", "dispatchAtMs": 222367, "durationMs": 2862, "firstNodeMs": 225600, "text": "One, two, three, two, one, four, three, two!" },
+   { "kind": "call", "slot": "call/1-2-3-2-1-4-3-2", "dispatchAtMs": 229567, "durationMs": 2862, "firstNodeMs": 232800, "text": "One, two, three, two, one, four, three, two!" }
+  ],
+  "tokensDue": 236
+ },
+ "timing": {
+  "dispatchLateMs": {
+   "n": 43,
+   "minMs": 1,
+   "medianMs": 37,
+   "p95Ms": 66,
+   "maxMs": 109
+  },
+  "ringTokenLateMs": {
+   "n": 236,
+   "minMs": 0.3,
+   "medianMs": 32.5,
+   "p95Ms": 67.5,
+   "maxMs": 195.2
+  }
+ }
+}

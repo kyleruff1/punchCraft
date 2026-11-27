@@ -33,6 +33,25 @@ The verifier (`verify-first-round.mjs`) still judges round 1; the suite adds
 whole-session health counters, AudioTrack readings at arm and at end, and
 the observers' summary beside every verdict.
 
+### The same suite on the PC
+
+`npm run pc:suite` drives the same 22 workouts from the same QA link in a
+headless browser, with no tablet: about 20 minutes for all of them. The
+correlator is this skill's, unchanged, on a capture in this skill's layout.
+The timing half is different, and has to be: `observed-timing.mjs` **refuses
+a PC capture**, because the playhead observer above means nothing in a
+browser. The PC listens to the sound itself instead and judges that
+(`tools/pc/suite/README.md`).
+
+Use it first. What is said, in what order and when is code both devices run,
+so a correlator failure there is a failure here, found without the tablet.
+What it cannot stand in for is this device's audio path: onset latency, the
+95 ms skew, the breath as delivered on the tablet. **Never tune a constant in
+this skill or in cadence-lab from a PC number.**
+
+After a tablet suite run, refresh what the PC compares itself with:
+`npm run pc:parity -- --build-reference tools/analysis/suites/<epoch>`.
+
 ## Preconditions
 
 1. **Tablet paired over wireless ADB** and awake-able: `adb devices` shows

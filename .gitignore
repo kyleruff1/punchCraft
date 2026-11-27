@@ -90,3 +90,6 @@ tools/audition/__pycache__/
 assets/branding/Punch Step1s/
 assets/branding/Punch Step2s/
 tools/voice/bakeoff/
+
+# PC suite runs (`npm run pc:suite`): captures and reports, one folder per run
+tools/pc/suite/runs/

@@ -1,0 +1,107 @@
+{
+ "workoutId": "quick-coast-reset",
+ "vocab": "techniques",
+ "timelineHash": "v2:fbcb2a56",
+ "source": {
+  "suite": "post-floor-techniques",
+  "capturedOn": "2026-09-08",
+  "device": "tablet",
+  "build": "b8e72bc5",
+  "simulatedPunches": "captured-jam",
+  "verdict": "WARN",
+  "correlator": "matched=4 extras=0 reanchor=0"
+ },
+ "round1": {
+  "dispatches": [
+   { "kind": "call", "slot": "call/1-1-1-1", "dispatchAtMs": 2979, "durationMs": 1300, "firstNodeMs": 4800, "text": "Jab, jab, jab, jab!" },
+   { "kind": "call", "slot": "call/1-1-1-1", "dispatchAtMs": 7779, "durationMs": 1300, "firstNodeMs": 9600, "text": "Jab, jab, jab, jab!" },
+   { "kind": "call", "slot": "call/1-1-1-1", "dispatchAtMs": 12579, "durationMs": 1300, "firstNodeMs": 14400, "text": "Jab, jab, jab, jab!" },
+   { "kind": "call", "slot": "call/1-1-1-1", "dispatchAtMs": 17379, "durationMs": 1300, "firstNodeMs": 19200, "text": "Jab, jab, jab, jab!" },
+   { "kind": "call", "slot": "call/1-1-1-1", "dispatchAtMs": 22179, "durationMs": 1300, "firstNodeMs": 24000, "text": "Jab, jab, jab, jab!" },
+   { "kind": "call", "slot": "call/1-1-1-1", "dispatchAtMs": 26979, "durationMs": 1300, "firstNodeMs": 28800, "text": "Jab, jab, jab, jab!" },
+   { "kind": "call", "slot": "call/1-1-1-1", "dispatchAtMs": 31779, "durationMs": 1300, "firstNodeMs": 33600, "text": "Jab, jab, jab, jab!" },
+   { "kind": "call", "slot": "call/1-1-1-1", "dispatchAtMs": 36579, "durationMs": 1300, "firstNodeMs": 38400, "text": "Jab, jab, jab, jab!" },
+   {
+    "kind": "lead-in",
+    "slot": "lead-in/quick-coast-reset/r1s2",
+    "dispatchAtMs": 41934,
+    "durationMs": 9040,
+    "text": "Coast bar — one, then three empty slots, straight time, eight bars. One shot, then recover on your feet. The empty slots are the work."
+   },
+   { "kind": "call", "slot": "call/1-.-.-.", "dispatchAtMs": 51724, "durationMs": 760, "firstNodeMs": 52800, "text": "Jab!" },
+   { "kind": "call", "slot": "call/1-.-.-.", "dispatchAtMs": 56524, "durationMs": 760, "firstNodeMs": 57600, "text": "Jab!" },
+   { "kind": "call", "slot": "call/1-.-.-.", "dispatchAtMs": 61324, "durationMs": 760, "firstNodeMs": 62400, "text": "Jab!" },
+   { "kind": "call", "slot": "call/1-.-.-.", "dispatchAtMs": 66124, "durationMs": 760, "firstNodeMs": 67200, "text": "Jab!" },
+   { "kind": "call", "slot": "call/1-.-.-.", "dispatchAtMs": 70924, "durationMs": 760, "firstNodeMs": 72000, "text": "Jab!" },
+   { "kind": "call", "slot": "call/1-.-.-.", "dispatchAtMs": 75724, "durationMs": 760, "firstNodeMs": 76800, "text": "Jab!" },
+   { "kind": "call", "slot": "call/1-.-.-.", "dispatchAtMs": 80524, "durationMs": 760, "firstNodeMs": 81600, "text": "Jab!" },
+   {
+    "kind": "lead-in",
+    "slot": "lead-in/quick-coast-reset/r1s3",
+    "dispatchAtMs": 85684,
+    "durationMs": 7158,
+    "text": "Pump: crosses only, double-time — ten bars. Rear hand, fast and straight. Then we breathe."
+   },
+   { "kind": "call", "slot": "call/2-2-2-2", "dispatchAtMs": 93592, "durationMs": 1587, "firstNodeMs": 96000, "text": "Cross, cross, cross, cross!" },
+   { "kind": "call", "slot": "call/2-2-2-2", "dispatchAtMs": 95992, "durationMs": 1587, "firstNodeMs": 98400, "text": "Cross, cross, cross, cross!" },
+   { "kind": "call", "slot": "call/2-2-2-2", "dispatchAtMs": 98392, "durationMs": 1587, "firstNodeMs": 100800, "text": "Cross, cross, cross, cross!" },
+   { "kind": "call", "slot": "call/2-2-2-2", "dispatchAtMs": 100792, "durationMs": 1587, "firstNodeMs": 103200, "text": "Cross, cross, cross, cross!" },
+   { "kind": "call", "slot": "call/2-2-2-2", "dispatchAtMs": 103192, "durationMs": 1587, "firstNodeMs": 105600, "text": "Cross, cross, cross, cross!" },
+   { "kind": "call", "slot": "call/2-2-2-2", "dispatchAtMs": 105592, "durationMs": 1587, "firstNodeMs": 108000, "text": "Cross, cross, cross, cross!" },
+   { "kind": "call", "slot": "call/2-2-2-2", "dispatchAtMs": 107992, "durationMs": 1587, "firstNodeMs": 110400, "text": "Cross, cross, cross, cross!" },
+   { "kind": "call", "slot": "call/2-2-2-2", "dispatchAtMs": 110392, "durationMs": 1587, "firstNodeMs": 112800, "text": "Cross, cross, cross, cross!" },
+   {
+    "kind": "lead-in",
+    "slot": "lead-in/quick-coast-reset/r1s4",
+    "dispatchAtMs": 113719,
+    "durationMs": 9000,
+    "text": "Jab, cross — with a hold after each, straight time, fourteen bars. Punch, wait, punch, wait. Reset between every shot."
+   },
+   { "kind": "call", "slot": "call/1-.-2-.", "dispatchAtMs": 123469, "durationMs": 1015, "firstNodeMs": 124800, "text": "Jab, cross!" },
+   { "kind": "call", "slot": "call/1-.-2-.", "dispatchAtMs": 128269, "durationMs": 1015, "firstNodeMs": 129600, "text": "Jab, cross!" },
+   { "kind": "call", "slot": "call/1-.-2-.", "dispatchAtMs": 133069, "durationMs": 1015, "firstNodeMs": 134400, "text": "Jab, cross!" },
+   { "kind": "call", "slot": "call/1-.-2-.", "dispatchAtMs": 137869, "durationMs": 1015, "firstNodeMs": 139200, "text": "Jab, cross!" },
+   { "kind": "call", "slot": "call/1-.-2-.", "dispatchAtMs": 142669, "durationMs": 1015, "firstNodeMs": 144000, "text": "Jab, cross!" },
+   { "kind": "call", "slot": "call/1-.-2-.", "dispatchAtMs": 147469, "durationMs": 1015, "firstNodeMs": 148800, "text": "Jab, cross!" },
+   { "kind": "call", "slot": "call/1-.-2-.", "dispatchAtMs": 157069, "durationMs": 1015, "firstNodeMs": 158400, "text": "Jab, cross!" },
+   { "kind": "call", "slot": "call/1-.-2-.", "dispatchAtMs": 161869, "durationMs": 1015, "firstNodeMs": 163200, "text": "Jab, cross!" },
+   { "kind": "call", "slot": "call/1-.-2-.", "dispatchAtMs": 166669, "durationMs": 1015, "firstNodeMs": 168000, "text": "Jab, cross!" },
+   { "kind": "call", "slot": "call/1-.-2-.", "dispatchAtMs": 171469, "durationMs": 1015, "firstNodeMs": 172800, "text": "Jab, cross!" },
+   { "kind": "call", "slot": "call/1-.-2-.", "dispatchAtMs": 176269, "durationMs": 1015, "firstNodeMs": 177600, "text": "Jab, cross!" },
+   { "kind": "call", "slot": "call/1-.-2-.", "dispatchAtMs": 181069, "durationMs": 1015, "firstNodeMs": 182400, "text": "Jab, cross!" },
+   {
+    "kind": "lead-in",
+    "slot": "lead-in/quick-coast-reset/r1s5",
+    "dispatchAtMs": 186056,
+    "durationMs": 8673,
+    "text": "Coast bar — cross, lead hook, empty, empty, straight time, nine bars. Cross, hook, then stand tall and breathe."
+   },
+   { "kind": "call", "slot": "call/2-3-.-.", "dispatchAtMs": 195479, "durationMs": 800, "firstNodeMs": 196800, "text": "Cross, hook!" },
+   { "kind": "call", "slot": "call/2-3-.-.", "dispatchAtMs": 200279, "durationMs": 800, "firstNodeMs": 201600, "text": "Cross, hook!" },
+   { "kind": "call", "slot": "call/2-3-.-.", "dispatchAtMs": 205079, "durationMs": 800, "firstNodeMs": 206400, "text": "Cross, hook!" },
+   { "kind": "call", "slot": "call/2-3-.-.", "dispatchAtMs": 209879, "durationMs": 800, "firstNodeMs": 211200, "text": "Cross, hook!" },
+   { "kind": "call", "slot": "call/2-3-.-.", "dispatchAtMs": 214679, "durationMs": 800, "firstNodeMs": 216000, "text": "Cross, hook!" },
+   { "kind": "call", "slot": "call/2-3-.-.", "dispatchAtMs": 219479, "durationMs": 800, "firstNodeMs": 220800, "text": "Cross, hook!" },
+   { "kind": "call", "slot": "call/2-3-.-.", "dispatchAtMs": 224279, "durationMs": 800, "firstNodeMs": 225600, "text": "Cross, hook!" },
+   { "kind": "call", "slot": "call/2-3-.-.", "dispatchAtMs": 229079, "durationMs": 800, "firstNodeMs": 230400, "text": "Cross, hook!" },
+   { "kind": "call", "slot": "call/2-3-.-.", "dispatchAtMs": 233879, "durationMs": 800, "firstNodeMs": 235200, "text": "Cross, hook!" }
+  ],
+  "tokensDue": 129
+ },
+ "timing": {
+  "dispatchLateMs": {
+   "n": 48,
+   "minMs": 2,
+   "medianMs": 28,
+   "p95Ms": 60,
+   "maxMs": 67
+  },
+  "ringTokenLateMs": {
+   "n": 129,
+   "minMs": 0.6,
+   "medianMs": 32.5,
+   "p95Ms": 73.6,
+   "maxMs": 101.8
+  }
+ }
+}

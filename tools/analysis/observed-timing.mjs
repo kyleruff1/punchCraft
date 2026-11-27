@@ -33,13 +33,15 @@
  *   → <dir>/observed-timing-report.json + .md
  *
  * Exit: 0 clean, 1 hard (coverage < 98 %, truncation, or a fit that
- * disagrees with its boundary by > 250 ms), 2 soft (any warning), 3 usage.
+ * disagrees with its boundary by > 250 ms), 2 soft (any warning), 3 usage —
+ * or a capture the tablet did not write, which is refused whole (see
+ * `NotATabletCapture`).
  */
 
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-import { boolField, extractField, numField, recordsWithTag } from './logcat.mjs'
+import { boolField, capturePlatform, extractField, numField, recordsWithTag } from './logcat.mjs'
 import { latencyStats, median, parseInstrumentObserved, parseVoiceObserved, percentile, TRUNCATION_MS } from './observed-summary.mjs'
 import { loadTimingConstants } from './timing-constants.mjs'
 
@@ -446,7 +448,39 @@ function tally(items, key) {
   return out
 }
 
+/**
+ * Thrown for a capture the tablet did not write.
+ *
+ * Everything this tool reports rests on two facts about the tablet's audio
+ * path: the playback observer's "playing" event means something there, and it
+ * runs `OBSERVER_ONSET_SKEW_MS` ahead of the sound. Neither holds in a
+ * browser. expo-audio's web player reports "playing" the moment play is
+ * requested, and it swaps its audio element under a `downloadFirst` clip,
+ * which the observer reads as a play a few milliseconds long.
+ *
+ * Run on a PC capture (2026-11-26, quick-one-two round 1) this tool reported
+ * five clips cut short that a direct measurement of the sound showed playing
+ * in full, and proposed moving `CALL_DISPATCH_LAG_MS` from 71 to 28.
+ *
+ * So it refuses, whole. Hiding only the proposals would leave the findings,
+ * and they stand on the same two facts.
+ */
+export class NotATabletCapture extends Error {
+  constructor(platform) {
+    super(
+      `this capture was written on "${platform}", not on the tablet. observed-timing judges the tablet's audio path: ` +
+        `every figure rests on the tablet's measured start latency (OBSERVER_ONSET_SKEW_MS, ${OBSERVER_ONSET_SKEW_MS} ms), ` +
+        'and anywhere else the playback observer reports "started" the moment play is requested. ' +
+        'Nothing is reported and no constant is proposed from it.',
+    )
+    this.name = 'NotATabletCapture'
+    this.platform = platform
+  }
+}
+
 export function analyze(text, constants = null) {
+  const platform = capturePlatform(text)
+  if (platform !== 'android') throw new NotATabletCapture(platform)
   const plays = parsePlays(text)
   // The ONLY place the skew is applied. Downstream, `onsetMs` is corrected and
   // `onsetMsRaw` is the status event; nothing else ever adds the constant.
@@ -1369,7 +1403,16 @@ function main() {
   }
   const constantsArg = argv.find((a) => a.startsWith('--constants='))?.slice('--constants='.length)
   const constants = constantsArg ? JSON.parse(readFileSync(constantsArg, 'utf8')) : loadTimingConstants()
-  const report = analyze(readFileSync(logPath, 'utf8'), constants)
+  let report
+  try {
+    report = analyze(readFileSync(logPath, 'utf8'), constants)
+  } catch (err) {
+    if (!(err instanceof NotATabletCapture)) throw err
+    // Before either report file is written: a refused capture leaves nothing
+    // behind that could be mistaken for a judgement.
+    console.error(`observed-timing: ${err.message}`)
+    process.exit(3)
+  }
   report.constants = constants
   const md = renderReport(report, sessionArg)
   writeFileSync(join(sessionArg, 'observed-timing-report.json'), JSON.stringify(report, null, 2) + '\n', 'utf8')

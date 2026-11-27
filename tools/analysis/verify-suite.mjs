@@ -146,7 +146,21 @@ export function parseArgs(argv) {
  * the app — Settings, QA mode — and persists; a drive against a device where
  * it is off fails with `qa-flag-off`.
  */
-export function buildRunUrl({ workout, vocab, sim, simForce, simBpm, nonce }) {
+export function buildRunUrl(run) {
+  return `punchcraft://qa/run?${runQuery(run)}`
+}
+
+/**
+ * The query of a QA run link: everything after the `?`.
+ *
+ * Its own function because two suites build the link. The tablet's opens
+ * `punchcraft://qa/run?…` as a deep link; the PC's (`tools/pc/suite/`) opens
+ * `/qa/run?…` as a page. The same route reads both, and the two drives are
+ * only comparable if they asked it for the same thing.
+ *
+ * @param {{ workout: string, vocab: string, sim?: string, simForce?: boolean, simBpm?: number, nonce: string }} run
+ */
+export function runQuery({ workout, vocab, sim, simForce, simBpm, nonce }) {
   const params = [
     ['workout', workout],
     ['vocab', vocab],
@@ -156,8 +170,7 @@ export function buildRunUrl({ workout, vocab, sim, simForce, simBpm, nonce }) {
     ['autostart', '1'],
     ['nonce', nonce],
   ]
-  const query = params.map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join('&')
-  return `punchcraft://qa/run?${query}`
+  return params.map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join('&')
 }
 
 /**

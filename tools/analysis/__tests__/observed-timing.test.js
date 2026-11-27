@@ -8,7 +8,13 @@
  * countdown ends 150 ms before the bell.
  */
 
-import { analyze, fitWorkAxis, OBSERVER_ONSET_SKEW_MS, renderReport, roundWindows } from '../observed-timing.mjs'
+import { spawnSync } from 'node:child_process'
+import { mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+import { WEB_CAPTURE_TAG } from '../logcat.mjs'
+import { analyze, fitWorkAxis, NotATabletCapture, OBSERVER_ONSET_SKEW_MS, renderReport, roundWindows } from '../observed-timing.mjs'
 
 const PID = '( 8286)'
 // The REAL ConsoleSink shape (src/diagnostics/logger.ts), copied from a
@@ -511,5 +517,54 @@ describe('report', () => {
     expect(md).toContain('| call/1-2 | 3 | numbers | 250 | 140 | 140 (min (n=3, too few for a p5)) | 140 | 140 | 110 |')
     expect(md).toContain('floor 150 ms · **at or past the punch: 0** · under floor 3/3 (100%)')
     expect(md).toContain('build: release · sha abc1234')
+  })
+})
+
+describe('a capture the tablet did not write', () => {
+  // The fixture's lines under the PC's tag: the same records, a different
+  // author. Nothing else about it changes, so what follows is the guard alone.
+  const fromThePc = () => capture().replaceAll('ReactNativeJS', WEB_CAPTURE_TAG)
+
+  it('is refused whole — no findings, no proposals', () => {
+    expect(() => analyze(fromThePc(), CONSTANTS)).toThrow(NotATabletCapture)
+    expect(() => analyze(fromThePc(), CONSTANTS)).toThrow(/written on "web", not on the tablet/)
+  })
+
+  it('is refused on the QA run record’s word as well as on the tag', () => {
+    const named = capture().replace("gitSha: 'abc1234'", "gitSha: 'abc1234',\n08-31 10:00:00.000 I/ReactNativeJS( 8286):   platform: 'web'")
+    expect(named).not.toBe(capture())
+    expect(() => analyze(named, CONSTANTS)).toThrow(NotATabletCapture)
+  })
+
+  it('still analyzes a capture that names the tablet, and one that names nothing', () => {
+    const named = capture().replace("gitSha: 'abc1234'", "gitSha: 'abc1234',\n08-31 10:00:00.000 I/ReactNativeJS( 8286):   platform: 'android'")
+    expect(named).not.toBe(capture())
+    expect(analyze(named, CONSTANTS).breath.calls).toBe(analyze(capture(), CONSTANTS).breath.calls)
+  })
+
+  describe('from the command line', () => {
+    let dir
+    beforeEach(() => {
+      dir = mkdtempSync(join(tmpdir(), 'observed-timing-'))
+    })
+    afterEach(() => rmSync(dir, { recursive: true, force: true }))
+    const run = (text) => {
+      writeFileSync(join(dir, 'logcat.txt'), text + '\n', 'utf8')
+      return spawnSync(process.execPath, [join(process.cwd(), 'tools', 'analysis', 'observed-timing.mjs'), '--session', dir], { encoding: 'utf8' })
+    }
+
+    it('exits 3, says why, and leaves no report behind', () => {
+      const result = run(fromThePc())
+      expect(result.status).toBe(3)
+      expect(result.stderr).toMatch(/not on the tablet/)
+      expect(result.stdout).toBe('')
+      expect(readdirSync(dir)).toEqual(['logcat.txt'])
+    })
+
+    it('still reports on the tablet’s own capture', () => {
+      const result = run(capture())
+      expect(result.status).not.toBe(3)
+      expect(readdirSync(dir).sort()).toEqual(['logcat.txt', 'observed-timing-report.json', 'observed-timing-report.md'])
+    })
   })
 })
