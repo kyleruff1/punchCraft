@@ -9,6 +9,7 @@
 //   npm run pc:suite -- --record                   keep what it played, as sound.webm
 //   npm run pc:suite -- --sound-gate warn          a sound finding warns instead of failing (or `off`)
 //   npm run pc:suite -- --fault mute               break the app on purpose (see faults.mjs)
+//   npm run pc:suite -- --jobs 1                   how many browsers at once (default: by the machine)
 //
 // Each workout is driven in a headless browser from the same QA link the
 // tablet suite uses, its log is saved in the tablet's layout, and the
@@ -23,6 +24,7 @@
 // 4 a manifest that no longer matches the build — the tablet suite's codes.
 import { execFileSync, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
 
@@ -47,12 +49,35 @@ import { spread } from './stats.mjs'
 
 const MANIFESTS_DIR = path.join(REPO_ROOT, 'tools', 'analysis', 'manifests')
 const RUNS_DIR = path.join(REPO_ROOT, 'tools', 'pc', 'suite', 'runs')
+/**
+ * How many drives to run at once on a machine with this many processors:
+ * half of them, and no more than six.
+ *
+ * Each drive is a browser of its own playing a workout in real time — a
+ * 50 ms loop, an animation, a little audio — so it sits well under one
+ * processor. What matters is that none has to wait for one: a drive that
+ * waits dispatches late, and its timing figures are about the queue.
+ *
+ * Measured here (16 processors, 2026-11-26, One-Two round 1): the delay from
+ * a clip's scheduled send to its first sound was 102 / 116 ms alone,
+ * 105 / 112 with three neighbours and 109 / 115 with five (median / 95th
+ * percentile) — no difference. All 22 workouts, six at a time, took 18½
+ * minutes against an hour and three quarters in series, with no call under
+ * the floor in 1 379. More than six, and fewer than half the processors
+ * idle, have not been measured.
+ *
+ * @param {number} [processors]
+ */
+export function defaultJobs(processors = os.availableParallelism()) {
+  return Math.max(1, Math.min(6, Math.floor(processors / 2)))
+}
+
 /** The simulated punches every stored tablet suite used — so the two compare. */
 export const DEFAULT_SIM = 'captured-jam'
 
 /**
  * @param {string[]} argv
- * @returns {{ only: string[], vocab: string, full: boolean, build: boolean, out: string | null, sim: string, sound: boolean, record: boolean, soundGate: string, fault: string | null }}
+ * @returns {{ only: string[], vocab: string, full: boolean, build: boolean, out: string | null, sim: string, sound: boolean, record: boolean, soundGate: string, fault: string | null, jobs: number | null }}
  */
 export function parseArgs(argv) {
   const args = {
@@ -66,6 +91,8 @@ export function parseArgs(argv) {
     record: false,
     soundGate: 'fail',
     fault: null,
+    /** How many drives at once; null until `main` asks the machine. */
+    jobs: /** @type {number | null} */ (null),
   }
   for (let i = 0; i < argv.length; i += 1) {
     const [flag, inline] = argv[i].split(/=(.*)/s)
@@ -84,6 +111,7 @@ export function parseArgs(argv) {
     else if (flag === '--record') args.record = true
     else if (flag === '--sound-gate') args.soundGate = value()
     else if (flag === '--fault') args.fault = value()
+    else if (flag === '--jobs') args.jobs = Number(value())
     else throw new Error(`unknown argument: ${argv[i]}`)
   }
   if (!['numbers', 'techniques', 'both'].includes(args.vocab)) {
@@ -98,6 +126,9 @@ export function parseArgs(argv) {
   }
   if (args.fault !== null && !args.sound)
     throw new Error('--fault needs the sound tap: drop --no-sound')
+  if (args.jobs !== null && !(Number.isInteger(args.jobs) && args.jobs >= 1)) {
+    throw new Error('--jobs is a whole number, 1 or more')
+  }
   return args
 }
 
@@ -201,7 +232,7 @@ export function renderSummary(rows, meta) {
   const L = [
     `# PC suite — ${meta.suiteId}`,
     '',
-    `checkout ${meta.hostSha} · ${meta.args.full ? 'whole workouts' : 'round 1'} · simulated punches: ${meta.args.sim} · sound ${meta.args.sound ? `gate: ${meta.args.soundGate}` : 'not listened to'} · ${path.basename(meta.browser)}`,
+    `checkout ${meta.hostSha} · ${meta.args.full ? 'whole workouts' : 'round 1'} · ${meta.args.jobs ?? 1} at a time · simulated punches: ${meta.args.sim} · sound ${meta.args.sound ? `gate: ${meta.args.soundGate}` : 'not listened to'} · ${path.basename(meta.browser)}`,
     '',
     ...(meta.args.fault
       ? [
@@ -289,7 +320,10 @@ async function runJob({ job, args, executable, baseUrl, suiteId, suiteDir, hostS
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
   const budget = budgetMs(manifest, { firstRoundOnly: !args.full })
   const nonce = `pc-${suiteId}-${job.dirName}`
-  console.info(`── ${job.workoutId} (${job.vocab}) · budget ${Math.round(budget / 1000)} s`)
+  // Several drives run at once, so a drive's lines are kept and printed
+  // together when it is done; only its start is announced as it happens.
+  const lines = [`── ${job.workoutId} (${job.vocab})`]
+  console.info(`▶ ${job.workoutId} (${job.vocab}) · budget ${Math.round(budget / 1000)} s`)
   const drive = await driveWorkout({
     executable,
     baseUrl,
@@ -359,17 +393,43 @@ async function runJob({ job, args, executable, baseUrl, suiteId, suiteDir, hostS
   }
   writeFileSync(path.join(dir, 'drive.json'), JSON.stringify(row, null, 2) + '\n', 'utf8')
   const late = row.lateness.dispatch
-  console.info(
+  lines.push(
     `   ${verdict}${row.stats ? ` · ${row.stats}` : ''} · dispatch late ${ms(late.medianMs)} / ${ms(late.p95Ms)} ms · ${clock(row.elapsedMs)}`,
   )
   if (sound) {
     const gap = sound.calls.breath
-    console.info(
+    lines.push(
       `   sound: ${sound.clips.heard} of ${sound.clips.played} clips heard · last sound → ring ${ms(gap.minMs)} least, ${ms(gap.medianMs)} median · ${sound.clips.silent.length} silent · ${sound.clips.cutShort.length} cut short`,
     )
   }
-  for (const reason of reasons) console.info(`   ! ${reason}`)
+  for (const reason of reasons) lines.push(`   ! ${reason}`)
+  console.info(lines.join('\n'))
   return row
+}
+
+/**
+ * Run `task` over `items`, at most `limit` at a time. The results come back
+ * in the items' order, whatever order they finished in.
+ *
+ * @template T, R
+ * @param {T[]} items
+ * @param {number} limit
+ * @param {(item: T, index: number) => Promise<R>} task
+ * @returns {Promise<R[]>}
+ */
+export async function pooled(items, limit, task) {
+  const results = new Array(items.length)
+  let next = 0
+  const worker = async () => {
+    for (;;) {
+      const index = next
+      next += 1
+      if (index >= items.length) return
+      results[index] = await task(items[index], index)
+    }
+  }
+  await Promise.all(Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, worker))
+  return results
 }
 
 async function main() {
@@ -405,16 +465,15 @@ async function main() {
 
   // Port 0: a free one, so this never collides with a `pc:app` left running.
   const served = await serveWebApp({ port: 0 })
+  args.jobs ??= defaultJobs()
   console.info(
-    `PC suite ${suiteId}: ${jobs.length} drive(s), ${args.full ? 'whole workouts' : 'round 1'} → ${suiteDir}`,
+    `PC suite ${suiteId}: ${jobs.length} drive(s), ${args.full ? 'whole workouts' : 'round 1'}, ${args.jobs} at a time → ${suiteDir}`,
   )
-  const rows = []
+  let rows
   try {
-    for (const job of jobs) {
-      rows.push(
-        await runJob({ job, args, executable, baseUrl: served.url, suiteId, suiteDir, hostSha }),
-      )
-    }
+    rows = await pooled(jobs, args.jobs, (job) =>
+      runJob({ job, args, executable, baseUrl: served.url, suiteId, suiteDir, hostSha }),
+    )
   } finally {
     await served.close()
   }

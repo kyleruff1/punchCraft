@@ -5,7 +5,7 @@
  */
 import { driveState } from '../drive.mjs'
 import { spread } from '../stats.mjs'
-import { driveVerdict, lateness, parseArgs, renderSummary } from '../suite.mjs'
+import { defaultJobs, driveVerdict, lateness, parseArgs, pooled, renderSummary } from '../suite.mjs'
 
 const record = (code, fields = {}) => ({
   wallMs: 0,
@@ -73,7 +73,13 @@ describe('parseArgs', () => {
       record: false,
       soundGate: 'fail',
       fault: null,
+      jobs: null,
     })
+  })
+  it('takes how many to run at once, as a whole number of one or more', () => {
+    expect(parseArgs(['--jobs', '3']).jobs).toBe(3)
+    expect(() => parseArgs(['--jobs', '0'])).toThrow(/--jobs is a whole number, 1 or more/)
+    expect(() => parseArgs(['--jobs', 'many'])).toThrow(/--jobs is a whole number/)
   })
   it('takes a gate level and a fault, and only ones it knows', () => {
     expect(parseArgs(['--sound-gate', 'warn', '--fault=cut'])).toMatchObject({
@@ -115,12 +121,49 @@ describe('parseArgs', () => {
       record: false,
       soundGate: 'fail',
       fault: null,
+      jobs: null,
     })
   })
   it('refuses what it does not know rather than running something else', () => {
     expect(() => parseArgs(['--first-round-only'])).toThrow(/unknown argument: --first-round-only/)
     expect(() => parseArgs(['--vocab', 'french'])).toThrow(/numbers, techniques or both/)
     expect(() => parseArgs(['--only'])).toThrow(/--only needs a value/)
+  })
+})
+
+describe('running several at once', () => {
+  it('runs half the processors’ worth, at least one and at most six', () => {
+    expect([1, 2, 4, 8, 16, 64].map((n) => defaultJobs(n))).toEqual([1, 1, 2, 4, 6, 6])
+  })
+
+  it('never runs more than the limit at once, and returns results in the order asked', async () => {
+    let running = 0
+    let most = 0
+    const release = []
+    const task = (item) =>
+      new Promise((resolve) => {
+        running += 1
+        most = Math.max(most, running)
+        release.push(() => {
+          running -= 1
+          resolve(item * 10)
+        })
+      })
+    const done = pooled([1, 2, 3, 4, 5], 2, task)
+    // Finish them out of order: the last started first.
+    for (let turn = 0; turn < 5; turn += 1) {
+      await Promise.resolve()
+      release.pop()()
+      await Promise.resolve()
+      await Promise.resolve()
+    }
+    await expect(done).resolves.toEqual([10, 20, 30, 40, 50])
+    expect(most).toBe(2)
+  })
+
+  it('copes with fewer items than the limit, and with none', async () => {
+    await expect(pooled(['a'], 6, async (item) => item + '!')).resolves.toEqual(['a!'])
+    await expect(pooled([], 6, async () => 1)).resolves.toEqual([])
   })
 })
 
@@ -277,7 +320,9 @@ describe('renderSummary', () => {
       '| quick-one-two | numbers | PASS | matched=3 extras=0 reanchor=0 | 0 | — | — | — | 36 / 44 | 39.7 / 45.3 | 4:42 |',
     )
     expect(md).toContain('- **body-work** (numbers): 1 error(s) on the page: x')
-    expect(md).toContain('round 1 · simulated punches: captured-jam')
+    expect(md).toContain('round 1 · 1 at a time · simulated punches: captured-jam')
+    const six = renderSummary([row()], { ...meta, args: { ...meta.args, jobs: 6 } })
+    expect(six).toContain('round 1 · 6 at a time ·')
   })
 
   it('shows what was heard: clips, losses, and the tightest and the usual gap before a ring', () => {
