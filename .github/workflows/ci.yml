@@ -74,6 +74,10 @@ jobs:
     name: pc smoke (advisory)
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # What makes it advisory in fact: the job still shows as failed, but the
+    # run does not fail with it. Without this, leaving it out of `needs`
+    # below would keep it out of the gate and still turn the run red.
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
         with:
