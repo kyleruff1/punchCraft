@@ -69,9 +69,13 @@ its migrations, the QA deep link, and the tablet's own verify suite.
   (at launch and on the live screen) and the second prompt holds the workout
   until it is answered. Decline both.
 - **Every timing figure from it is a PC number.** Its processor and audio
-  path are this PC's. `observed-timing.mjs` does not know that — it accepts
-  the capture and prints proposals for tablet constants (N-19 in the
-  findings doc). Ignore them; no tablet constant is set from an emulator.
+  path are this PC's, and no tablet constant is set from an emulator. The
+  tooling enforces most of that (N-19 in the findings doc): the app's QA run
+  record says `emulator: true`, `observed-timing.mjs` refuses such a
+  capture, and the verify suite asks the device and does not run the timing
+  analyzer for one. **Not enforced:** a capture taken by hand from an
+  emulator running a build older than `38d556f9` — an old APK installed to
+  test an upgrade — says nothing about its device. Do not analyze one.
 
 **The device.** AVD `punchcraft-emu`: Pixel Tablet profile (2560×1600),
 Android 15 (API 35, Google APIs, x86_64), 4 GB. `helioscape-dev`
@@ -107,9 +111,12 @@ The suite mutes the emulator and restores it.
 node tools/analysis/verify-suite.mjs --only=quick-one-two --device=emulator-5556 --expect-release --out=tools/analysis/suites/<name>
 ```
 
-The verdict, the correlator and the work-axis lines of the timing report
-(`round N: … disagreement … ms`) mean on an emulator what they mean on the
-tablet. Its onset, breath and proposal tables do not.
+On an emulator the suite reports the verdict and the correlator's stats,
+marks timing "not judged", and prints the **work axis** in its place — per
+round, how many ring tokens place the work clock and how far the
+work-entered boundary record trails its zero. Those are the app's own two
+clocks with no audio in them, and they mean on an emulator what they mean
+on the tablet. The onset columns of its table are this PC's.
 
 **Reading the database.** The image is a userdebug one, so:
 

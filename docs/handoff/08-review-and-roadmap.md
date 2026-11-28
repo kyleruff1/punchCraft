@@ -1556,6 +1556,9 @@ How to use what it built: `tools/pc/suite/README.md`.
 | N-18: a round opened by a skip starts its work clock at the skip | `3c1716c9` |
 | N-18: the ring clock is published with the work clock's reading at that instant | `495a67a8` |
 | The tablet's timing tool no longer files the round-1 gap as log latency | `1b272a35` |
+| N-19: the QA run record says whether an emulator wrote it | `38d556f9` |
+| N-19: the timing tool refuses an emulator's capture | `a3e6a16d` |
+| N-19: the verify suite asks the device, and does not judge an emulator's timing | `6b47e616` |
 
 The two merged branches (`feat/pc-sync-bench`, `docs/pc-sync-first-run`) are
 deleted on GitHub.
@@ -1833,27 +1836,50 @@ stay with their plan. `listAdaptationsForSession` now describes one session.
 Like 009 it is one `ADD COLUMN`, it passes the upgrade path on both engines,
 and **the tablet's real database has not run it** (§7).
 
-#### N-19 · The tablet's timing tool cannot tell an emulator from the tablet · **open — yours to decide**
+#### N-19 · The tablet's timing tool could not tell an emulator from the tablet · **fixed** (`38d556f9`, `a3e6a16d`, `6b47e616`)
 
 `observed-timing.mjs` refuses a capture from the PC version, because every
 onset in it is corrected by the tablet's start latency and every constant
 it proposes is the tablet's. An Android emulator on this PC writes a real
-Android capture, and the tool has no way to know: nothing in the log names
+Android capture, and the tool had no way to know: nothing in the log named
 the device. The verify suite ran it on the emulator's capture and it
 proposed, marked *apply: yes*, `CALL_DISPATCH_LAG_MS` 71 → 28 and
 `CLICK_SCRIPT_PREARM_PAD_MS` 200 → 180 — from this PC's audio path. That
 is the same trap the refusal was written for, by a different door, and I
 opened the door by putting the suite on an emulator.
 
-**Nothing was applied.** `CLAUDE.md`, the runbook and `docs/dev-setup.md`
-now say an emulator's timing figures are a PC's and its proposals are to be
-ignored. That is a sentence, not a guard.
+**Nothing was applied**, and the report that held the proposals is deleted.
 
-The guard would be small: `workout.qa.run` logs the device's model (React
-Native already has it — no new module), and the tool refuses a capture
-whose model is an emulator's, as it refuses a PC's; the suite would then
-show the verdict and the work-axis lines and no proposals. It touches the
-app's log and the tool's refusal, so it is yours to say.
+**Fixed, on your yes (2026-11-27), in three layers.**
+
+- *The app says what wrote the capture* (`38d556f9`). `workout.qa.run`
+  carries `emulator` and `deviceModel`, read from what React Native already
+  holds (`Build.MODEL`, `Build.FINGERPRINT`) — no new module.
+  `src/diagnostics/deviceKind.ts` decides, and is tested against this PC's
+  image, three older ones, and four shipped devices including Google's own.
+- *The tool refuses it* (`a3e6a16d`), through the refusal it already had for
+  the PC version: exit 3, nothing written, nothing proposed.
+- *The suite asks the device* (`6b47e616`) — adb's `emulator-<port>` name
+  and the image's own properties — and for anything but the tablet does not
+  run the tool at all. The drive keeps its correlator verdict, the timing
+  cell reads "not judged", and the summary shows the work axis in its
+  place. `--gh-ledger` appends nothing for an emulator.
+
+Seen working on the emulator, with a build that has it: the capture says
+`emulator: true, deviceModel: 'sdk_gphone64_x86_64'`; the suite printed
+"timing not judged — the device is an emulator" and the work axis (round 1
+at 12.7 ms, a third reading of the N-18 fix); no timing report was written;
+and the tool, run by hand on that capture, refused it.
+
+*One thing I planned and did not do.* I meant the tool itself to print the
+work axis when it refuses. A test already pins that a refused capture
+prints nothing at all, deliberately, so the tool stays silent and the suite
+shows the work axis.
+
+*What nothing catches:* a capture taken **by hand** from an emulator
+running a build older than `38d556f9`. The capture says nothing, and no
+suite is there to ask the device. The September-build run in §N-18 above is
+exactly that; I read only its clocks.
 
 #### Seen, and not chased
 
@@ -2304,6 +2330,13 @@ by design.
   010 have run on native SQLite in an emulator over a September-build
   database (§3i, Still unproven) — the shape of the upgrade is proven, the
   tablet's own data is not.
+- *N-19 — what the tablet should say of itself.* In the first capture from
+  this build, `workout.qa.run` should read `emulator: false` and
+  `deviceModel: 'Lenovo TB125FU'`, and the timing analyzer should run as it
+  always has. The check is tested against the tablet's own model and
+  fingerprint (`docs/hardware-baseline.md`), so a refusal there — the tool
+  saying the capture was written on `android-emulator` — would mean those
+  strings have changed.
 - *N-18 — fixed (`3c1716c9`, `495a67a8`); seen fixed on a native build in
   an emulator, never run on the tablet.* One tablet suite run. In every `observed-timing-report.md`, the work-axis
   line for round 0 (`disagreement … ms`) stood at 43 to 87 ms in September;

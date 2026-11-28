@@ -130,9 +130,11 @@ The same loop runs against an Android emulator with no tablet attached:
 `--device=emulator-5556`, an x86_64 release build. Recipe and limits:
 `docs/dev-setup.md`, "An Android emulator". The verdict, the correlator and
 the work-axis lines mean what they mean on the tablet. **Its timing figures
-are this PC's, and the timing report's proposals from it are to be
-ignored** — the analyzer does not refuse an emulator's capture as it does a
-PC's (N-19 in the findings doc).
+are this PC's.** The suite knows an emulator when it sees one: it marks
+timing "not judged", does not run the timing analyzer, prints the work axis
+in its place, and appends nothing to the ledger (N-19 in the findings doc).
+The analyzer itself refuses an emulator's capture, as it does a PC's — but
+only from a build new enough to say what wrote it (`38d556f9`).
 
 ### Single-workout quick check
 
