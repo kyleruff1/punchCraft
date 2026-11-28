@@ -33,9 +33,10 @@ import {
   type SharedValue,
 } from 'react-native-reanimated'
 
-import { logger, safe } from '@/diagnostics/logger'
+import { logger } from '@/diagnostics/logger'
 import { sharedWorkElapsedMs, type SharedWorkClock } from '@domain/timing/SharedWorkClock'
 import { beatOrdinalAtMsWorklet } from './ringBeatMath'
+import { ringPromoteFields } from './ringLog'
 
 /** One bar of the round's walk plan, in walk order. */
 export interface WalkBar {
@@ -51,10 +52,24 @@ export interface RoundWalkPlan {
   bars: readonly WalkBar[]
 }
 
+/**
+ * A step of the walk, as the UI thread saw it: the bar, the ring stepped to
+ * (-1 clears the row for a new bar), the ring stepped from, and the two
+ * clocks of the frame it happened on — the work-elapsed projected from the
+ * ring clock, and the frame's own timestamp. See `ringLog.ts`.
+ */
+export type OnRingStep = (
+  epoch: string,
+  ordinal: number,
+  from: number,
+  workElapsedMs: number,
+  frameMs: number,
+) => void
+
 export function useRingBeatClock(
   plan: RoundWalkPlan | null,
   clock: SharedValue<SharedWorkClock> | undefined,
-  onOrdinal: (epoch: string, ordinal: number) => void,
+  onOrdinal: OnRingStep,
   displayOrdinal?: SharedValue<number>,
 ): void {
   // The whole plan as parallel shared arrays — staged ONCE per round.
@@ -67,11 +82,18 @@ export function useRingBeatClock(
   const planRound = useSharedValue(-1)
   const active = useSharedValue(false)
 
-  const onPromote = (epochV: string, lateMs: number): void => {
-    logger.info('workout.ring.promote', 'bar promoted', {
-      cueId: safe(epochV),
-      lateMs: safe(Math.round(lateMs * 10) / 10),
-    })
+  const onPromote = (
+    epochV: string,
+    lateMs: number,
+    previousEpoch: string,
+    previousReached: number,
+    frameMs: number,
+  ): void => {
+    logger.info(
+      'workout.ring.promote',
+      'bar promoted',
+      ringPromoteFields({ epoch: epochV, lateMs, previousEpoch, previousReached, frameMs }),
+    )
   }
 
   const roundIndex = plan?.roundIndex ?? -1
@@ -110,12 +132,22 @@ export function useRingBeatClock(
     // would be VISIBLE in the log — by construction none remain.
     let idx = barIdx.value
     while (idx + 1 < n && elapsed >= s[idx + 1]!) {
+      // How far the bar being left got — read before the row is cleared.
+      // A bar the clock stepped straight over reached nothing, and says so.
+      const previousReached = lastOrdinal.value
+      const previousEpoch = idx >= 0 ? epochs.value[idx]! : ''
       idx += 1
       barIdx.value = idx
       lastOrdinal.value = -1
       if (displayOrdinal) displayOrdinal.value = -1
-      runOnJS(onPromote)(epochs.value[idx]!, elapsed - s[idx]!)
-      runOnJS(onOrdinal)(epochs.value[idx]!, -1)
+      runOnJS(onPromote)(
+        epochs.value[idx]!,
+        elapsed - s[idx]!,
+        previousEpoch,
+        previousReached,
+        timestamp,
+      )
+      runOnJS(onOrdinal)(epochs.value[idx]!, -1, previousReached, elapsed, timestamp)
     }
     if (idx < 0) return
     const target = beatOrdinalAtMsWorklet(
@@ -124,10 +156,13 @@ export function useRingBeatClock(
       expected.value[idx]!,
       elapsed,
     )
-    if (target <= lastOrdinal.value) return
+    const from = lastOrdinal.value
+    if (target <= from) return
     lastOrdinal.value = target
     if (displayOrdinal) displayOrdinal.value = target
-    runOnJS(onOrdinal)(epochs.value[idx]!, target)
+    // The frame that lit the ring, and what both clocks read on it: the
+    // log line itself is written a thread-hop later and carries no time.
+    runOnJS(onOrdinal)(epochs.value[idx]!, target, from, elapsed, timestamp)
   })
 
   useEffect(() => {
