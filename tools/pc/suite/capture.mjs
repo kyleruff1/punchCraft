@@ -10,9 +10,11 @@
 // - the process tag is `PunchCraftWeb`, not `ReactNativeJS`. No verifier
 //   reads the tag, and it is how a capture with no QA run record in it still
 //   says it is the PC's (`capturePlatform` in `tools/analysis/logcat.mjs`).
-// - the clock starts at 00:00:00.000 with the first record. The verifiers
-//   use differences only, and they read the time of day as milliseconds
-//   since midnight — so a real clock would break any run that crossed it.
+// - the clock starts at 00:00:00.000 with the first record, on one date,
+//   and simply counts up. The verifiers use differences only. (They used to
+//   read the time of day alone, which a real clock crossing midnight would
+//   have broken; the capture clock now runs through midnight, and this
+//   layout stays as it is because every stored run is written in it.)
 import { WEB_CAPTURE_TAG } from '../../analysis/logcat.mjs'
 
 /** `[INFO] workout.round.boundary` — the app's own records, and nothing else's. */

@@ -51,7 +51,6 @@ import { basename, join } from 'node:path'
 import {
   extractField,
   numField,
-  parseTimestampMs,
   stitchLogRecords,
   withCurrentTag,
 } from './logcat.mjs'
@@ -113,8 +112,7 @@ const DEFER_JOIN_WINDOW_MS = 5000
 export function parseLogcat(logcatText) {
   const events = []
   const records = stitchLogRecords(logcatText)
-  for (const { dateStr, timeStr, body: recorded } of records) {
-    const ts = parseTimestampMs(dateStr, timeStr)
+  for (const { ts, body: recorded } of records) {
     // Every check below matches the CURRENT event-code spelling. A capture
     // from before the rename spells them `puncheokie.*`; read it as written
     // today, or all ~240 stored captures parse to nothing.

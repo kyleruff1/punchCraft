@@ -60,9 +60,9 @@ export function splitLogLine(rawLine) {
 }
 
 /**
- * Milliseconds since midnight for a `-v time` timestamp. Only DIFFERENCES
- * are ever used, so a capture that crosses midnight is the caller's problem
- * (none of the archived ones do).
+ * Milliseconds since midnight for a `-v time` timestamp — the time of day
+ * alone. It wraps at midnight, so it is not a clock: read a record's `ts`
+ * (set by `stitchLogRecords`) for anything that takes a difference.
  */
 export function parseTimestampMs(dateStr, timeStr) {
   const [hh, mm, ss] = timeStr.split(':')
@@ -112,13 +112,44 @@ export function stitchLogRecords(logcatText) {
     const startsWithTag = body.startsWith("'[")
     if (startsWithTag || current === null) {
       if (current) records.push(current)
-      current = { dateStr, timeStr, pid, epochMs, body }
+      // `ts` is the capture clock, set for every record once all are stitched.
+      current = { dateStr, timeStr, pid, epochMs, body, ts: 0 }
     } else {
       current.body += ' ' + body.trim()
     }
   }
   if (current) records.push(current)
+  stampCaptureClock(records)
   return records
+}
+
+const DAY_MS = 86_400_000
+
+/**
+ * Give every record its `ts`: milliseconds on one clock that runs on through
+ * midnight.
+ *
+ * A capture that stays inside one day reads exactly as it always did —
+ * milliseconds since midnight — so nothing stored changes. When the DATE on a
+ * line differs from the line before it, the day has turned: forward if the
+ * time of day fell (23:59 → 00:00), back if it rose, which is a line from
+ * just before midnight written after one from just after it. Only the date
+ * changing can turn the day, so a long quiet stretch inside one day is never
+ * taken for a wrap; and no calendar is consulted, so the end of a month, of
+ * February and of the year are all the same case.
+ *
+ * Round 1 is four minutes and never met midnight. A suite of whole workouts
+ * on an emulator runs for hours and will.
+ */
+function stampCaptureClock(records) {
+  let day = 0
+  let previous = null
+  for (const record of records) {
+    const ofDay = parseTimestampMs(record.dateStr, record.timeStr)
+    if (previous !== null && record.dateStr !== previous.dateStr) day += ofDay < previous.ofDay ? 1 : -1
+    record.ts = day * DAY_MS + ofDay
+    previous = { dateStr: record.dateStr, ofDay }
+  }
 }
 
 /**
@@ -177,9 +208,9 @@ function tagAliases(tag) {
 }
 
 /**
- * Stitched records whose code is EXACTLY `tag`, each with its `ts` (ms since
- * midnight). Exact, so `workout.qa.run` never swallows
- * `workout.qa.run.blocked` or `.duplicate`.
+ * Stitched records whose code is EXACTLY `tag`, each with its `ts` (the
+ * capture's clock: ms since midnight, running on through it). Exact, so
+ * `workout.qa.run` never swallows `workout.qa.run.blocked` or `.duplicate`.
  *
  * Matches the pre-fork `puncheokie.*` spelling too — see LEGACY_TAG_PREFIX.
  */
@@ -187,7 +218,7 @@ export function recordsWithTag(logcatText, tag) {
   const accepted = new Set(tagAliases(tag))
   return stitchLogRecords(logcatText)
     .filter((r) => accepted.has(recordTag(r.body)))
-    .map((r) => ({ ts: parseTimestampMs(r.dateStr, r.timeStr), body: r.body }))
+    .map((r) => ({ ts: r.ts, body: r.body }))
 }
 
 /**
