@@ -144,11 +144,27 @@ export class WorkoutSessionClock {
     return transitions
   }
 
+  /**
+   * Hold the session where it is.
+   *
+   * The time since the last tick is counted first. A pause is a tap, and
+   * lands between two ticks; without this the clock froze at the tick
+   * BEFORE the tap and `resume` then set the anchor to its own instant, so
+   * every pause dropped up to a tick of the round — the round ran that much
+   * long. It is the mirror of the round that opened a tick early (N-18).
+   *
+   * So a pause can cross a boundary: if the round ended since the last tick,
+   * the rest is entered and THEN paused, and the transitions say so in that
+   * order. If the workout ended, it is completed and there is nothing to
+   * pause.
+   */
   pause(): SessionTransition[] {
     if (!this.isRunning()) return []
+    const crossed = this.advance()
+    if (!this.isRunning()) return crossed
     this.phaseBeforePause = this.phase
     this.phase = 'paused'
-    return [{ type: 'paused' }]
+    return [...crossed, { type: 'paused' }]
   }
 
   resume(): SessionTransition[] {

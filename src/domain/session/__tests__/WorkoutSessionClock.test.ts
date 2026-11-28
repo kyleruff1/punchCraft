@@ -195,6 +195,95 @@ describe('pause and resume', () => {
   })
 })
 
+describe('a pause between two ticks', () => {
+  // A tick comes every 50 ms on a device, and a pause is a tap: it lands
+  // between two of them. Every pause test above pauses ON a tick, where the
+  // time since the last tick is nothing — which is how a pause that dropped
+  // that time went unseen. It is the mirror of the round that opened a tick
+  // early (findings doc, N-18).
+  const SINCE_LAST_TICK_MS = 30
+
+  it('counts the time up to the pause', () => {
+    const h = harness()
+    h.session.start()
+    h.run(3_000)
+    h.clock.advance(SINCE_LAST_TICK_MS)
+    h.session.pause()
+    expect(h.session.snapshot().workElapsedMs).toBe(3_030)
+
+    h.clock.advance(30_000)
+    h.session.resume()
+    h.run(1_000)
+    // 4,030 ms of the round have been worked, and the clock says so.
+    expect(h.session.snapshot().workElapsedMs).toBe(4_030)
+  })
+
+  it('loses nothing over many pauses', () => {
+    const h = harness()
+    h.session.start()
+    for (let i = 0; i < 5; i++) {
+      h.run(1_000)
+      h.clock.advance(SINCE_LAST_TICK_MS)
+      h.session.pause()
+      h.clock.advance(3_000)
+      h.session.resume()
+    }
+    // It read 5,000: 150 ms of work the round then ran over by.
+    expect(h.session.snapshot().workElapsedMs).toBe(5_150)
+  })
+
+  it('reads the same frozen time at any instant while paused', () => {
+    const h = harness()
+    h.session.start()
+    h.run(3_000)
+    h.clock.advance(SINCE_LAST_TICK_MS)
+    h.session.pause()
+    h.clock.advance(10_000)
+    expect(h.session.workElapsedAt(h.clock.now())).toBe(3_030)
+  })
+
+  it('counts it in a countdown and in a rest too', () => {
+    const h = harness(ROUNDS, 3_000)
+    h.session.start()
+    h.run(1_000)
+    h.clock.advance(SINCE_LAST_TICK_MS)
+    h.session.pause()
+    expect(h.session.snapshot().phaseElapsedMs).toBe(1_030)
+    h.session.resume()
+    h.run(2_000 + 10_000 + 1_000) // the countdown's end, round 1, a second of rest
+    expect(h.session.snapshot().phase).toBe('rest')
+    const before = h.session.snapshot().phaseElapsedMs
+    h.clock.advance(SINCE_LAST_TICK_MS)
+    h.session.pause()
+    expect(h.session.snapshot().phaseElapsedMs).toBe(before + SINCE_LAST_TICK_MS)
+  })
+
+  it('enters the rest, then pauses, when the round ended since the last tick', () => {
+    const h = harness()
+    h.session.start()
+    h.run(9_900)
+    // 130 ms on: 30 ms past the bell, and no tick has seen it yet.
+    h.clock.advance(130)
+    expect(h.session.pause()).toEqual([{ type: 'rest-entered', roundIndex: 0 }, { type: 'paused' }])
+    expect(h.session.snapshot()).toMatchObject({ phase: 'paused', roundIndex: 0 })
+
+    h.clock.advance(60_000)
+    expect(h.session.resume()).toEqual([{ type: 'resumed' }])
+    // The rest is the 30 ms old it was when the pause landed.
+    expect(h.session.snapshot()).toMatchObject({ phase: 'rest', phaseElapsedMs: 30 })
+  })
+
+  it('completes the workout instead when the last round ended since the last tick', () => {
+    const h = harness([{ workDurationMs: 1_000, restAfterMs: 0 }])
+    h.session.start()
+    h.run(900)
+    h.clock.advance(130)
+    expect(h.session.pause()).toEqual([{ type: 'completed' }])
+    expect(h.session.snapshot().phase).toBe('completed')
+    // There is nothing to resume.
+    expect(h.session.resume()).toEqual([])
+  })
+})
 describe('cancel (doc §25)', () => {
   it('stops immediately and accumulates nothing further', () => {
     const h = harness()
