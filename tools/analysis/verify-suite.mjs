@@ -23,7 +23,7 @@
  *       [--only=a,b] [--device=<serial>] [--expect-release] [--first-round-only]
  *       [--sim=captured-jam|alternating-1-2|none] [--sim-force] [--sim-bpm=N]
  *       [--gh-ledger] [--dry-run] [--tap-fallback] [--keep-volume] [--out=<dir>]
- *       [--timing-gate=off|warn|fail] [--require-sha[=<sha>]]
+ *       [--timing-gate=off|warn|fail] [--require-sha[=<sha>]] [--part]
  *
  * `--require-sha` makes "the installed build is this commit" a condition
  * rather than a warning: the first drive whose build is another commit FAILS
@@ -71,8 +71,10 @@ import { parseLogcat } from './verify-first-round.mjs'
 const REPO_ROOT = import.meta.url
   ? resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
   : process.cwd()
-const MANIFESTS_DIR = join(REPO_ROOT, 'tools', 'analysis', 'manifests')
-const SUITES_DIR = join(REPO_ROOT, 'tools', 'analysis', 'suites')
+export const MANIFESTS_DIR = join(REPO_ROOT, 'tools', 'analysis', 'manifests')
+export const SUITES_DIR = join(REPO_ROOT, 'tools', 'analysis', 'suites')
+/** Where a `--part` process leaves its rows, inside the run folder it shares. */
+export const PART_ROWS_DIR = '.rows'
 
 /** Walkout + countdown allowance before round 1's bell. */
 export const WALKOUT_ALLOWANCE_MS = 90_000
@@ -109,6 +111,11 @@ export function parseArgs(argv) {
     timingGate: 'fail',
     /** undefined: only warn on a build from another commit. 'HEAD' or a sha: fail and stop. */
     requireSha: undefined,
+    /**
+     * One of several processes sharing a run folder (`emu:suite --jobs`): it
+     * writes its rows for the process that started it, and no summary.
+     */
+    part: false,
   }
   for (const a of argv) {
     if (a === '--all') args.all = true
@@ -127,6 +134,7 @@ export function parseArgs(argv) {
     else if (a === '--keep-volume') args.keepVolume = true
     else if (a.startsWith('--out=')) args.out = a.slice('--out='.length)
     else if (a.startsWith('--timing-gate=')) args.timingGate = a.slice('--timing-gate='.length)
+    else if (a === '--part') args.part = true
     else if (a === '--require-sha') args.requireSha = 'HEAD'
     else if (a.startsWith('--require-sha=')) args.requireSha = a.slice('--require-sha='.length)
     else throw new Error(`unknown argument: ${a}`)
@@ -1132,13 +1140,22 @@ async function main() {
       const row = await driveOne(ctx, job)
       ctx.rows.push(row)
       if (row.stopsSuite) stoppedAfter = index
-      writeFileSync(join(suiteDir, 'summary.json'), JSON.stringify({ suiteId, deviceId, args, rows: ctx.rows }, null, 2) + '\n', 'utf8')
+      if (!args.part) writeFileSync(join(suiteDir, 'summary.json'), JSON.stringify({ suiteId, deviceId, args, rows: ctx.rows }, null, 2) + '\n', 'utf8')
     }
     if (stoppedAfter !== null) {
       slog(`stopping: ${jobs.length - stoppedAfter - 1} drive(s) not run — they would have tested the same wrong build`)
     }
     const judged = ctx.rows.filter((r) => !r.superseded)
     exitCode = aggregateVerdicts(judged.map((r) => r.verdict))
+    if (args.part) {
+      // One of several processes sharing this folder. Its rows are left for the
+      // process that started them all, which writes the one summary.
+      ensureDir(join(suiteDir, PART_ROWS_DIR))
+      const name = `${jobs[0]?.dirName ?? 'none'}.json`
+      writeFileSync(join(suiteDir, PART_ROWS_DIR, name), JSON.stringify({ deviceId, exitCode, rows: ctx.rows }, null, 2) + '\n', 'utf8')
+      slog(`part done · exit ${exitCode}`)
+      return exitCode
+    }
     const md = renderSummaryMd(judged, {
       suiteId,
       deviceId,

@@ -278,6 +278,10 @@ describe('args', () => {
     expect(() => parseArgs(['--all', '--require-sha=main'])).toThrow(/--require-sha/)
     expect(() => parseArgs(['--all', '--require-sha=abc'])).toThrow(/--require-sha/)
   })
+  it('takes --part: one of several processes sharing a run folder', () => {
+    expect(parseArgs(['--all']).part).toBe(false)
+    expect(parseArgs(['--only=body-work', '--part']).part).toBe(true)
+  })
   it('rejects a run with nothing selected, a bad vocab, or an unknown flag', () => {
     expect(() => parseArgs([])).toThrow(/--all or --only/)
     expect(() => parseArgs(['--all', '--vocab=loud'])).toThrow(/--vocab/)

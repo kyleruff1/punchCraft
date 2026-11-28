@@ -6,6 +6,7 @@
  * drive adb are proven by running it (docs/dev-setup.md).
  */
 import {
+  afterRedrive,
   ARCH,
   avdNameFrom,
   DEFAULT_AVD,
@@ -13,10 +14,13 @@ import {
   deviceRefusal,
   emulatorArgs,
   gradleInvocation,
+  instancePorts,
   grantedIn,
   isAndroidSource,
   needsBuild,
+  needsRedrive,
   parseArgs,
+  partArguments,
   qaModeIsOn,
   qaModeSql,
   QA_VALUE,
@@ -254,5 +258,94 @@ describe('copying android/ into a worktree', () => {
   it('reads Windows paths the same way', () => {
     expect(isAndroidSource('app\\build\\outputs')).toBe(false)
     expect(isAndroidSource('app\\src\\main')).toBe(true)
+  })
+})
+
+describe('several emulators at once', () => {
+  it('takes --jobs from 1 to 8, and no further than the last emulator port', () => {
+    expect(parseArgs([]).jobs).toBe(1)
+    expect(parseArgs(['--jobs=4']).jobs).toBe(4)
+    expect(() => parseArgs(['--jobs=0'])).toThrow(/--jobs/)
+    expect(() => parseArgs(['--jobs=9'])).toThrow(/--jobs/)
+    expect(() => parseArgs(['--jobs=two'])).toThrow(/--jobs/)
+    expect(() => parseArgs(['--jobs=4', '--port=5680'])).toThrow(/past the last emulator port/)
+  })
+
+  it('gives each instance its own port, two apart, and never the first emulator’s', () => {
+    expect(instancePorts(5556, 4)).toEqual([5556, 5558, 5560, 5562])
+    expect(instancePorts(5556, 1)).toEqual([5556])
+  })
+
+  it('starts them read-only, so they share the AVD and keep nothing', () => {
+    expect(emulatorArgs({ avd: 'punchcraft-emu', port: 5558, readOnly: true })).toEqual([
+      '-avd',
+      'punchcraft-emu',
+      '-read-only',
+      '-no-window',
+      '-no-snapshot',
+      '-no-boot-anim',
+      '-gpu',
+      'host',
+      '-port',
+      '5558',
+    ])
+    expect(emulatorArgs({ avd: 'punchcraft-emu', port: 5556 })).not.toContain('-read-only')
+  })
+
+  it('hands each process one drive, one emulator, the shared folder — and no summary of its own', () => {
+    const job = { workoutId: 'body-work', vocab: 'techniques', dirName: 'body-work.techniques' }
+    expect(
+      partArguments(job, 'emulator-5558', 'F:/run', [
+        '--vocab=both',
+        '--first-round-only',
+        '--only=a,b',
+        '--all',
+        '--out=elsewhere',
+        '--sim=captured-jam',
+      ]),
+    ).toEqual([
+      '--device=emulator-5558',
+      '--expect-release',
+      '--require-sha',
+      '--only=body-work',
+      '--vocab=techniques',
+      '--out=F:/run',
+      '--part',
+      '--first-round-only',
+      '--sim=captured-jam',
+    ])
+  })
+
+  it('drives a FAIL or an ERROR again alone before reporting it — but not a wrong build', () => {
+    expect(needsRedrive({ verdict: 'FAIL', reason: null })).toBe(true)
+    expect(needsRedrive({ verdict: 'ERROR', reason: 'timeout: no rest-entered within 390s' })).toBe(
+      true,
+    )
+    expect(needsRedrive({ verdict: 'WARN' })).toBe(false)
+    expect(needsRedrive({ verdict: 'PASS' })).toBe(false)
+    expect(
+      needsRedrive({
+        verdict: 'FAIL',
+        reason:
+          'build-mismatch: the installed build is abc1234, and --require-sha asked for def5678',
+      }),
+    ).toBe(false)
+  })
+
+  it('reports the drive it had alone, and says what it was when busy', () => {
+    const busy = {
+      workoutId: 'body-work',
+      vocab: 'numbers',
+      verdict: 'FAIL',
+      reason: '3 bar(s) did not light all their rings',
+    }
+    const alone = { workoutId: 'body-work', vocab: 'numbers', verdict: 'PASS', reason: null }
+    expect(afterRedrive(busy, alone)).toEqual({
+      ...alone,
+      redrivenAlone: {
+        verdictWhenBusy: 'FAIL',
+        reasonWhenBusy: '3 bar(s) did not light all their rings',
+      },
+    })
   })
 })

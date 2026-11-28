@@ -5,6 +5,7 @@
  *   npm run emu:suite                                  all 22, numbers, whole workouts
  *   npm run emu:suite -- --only=quick-one-two --first-round-only
  *   npm run emu:suite -- --vocab=both --out=tools/analysis/suites/<name>
+ *   npm run emu:suite -- --vocab=both --jobs=4         four emulators at once
  *   npm run emu:suite -- --dry-run                     say what it would do
  *   npm run emu:prepare                                give a worktree its android/ project
  *
@@ -46,6 +47,7 @@ import {
   existsSync,
   mkdirSync,
   openSync,
+  readdirSync,
   readFileSync,
   readSync,
   writeFileSync,
@@ -53,7 +55,16 @@ import {
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { isEmulatorDevice } from '../analysis/verify-suite.mjs'
+import {
+  aggregateVerdicts,
+  isEmulatorDevice,
+  MANIFESTS_DIR,
+  parseArgs as parseSuiteArgs,
+  PART_ROWS_DIR,
+  planJobs,
+  renderSummaryMd,
+  SUITES_DIR,
+} from '../analysis/verify-suite.mjs'
 import { devicesFromAdb, PACKAGE, sawReady } from './reload-tablet.mjs'
 
 export const DEFAULT_AVD = 'punchcraft-emu'
@@ -92,6 +103,8 @@ export function parseArgs(argv) {
     keepRunning: false,
     avd: DEFAULT_AVD,
     port: DEFAULT_PORT,
+    /** How many emulators drive at once. */
+    jobs: 1,
     bootTimeoutMs: 300_000,
     /** @type {string[]} */
     suiteArgs: [],
@@ -103,6 +116,7 @@ export function parseArgs(argv) {
     else if (arg === '--keep-running') opts.keepRunning = true
     else if (arg.startsWith('--avd=')) opts.avd = arg.slice('--avd='.length)
     else if (arg.startsWith('--port=')) opts.port = Number(arg.slice('--port='.length))
+    else if (arg.startsWith('--jobs=')) opts.jobs = Number(arg.slice('--jobs='.length))
     else if (arg === '--device' || arg.startsWith('--device=')) {
       throw new Error('--device is not taken here: the device is the emulator on --port')
     } else opts.suiteArgs.push(arg)
@@ -110,6 +124,12 @@ export function parseArgs(argv) {
   if (!/^[\w.-]+$/.test(opts.avd)) throw new Error(`--avd must be an AVD name, got '${opts.avd}'`)
   if (!Number.isInteger(opts.port) || opts.port < 5556 || opts.port > 5682 || opts.port % 2 !== 0) {
     throw new Error(`--port must be an even emulator port from 5556 to 5682, got ${opts.port}`)
+  }
+  if (!Number.isInteger(opts.jobs) || opts.jobs < 1 || opts.jobs > 8) {
+    throw new Error(`--jobs must be a whole number from 1 to 8, got ${opts.jobs}`)
+  }
+  if (opts.port + 2 * (opts.jobs - 1) > 5682) {
+    throw new Error(`--jobs=${opts.jobs} from port ${opts.port} runs past the last emulator port`)
   }
   return opts
 }
@@ -119,11 +139,18 @@ export function serialFor(port) {
   return `emulator-${port}`
 }
 
-/** No window, no snapshot: every start is the same cold device. */
-export function emulatorArgs({ avd, port }) {
+/**
+ * No window, no snapshot: every start is the same cold device.
+ *
+ * `readOnly` is how several run at once: a read-only instance shares the
+ * AVD's image with the others, boots from the state the last ordinary run
+ * left, and throws its own changes away when it stops.
+ */
+export function emulatorArgs({ avd, port, readOnly = false }) {
   return [
     '-avd',
     avd,
+    ...(readOnly ? ['-read-only'] : []),
     '-no-window',
     '-no-snapshot',
     '-no-boot-anim',
@@ -186,6 +213,56 @@ export function suiteArguments(passed, serial) {
     ...(picked ? [] : ['--all']),
     ...passed,
   ]
+}
+
+/** The console ports of several instances: the first, and every second one after it. */
+export function instancePorts(basePort, jobs) {
+  return Array.from({ length: jobs }, (_, index) => basePort + 2 * index)
+}
+
+/** Verify-suite arguments that pick the drives or the folder. With several emulators, this script decides those. */
+const picksDrives = (arg) =>
+  arg === '--all' ||
+  arg.startsWith('--only=') ||
+  arg.startsWith('--vocab=') ||
+  arg.startsWith('--out=')
+
+/**
+ * One child's arguments when several emulators share a run: one drive, one
+ * emulator, the shared folder, and no summary of its own (`--part`).
+ */
+export function partArguments(job, serial, runDir, passed) {
+  return [
+    `--device=${serial}`,
+    '--expect-release',
+    '--require-sha',
+    `--only=${job.workoutId}`,
+    `--vocab=${job.vocab}`,
+    `--out=${runDir}`,
+    '--part',
+    ...passed.filter((arg) => !picksDrives(arg)),
+  ]
+}
+
+/**
+ * Whether a drive is worth driving again with nothing else running.
+ *
+ * Several emulators at once can starve one of them: frames are held, a ring
+ * is stepped over, a launch times out. A FAIL or an ERROR found that way is
+ * not reported until the drive has had the machine to itself. A build that
+ * is the wrong commit is not that kind of failure, and is not re-driven.
+ */
+export function needsRedrive(row) {
+  if (row.verdict !== 'FAIL' && row.verdict !== 'ERROR') return false
+  return !String(row.reason ?? '').startsWith('build-mismatch')
+}
+
+/** The row to report for a drive that was driven again alone: the second, saying what the first was. */
+export function afterRedrive(busyRow, aloneRow) {
+  return {
+    ...aloneRow,
+    redrivenAlone: { verdictWhenBusy: busyRow.verdict, reasonWhenBusy: busyRow.reason ?? null },
+  }
 }
 
 /**
@@ -489,6 +566,176 @@ function runSuite(opts, serial) {
   return spawnSync(process.execPath, args, { cwd: REPO_ROOT, stdio: 'inherit' }).status ?? 1
 }
 
+function stopEmulator(serial) {
+  say(`stopping ${serial}`)
+  adb(serial, 'emu', 'kill')
+}
+
+async function waitUntilGone(serial, timeoutMs) {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    if (!devicesFromAdb(run('adb', ['devices']).stdout).includes(serial)) return
+    await sleep(1_000)
+  }
+  throw new Stop(`${serial} did not stop`)
+}
+
+function startEmulator(opts, port, readOnly) {
+  mkdirSync(join(REPO_ROOT, 'artifacts'), { recursive: true })
+  const log = openSync(join(REPO_ROOT, 'artifacts', `emulator-${port}.log`), 'a')
+  const child = spawn(emulatorBinary(), emulatorArgs({ avd: opts.avd, port, readOnly }), {
+    detached: true,
+    stdio: ['ignore', log, log],
+  })
+  child.unref()
+  closeSync(log)
+}
+
+/** One drive as its own verify-suite process, its output kept beside its result. */
+function drivePart(job, serial, runDir, passed) {
+  return new Promise((done) => {
+    const rowsDir = join(runDir, PART_ROWS_DIR)
+    mkdirSync(rowsDir, { recursive: true })
+    const log = openSync(join(rowsDir, `${job.dirName}.log`), 'a')
+    const child = spawn(
+      process.execPath,
+      [
+        join(REPO_ROOT, 'tools', 'analysis', 'verify-suite.mjs'),
+        ...partArguments(job, serial, runDir, passed),
+      ],
+      { cwd: REPO_ROOT, stdio: ['ignore', log, log] },
+    )
+    child.on('close', () => {
+      closeSync(log)
+      let rows = []
+      try {
+        rows = JSON.parse(readFileSync(join(rowsDir, `${job.dirName}.json`), 'utf8')).rows ?? []
+      } catch {
+        // No result file: the process ended before it could judge anything.
+      }
+      const judged = rows.filter((row) => !row.superseded).at(-1)
+      done(
+        judged ?? {
+          workoutId: job.workoutId,
+          vocab: job.vocab,
+          verdict: 'ERROR',
+          reason: 'the suite process ended without a result',
+          elapsedMs: 0,
+        },
+      )
+    })
+  })
+}
+
+/**
+ * Several emulators at once.
+ *
+ * The base AVD is brought up to date in an ordinary instance — build
+ * installed, permissions granted, QA mode on — and stopped. Then N
+ * READ-ONLY instances of it start: each boots from that state, shares the
+ * base image, and throws its changes away when it stops, so they cannot
+ * disturb one another or the base. Each takes the next drive from one queue.
+ */
+async function runSeveral(opts) {
+  const suite = parseSuiteArgs(
+    suiteArguments(opts.suiteArgs, 'x').filter((arg) => !arg.startsWith('--device=')),
+  )
+  const jobs = planJobs(readdirSync(MANIFESTS_DIR), suite)
+  const runDir = resolve(REPO_ROOT, suite.out ?? join(SUITES_DIR, String(Date.now())))
+  const ports = instancePorts(opts.port, Math.min(opts.jobs, jobs.length))
+  const serials = ports.map(serialFor)
+  const upNow = devicesFromAdb(run('adb', ['devices']).stdout)
+  const inTheWay = serials.filter((serial) => upNow.includes(serial))
+  if (inTheWay.length > 0) {
+    throw new Stop(
+      `${inTheWay.join(', ')} already running. Several at once need the AVD to themselves — stop ${inTheWay.length === 1 ? 'it' : 'them'}, or use --jobs=1`,
+    )
+  }
+
+  const base = serials[0]
+  say(`bringing ${opts.avd} up to date`)
+  await ensureEmulator(opts, base)
+  try {
+    ensureInstalled(base)
+    grantBluetooth(base)
+    await enableQaMode(base)
+  } finally {
+    stopEmulator(base)
+  }
+  await waitUntilGone(base, 120_000)
+
+  say(`starting ${ports.length} read-only instances of ${opts.avd}: ${serials.join(', ')}`)
+  for (const port of ports) startEmulator(opts, port, true)
+  try {
+    for (const serial of serials) {
+      run('adb', ['-s', serial, 'wait-for-device'], { timeout: opts.bootTimeoutMs })
+      await waitForBoot(serial, opts.bootTimeoutMs)
+      const refusal = deviceRefusal({
+        serial,
+        isEmulator: true,
+        avdName: avdNameFrom(adb(serial, 'emu', 'avd', 'name').stdout),
+        expectedAvd: opts.avd,
+      })
+      if (refusal) throw new Stop(refusal)
+    }
+
+    const queue = [...jobs]
+    const rows = new Map()
+    let finished = 0
+    const worker = async (serial) => {
+      for (let job = queue.shift(); job !== undefined; job = queue.shift()) {
+        const row = await drivePart(job, serial, runDir, opts.suiteArgs)
+        rows.set(job.dirName, row)
+        finished += 1
+        say(
+          `${finished}/${jobs.length} ${job.workoutId} (${job.vocab}) ${row.verdict}${row.reason ? ` — ${row.reason}` : ''} · ${serial}`,
+        )
+      }
+    }
+    await Promise.all(serials.map(worker))
+
+    // Not reported until it has had the machine to itself.
+    for (const job of jobs.filter((each) => needsRedrive(rows.get(each.dirName)))) {
+      const busy = rows.get(job.dirName)
+      say(
+        `${job.workoutId} (${job.vocab}) was ${busy.verdict} with ${ports.length} running — driving it again alone`,
+      )
+      const alone = await drivePart(job, base, join(runDir, 'alone'), opts.suiteArgs)
+      rows.set(job.dirName, afterRedrive(busy, alone))
+      say(`  alone: ${alone.verdict}${alone.reason ? ` — ${alone.reason}` : ''}`)
+    }
+
+    const ordered = jobs.map((job) => rows.get(job.dirName))
+    const exitCode = aggregateVerdicts(ordered.map((row) => row.verdict))
+    const summary = renderSummaryMd(ordered, {
+      suiteId: String(Date.now()),
+      deviceId: `${serials.length} read-only instances of ${opts.avd}`,
+      deviceIsEmulator: true,
+      launch: suite.launch,
+      vocab: suite.vocab,
+      sim: suite.sim,
+      firstRoundOnly: suite.firstRoundOnly,
+      timingGate: suite.timingGate,
+      exitCode,
+    })
+    const redriven = ordered.filter((row) => row.redrivenAlone)
+    const note =
+      redriven.length === 0
+        ? ''
+        : `\n### Driven again alone\n\n${redriven.map((row) => `- **${row.workoutId} (${row.vocab})** — ${row.redrivenAlone.verdictWhenBusy} with ${serials.length} emulators running${row.redrivenAlone.reasonWhenBusy ? ` (${row.redrivenAlone.reasonWhenBusy})` : ''}; **${row.verdict}** alone, which is what is reported.`).join('\n')}\n`
+    writeFileSync(join(runDir, 'summary.md'), summary + note)
+    writeFileSync(
+      join(runDir, 'summary.json'),
+      JSON.stringify({ serials, exitCode, rows: ordered }, null, 2) + '\n',
+    )
+    console.log(`\n${summary}${note}`)
+    say(`done · exit ${exitCode} · ${join(runDir, 'summary.md')}`)
+    return exitCode
+  } finally {
+    if (!opts.keepRunning) for (const serial of serials) stopEmulator(serial)
+  }
+}
+
 /**
  * Give a worktree its `android/` project: the main checkout's, without its
  * build output. A worktree has none of its own — the folder is git-ignored —
@@ -544,10 +791,15 @@ async function main() {
     )
     say('would install the APK if the device has another, grant Bluetooth, switch QA mode on')
     say(`would run: verify-suite ${suiteArguments(opts.suiteArgs, serial).join(' ')}`)
+    if (opts.jobs > 1)
+      say(
+        `would run it as ${opts.jobs} read-only instances on ports ${instancePorts(opts.port, opts.jobs).join(', ')}, one drive each at a time`,
+      )
     return 0
   }
   // Build first: it needs no device, and a refusal here costs nothing.
   ensureBuild(opts)
+  if (opts.jobs > 1) return runSeveral(opts)
   const started = await ensureEmulator(opts, serial)
   try {
     ensureInstalled(serial)
