@@ -59,7 +59,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 53
+      "expectedCallBars": 53,
+      "rest": {
+        "restLine": {
+          "scriptId": "rr-8c8d3bac",
+          "slot": "rest/quick-downstairs/r1",
+          "text": "Good body work starts with balance, not with reaching down. Round two digs and comes back up — first set is one, two, three-bee, two in straight time. Let the ribs expand on a long breath.",
+          "plannedMs": 14800,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 2,
+          "afterOpener": [
+            "li-4d8ff1fe",
+            "warn-round-2"
+          ],
+          "afterOpenerMs": 14669,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 1,
@@ -97,9 +115,39 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 74
+      "expectedCallBars": 74,
+      "rest": null
     }
   ],
+  "ceremonies": {
+    "walkout": {
+      "segments": [
+        "intro-hello",
+        "intro-program-intermediate-steady",
+        "li-0a0bb4e4",
+        "intro-letsgo"
+      ],
+      "plannedMs": 22344,
+      "tracks": 7
+    },
+    "countdownOpeners": {
+      "warn-opener-01": 2453,
+      "warn-opener-02": 1293,
+      "warn-opener-03": 2426,
+      "warn-opener-04": 2893,
+      "warn-opener-05": 2451,
+      "warn-opener-06": 2512,
+      "warn-opener-07": 2019,
+      "warn-opener-08": 2285,
+      "warn-opener-09": 1733,
+      "warn-opener-10": 3893,
+      "warn-opener-11": 2673,
+      "warn-opener-12": 2310,
+      "warn-opener-13": 1782,
+      "warn-opener-14": 3319,
+      "warn-opener-15": 2653
+    }
+  },
   "silentByDesign": [],
   "notes": []
 }

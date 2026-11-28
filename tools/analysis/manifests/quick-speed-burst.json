@@ -59,7 +59,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 92
+      "expectedCallBars": 92,
+      "rest": {
+        "restLine": {
+          "scriptId": "rr-df021384",
+          "slot": "rest/quick-speed-burst/r1",
+          "text": "Speed lives in the bursts, not in the grid. Round two reads longer pages at pace — first set is one, two, three with the fourth slot open, double-time. Drop the shoulders and breathe slow.",
+          "plannedMs": 14544,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 2,
+          "afterOpener": [
+            "li-b3d182ff",
+            "warn-round-2"
+          ],
+          "afterOpenerMs": 14834,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 1,
@@ -97,9 +115,39 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 93
+      "expectedCallBars": 93,
+      "rest": null
     }
   ],
+  "ceremonies": {
+    "walkout": {
+      "segments": [
+        "intro-hello",
+        "intro-program-intermediate-steady",
+        "li-34f88a99",
+        "intro-letsgo"
+      ],
+      "plannedMs": 22575,
+      "tracks": 7
+    },
+    "countdownOpeners": {
+      "warn-opener-01": 2453,
+      "warn-opener-02": 1293,
+      "warn-opener-03": 2426,
+      "warn-opener-04": 2893,
+      "warn-opener-05": 2451,
+      "warn-opener-06": 2512,
+      "warn-opener-07": 2019,
+      "warn-opener-08": 2285,
+      "warn-opener-09": 1733,
+      "warn-opener-10": 3893,
+      "warn-opener-11": 2673,
+      "warn-opener-12": 2310,
+      "warn-opener-13": 1782,
+      "warn-opener-14": 3319,
+      "warn-opener-15": 2653
+    }
+  },
   "silentByDesign": [],
   "notes": []
 }

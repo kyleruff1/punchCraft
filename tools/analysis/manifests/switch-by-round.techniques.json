@@ -67,7 +67,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 52
+      "expectedCallBars": 52,
+      "rest": {
+        "restLine": {
+          "scriptId": "rt-4901cac7",
+          "slot": "rest/switch-by-round/r1",
+          "text": "Orthodox round is banked. Square up for a moment, breathe, then put the right foot forward for southpaw. The numbers do not change. First set is still jab, cross, lead hook, cross — make the mirror feel just as honest.",
+          "plannedMs": 15800,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 2,
+          "afterOpener": [
+            "lt-59c6cd4d",
+            "warn-round-2"
+          ],
+          "afterOpenerMs": 15755,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 1,
@@ -105,7 +123,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 52
+      "expectedCallBars": 52,
+      "rest": {
+        "restLine": {
+          "scriptId": "rt-c9c85ffd",
+          "slot": "rest/switch-by-round/r2",
+          "text": "Good mirror round. Switch back to orthodox and let the hips settle before the bell. Pressure round next: two pages beginning jab, cross, lead hook, cross. Page two changes level and keeps the same lead-rear logic.",
+          "plannedMs": 15326,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 3,
+          "afterOpener": [
+            "lt-3eefa88b",
+            "warn-round-3"
+          ],
+          "afterOpenerMs": 21167,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 2,
@@ -143,7 +179,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 50
+      "expectedCallBars": 50,
+      "rest": {
+        "restLine": {
+          "scriptId": "rt-c982b746",
+          "slot": "rest/switch-by-round/r3",
+          "text": "One more stance change. Southpaw for the finish. First set is jab, cross, lead hook, cross in straight time, then we add the square and the uppercut entry. Take one slow breath in, long breath out, and set the feet.",
+          "plannedMs": 15880,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 4,
+          "afterOpener": [
+            "lt-f05fe39b",
+            "warn-round-4"
+          ],
+          "afterOpenerMs": 13509,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 3,
@@ -181,9 +235,39 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 51
+      "expectedCallBars": 51,
+      "rest": null
     }
   ],
+  "ceremonies": {
+    "walkout": {
+      "segments": [
+        "intro-hello",
+        "intro-program-intermediate-technical",
+        "lt-4688ce14",
+        "intro-letsgo"
+      ],
+      "plannedMs": 24012,
+      "tracks": 7
+    },
+    "countdownOpeners": {
+      "warn-opener-01": 2453,
+      "warn-opener-02": 1293,
+      "warn-opener-03": 2426,
+      "warn-opener-04": 2893,
+      "warn-opener-05": 2451,
+      "warn-opener-06": 2512,
+      "warn-opener-07": 2019,
+      "warn-opener-08": 2285,
+      "warn-opener-09": 1733,
+      "warn-opener-10": 3893,
+      "warn-opener-11": 2673,
+      "warn-opener-12": 2310,
+      "warn-opener-13": 1782,
+      "warn-opener-14": 3319,
+      "warn-opener-15": 2653
+    }
+  },
   "silentByDesign": [],
   "notes": []
 }

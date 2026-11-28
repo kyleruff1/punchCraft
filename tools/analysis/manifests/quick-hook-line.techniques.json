@@ -59,7 +59,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 51
+      "expectedCallBars": 51,
+      "rest": {
+        "restLine": {
+          "scriptId": "rt-a2451fc4",
+          "slot": "rest/quick-hook-line/r1",
+          "text": "Hooks come off the line, never instead of it. Round two is both hooks — first set is jab, cross, lead hook, rear hook in straight time, then the hooks alone. Shake the arms out and stay tall.",
+          "plannedMs": 14120,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 2,
+          "afterOpener": [
+            "lt-bdcd9b40",
+            "warn-round-2"
+          ],
+          "afterOpenerMs": 14995,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 1,
@@ -97,9 +115,39 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 65
+      "expectedCallBars": 65,
+      "rest": null
     }
   ],
+  "ceremonies": {
+    "walkout": {
+      "segments": [
+        "intro-hello",
+        "intro-program-intermediate-steady",
+        "lt-671ca728",
+        "intro-letsgo"
+      ],
+      "plannedMs": 24664,
+      "tracks": 7
+    },
+    "countdownOpeners": {
+      "warn-opener-01": 2453,
+      "warn-opener-02": 1293,
+      "warn-opener-03": 2426,
+      "warn-opener-04": 2893,
+      "warn-opener-05": 2451,
+      "warn-opener-06": 2512,
+      "warn-opener-07": 2019,
+      "warn-opener-08": 2285,
+      "warn-opener-09": 1733,
+      "warn-opener-10": 3893,
+      "warn-opener-11": 2673,
+      "warn-opener-12": 2310,
+      "warn-opener-13": 1782,
+      "warn-opener-14": 3319,
+      "warn-opener-15": 2653
+    }
+  },
   "silentByDesign": [],
   "notes": []
 }

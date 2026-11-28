@@ -67,7 +67,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 53
+      "expectedCallBars": 53,
+      "rest": {
+        "restLine": {
+          "scriptId": "rr-8a5f2598",
+          "slot": "rest/switch-by-round/r1",
+          "text": "Orthodox round is banked. Square up for a moment, breathe, then put the right foot forward for southpaw. The numbers do not change. First set is still one, two, three, two — make the mirror feel just as honest.",
+          "plannedMs": 15240,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 2,
+          "afterOpener": [
+            "li-326f5136",
+            "warn-round-2"
+          ],
+          "afterOpenerMs": 14955,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 1,
@@ -105,7 +123,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 53
+      "expectedCallBars": 53,
+      "rest": {
+        "restLine": {
+          "scriptId": "rr-3b437962",
+          "slot": "rest/switch-by-round/r2",
+          "text": "Good mirror round. Switch back to orthodox and let the hips settle before the bell. Pressure round next: two pages beginning one, two, three, two. Page two changes level and keeps the same lead-rear logic.",
+          "plannedMs": 14620,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 3,
+          "afterOpener": [
+            "li-4dd1d094",
+            "warn-round-3"
+          ],
+          "afterOpenerMs": 18530,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 2,
@@ -143,7 +179,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 51
+      "expectedCallBars": 51,
+      "rest": {
+        "restLine": {
+          "scriptId": "rr-55885da9",
+          "slot": "rest/switch-by-round/r3",
+          "text": "One more stance change. Southpaw for the finish. First set is one, two, three, two in straight time, then we add the square and the uppercut entry. Take one slow breath in, long breath out, and set the feet.",
+          "plannedMs": 14331,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 4,
+          "afterOpener": [
+            "li-be5c2030",
+            "warn-round-4"
+          ],
+          "afterOpenerMs": 14233,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 3,
@@ -181,9 +235,39 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 54
+      "expectedCallBars": 54,
+      "rest": null
     }
   ],
+  "ceremonies": {
+    "walkout": {
+      "segments": [
+        "intro-hello",
+        "intro-program-intermediate-technical",
+        "li-9211bc13",
+        "intro-letsgo"
+      ],
+      "plannedMs": 23561,
+      "tracks": 7
+    },
+    "countdownOpeners": {
+      "warn-opener-01": 2453,
+      "warn-opener-02": 1293,
+      "warn-opener-03": 2426,
+      "warn-opener-04": 2893,
+      "warn-opener-05": 2451,
+      "warn-opener-06": 2512,
+      "warn-opener-07": 2019,
+      "warn-opener-08": 2285,
+      "warn-opener-09": 1733,
+      "warn-opener-10": 3893,
+      "warn-opener-11": 2673,
+      "warn-opener-12": 2310,
+      "warn-opener-13": 1782,
+      "warn-opener-14": 3319,
+      "warn-opener-15": 2653
+    }
+  },
   "silentByDesign": [],
   "notes": []
 }

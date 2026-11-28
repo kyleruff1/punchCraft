@@ -499,6 +499,7 @@ describe('how far a drive was meant to run', () => {
       reasons: [],
       stats: 'matched=12 extras=0 reanchor=0',
       roundsJudged: '4 of 4 rounds',
+      ceremonies: '7 of 7 ceremonies',
       pageProblems: [],
       lateness: {
         dispatch: { medianMs: 36, p95Ms: 44 },
@@ -513,7 +514,10 @@ describe('how far a drive was meant to run', () => {
       args: parseArgs(['--full']),
     }
     const md = renderSummary([row], meta)
-    expect(md).toContain('| PASS | matched=12 extras=0 reanchor=0 · 4 of 4 rounds | 0 |')
+    expect(md).toContain(
+      '| PASS | matched=12 extras=0 reanchor=0 · 4 of 4 rounds · 7 of 7 ceremonies | 0 |',
+    )
+    expect(md).toContain('“3 of 3 ceremonies” is the walkout, and each rest’s line and countdown')
     expect(md).toContain('**How far a drive was meant to run is part of the verdict.**')
     expect(md).not.toContain('have no independent check')
   })

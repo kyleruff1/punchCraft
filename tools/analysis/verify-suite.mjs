@@ -63,6 +63,7 @@ import {
   waitForLogLine,
   waitForUiTarget,
 } from './drive-workout-first-round.mjs'
+import { ceremoniesText } from './ceremonies.mjs'
 import { EMULATOR_PLATFORM, boolField, capturePlatform, extractField, recordsWithTag } from './logcat.mjs'
 import { renderObservedTable, summarizeObserved } from './observed-summary.mjs'
 import { fitWorkAxis, parseBoundaries, parseTokenDue } from './observed-timing.mjs'
@@ -321,6 +322,14 @@ export function timingVerdictFromExit(code, gate) {
 export function roundsArgument({ wholeWorkout, endedCleanly }) {
   if (!endedCleanly) return []
   return [wholeWorkout ? '--rounds=all' : '--rounds=1']
+}
+
+/**
+ * A row's `· 3 of 3 rounds · 7 of 7 ceremonies`, for the cell that holds the
+ * correlator's result; '' for a row from before rows said either.
+ */
+export function judgedSuffix(row) {
+  return [row.roundsJudged, row.ceremonies].filter(Boolean).map((text) => ` · ${text}`).join('')
 }
 
 /** `3 of 3 rounds`, from a correlator report; '' when the report does not say. */
@@ -606,7 +615,7 @@ export function renderSummaryMd(rows, meta) {
     const under = f ? `${f.barsUnderFloor}/${f.n}${f.barsUnderFloorRatio === null ? '' : ` (${Math.round(f.barsUnderFloorRatio * 1000) / 10}%)`}` : '—'
     const timing = r.timingRefusal ? 'not judged' : r.timingVerdict ? `${r.timingExit ?? '—'} ${r.timingVerdict}` : '—'
     lines.push(
-      `| ${r.workoutId} | ${r.vocab} | ${r.verdict} | ${r.reason ?? ''} | ${r.verifyExit ?? '—'}${r.roundsJudged ? ` · ${r.roundsJudged}` : ''} | ${timing} | ${breath} | ${past} | ${under} | ${ringsCell(r.rings)} | ${r.stats ?? '—'} | ${voice || '—'} | ${inst} | ${tracks} | ${Math.round((r.elapsedMs ?? 0) / 1000)}s |`,
+      `| ${r.workoutId} | ${r.vocab} | ${r.verdict} | ${r.reason ?? ''} | ${r.verifyExit ?? '—'}${judgedSuffix(r)} | ${timing} | ${breath} | ${past} | ${under} | ${ringsCell(r.rings)} | ${r.stats ?? '—'} | ${voice || '—'} | ${inst} | ${tracks} | ${Math.round((r.elapsedMs ?? 0) / 1000)}s |`,
     )
   }
   const refused = rows.filter((r) => r.timingRefusal)
@@ -779,6 +788,8 @@ async function driveOne(ctx, job, attempt = 1) {
     workAxis: null,
     /** How many of the manifest's rounds the correlator judged: "3 of 3 rounds". */
     roundsJudged: null,
+    /** How many of the ceremonies it judged were as planned: "7 of 7 ceremonies". */
+    ceremonies: null,
     /** The ring check: its report, its findings, and what the gate made of them. */
     rings: null,
     ringFindings: null,
@@ -1001,6 +1012,7 @@ async function driveOne(ctx, job, attempt = 1) {
         row.stats = compactStats(report)
         row.health = report.health ?? null
         row.roundsJudged = roundsJudgedText(report) || null
+        row.ceremonies = ceremoniesText(report) || null
       }
       const verdict = verdictFromVerifyExit(verify.status)
       if (row.reason === null || verdict === 'FAIL') {
@@ -1009,7 +1021,7 @@ async function driveOne(ctx, job, attempt = 1) {
         if (row.reason === null) row.verdict = verdict
         else if (verdict === 'FAIL') row.verdict = 'FAIL'
       }
-      slog(`   verify exit ${verify.status} → ${verdict}${row.stats ? ` · ${row.stats}` : ''}${row.roundsJudged ? ` · ${row.roundsJudged}` : ''}`)
+      slog(`   verify exit ${verify.status} → ${verdict}${row.stats ? ` · ${row.stats}` : ''}${judgedSuffix(row)}`)
       if (verdict === 'STALE' && attempt === 1) {
         slog('   STALE — regenerating the manifest and re-driving once')
         // The generator imports manifests that `require('…wav')`; the stub

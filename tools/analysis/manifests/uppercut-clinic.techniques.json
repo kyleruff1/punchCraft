@@ -67,7 +67,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 50
+      "expectedCallBars": 50,
+      "rest": {
+        "restLine": {
+          "scriptId": "rt-0e44c3a2",
+          "slot": "rest/uppercut-clinic/r1",
+          "text": "Good. The uppercuts should feel short, not scooped. Next round brings the body into the same lines. First set is jab, cross, lead uppercut, cross; after that the body lead uppercut starts showing up. Breathe and keep the elbows close.",
+          "plannedMs": 15520,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 2,
+          "afterOpener": [
+            "lt-22bdd1af",
+            "warn-round-2"
+          ],
+          "afterOpenerMs": 14709,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 1,
@@ -105,7 +123,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 52
+      "expectedCallBars": 52,
+      "rest": {
+        "restLine": {
+          "scriptId": "rt-96fd6466",
+          "slot": "rest/uppercut-clinic/r2",
+          "text": "Now you have the head and body uppercut lines. Round three turns them into longer phrases. First set is two pages: jab, cross, body lead uppercut, cross; then jab, body rear uppercut, lead hook, breathe. Keep the punches short enough to repeat.",
+          "plannedMs": 17663,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 3,
+          "afterOpener": [
+            "lt-45113c15",
+            "warn-round-3"
+          ],
+          "afterOpenerMs": 24005,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 2,
@@ -143,7 +179,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 50
+      "expectedCallBars": 50,
+      "rest": {
+        "restLine": {
+          "scriptId": "rt-96a0bfee",
+          "slot": "rest/uppercut-clinic/r3",
+          "text": "One round left. Let the elbows hang for a breath and loosen the forearms. Clinic finish starts jab, cross, lead uppercut, cross, then jab, body rear uppercut, lead hook, cross. Short punches, strong posture, ready on the bell.",
+          "plannedMs": 15223,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 4,
+          "afterOpener": [
+            "lt-7906f9ea",
+            "warn-round-4"
+          ],
+          "afterOpenerMs": 14720,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 3,
@@ -181,9 +235,39 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 52
+      "expectedCallBars": 52,
+      "rest": null
     }
   ],
+  "ceremonies": {
+    "walkout": {
+      "segments": [
+        "intro-hello",
+        "intro-program-intermediate-technical",
+        "lt-9b7561b4",
+        "intro-letsgo"
+      ],
+      "plannedMs": 24652,
+      "tracks": 7
+    },
+    "countdownOpeners": {
+      "warn-opener-01": 2453,
+      "warn-opener-02": 1293,
+      "warn-opener-03": 2426,
+      "warn-opener-04": 2893,
+      "warn-opener-05": 2451,
+      "warn-opener-06": 2512,
+      "warn-opener-07": 2019,
+      "warn-opener-08": 2285,
+      "warn-opener-09": 1733,
+      "warn-opener-10": 3893,
+      "warn-opener-11": 2673,
+      "warn-opener-12": 2310,
+      "warn-opener-13": 1782,
+      "warn-opener-14": 3319,
+      "warn-opener-15": 2653
+    }
+  },
   "silentByDesign": [],
   "notes": []
 }

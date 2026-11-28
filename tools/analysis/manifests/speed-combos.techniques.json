@@ -77,7 +77,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 77
+      "expectedCallBars": 77,
+      "rest": {
+        "restLine": {
+          "scriptId": "rt-2441724f",
+          "slot": "rest/speed-combos/r1",
+          "text": "Good speed, now let the hands loosen. Next round is doubles at pace. First set is two pages: jab, jab, cross, jab; then cross, lead hook, cross, breathe. The empty slots matter just as much as the fast jabs.",
+          "plannedMs": 15330,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 2,
+          "afterOpener": [
+            "lt-57703c6d",
+            "warn-round-2"
+          ],
+          "afterOpenerMs": 21597,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 1,
@@ -115,7 +133,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 70
+      "expectedCallBars": 70,
+      "rest": {
+        "restLine": {
+          "scriptId": "rt-f104e1dd",
+          "slot": "rest/speed-combos/r2",
+          "text": "Two rounds down. Drop the shoulders and slow your breathing. Round three makes you read longer pages at speed. First up is double jab, cross with the fourth slot open; then the one-two-three-two comes back in straight time.",
+          "plannedMs": 14859,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 3,
+          "afterOpener": [
+            "lt-11983efb",
+            "warn-round-3"
+          ],
+          "afterOpenerMs": 12890,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 2,
@@ -163,7 +199,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 73
+      "expectedCallBars": 73,
+      "rest": {
+        "restLine": {
+          "scriptId": "rt-fdf86750",
+          "slot": "rest/speed-combos/r3",
+          "text": "Last round coming. You do not need to outrun the click; you need to own the openings. First set is jab, cross, lead hook with the fourth slot empty at double-time. Then we change the shape without changing the discipline.",
+          "plannedMs": 14338,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 4,
+          "afterOpener": [
+            "lt-b01beb90",
+            "warn-round-4"
+          ],
+          "afterOpenerMs": 14766,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 3,
@@ -201,9 +255,39 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 87
+      "expectedCallBars": 87,
+      "rest": null
     }
   ],
+  "ceremonies": {
+    "walkout": {
+      "segments": [
+        "intro-hello",
+        "intro-program-intermediate-sprint",
+        "lt-9bb4a30e",
+        "intro-letsgo"
+      ],
+      "plannedMs": 24205,
+      "tracks": 7
+    },
+    "countdownOpeners": {
+      "warn-opener-01": 2453,
+      "warn-opener-02": 1293,
+      "warn-opener-03": 2426,
+      "warn-opener-04": 2893,
+      "warn-opener-05": 2451,
+      "warn-opener-06": 2512,
+      "warn-opener-07": 2019,
+      "warn-opener-08": 2285,
+      "warn-opener-09": 1733,
+      "warn-opener-10": 3893,
+      "warn-opener-11": 2673,
+      "warn-opener-12": 2310,
+      "warn-opener-13": 1782,
+      "warn-opener-14": 3319,
+      "warn-opener-15": 2653
+    }
+  },
   "silentByDesign": [],
   "notes": []
 }

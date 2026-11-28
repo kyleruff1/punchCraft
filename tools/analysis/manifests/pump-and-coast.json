@@ -77,7 +77,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 54
+      "expectedCallBars": 54,
+      "rest": {
+        "restLine": {
+          "scriptId": "rr-3ca8eca0",
+          "slot": "rest/pump-and-coast/r1",
+          "text": "That is the rhythm: work, recover, stay alive. Round two changes the pump targets. First is threes only at double-time, then a long one-touch coast. Let the breathing come down without standing still.",
+          "plannedMs": 13490,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 2,
+          "afterOpener": [
+            "li-a57b2213",
+            "warn-round-2"
+          ],
+          "afterOpenerMs": 13315,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 1,
@@ -125,7 +143,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 55
+      "expectedCallBars": 55,
+      "rest": {
+        "restLine": {
+          "scriptId": "rr-31c1c21b",
+          "slot": "rest/pump-and-coast/r2",
+          "text": "Good. Round three turns the pump into a two-page sequence. First page is one, one, one, two; second page is three, two, three, two. Then we coast and come back to a fast body-one pump.",
+          "plannedMs": 13908,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 3,
+          "afterOpener": [
+            "li-d5758683",
+            "warn-round-3"
+          ],
+          "afterOpenerMs": 18100,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 2,
@@ -163,7 +199,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 62
+      "expectedCallBars": 62,
+      "rest": {
+        "restLine": {
+          "scriptId": "rr-ceba7877",
+          "slot": "rest/pump-and-coast/r3",
+          "text": "One last round. We start with steady ones, coast, then turn the final half into combinations. First set is ones only in straight time. Save enough to make the last one-two-three-two look clean.",
+          "plannedMs": 13849,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 4,
+          "afterOpener": [
+            "li-e583c241",
+            "warn-round-4"
+          ],
+          "afterOpenerMs": 14881,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 3,
@@ -201,9 +255,39 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 62
+      "expectedCallBars": 62,
+      "rest": null
     }
   ],
+  "ceremonies": {
+    "walkout": {
+      "segments": [
+        "intro-hello",
+        "intro-program-intermediate-steady",
+        "li-6335b5f8",
+        "intro-letsgo"
+      ],
+      "plannedMs": 23470,
+      "tracks": 7
+    },
+    "countdownOpeners": {
+      "warn-opener-01": 2453,
+      "warn-opener-02": 1293,
+      "warn-opener-03": 2426,
+      "warn-opener-04": 2893,
+      "warn-opener-05": 2451,
+      "warn-opener-06": 2512,
+      "warn-opener-07": 2019,
+      "warn-opener-08": 2285,
+      "warn-opener-09": 1733,
+      "warn-opener-10": 3893,
+      "warn-opener-11": 2673,
+      "warn-opener-12": 2310,
+      "warn-opener-13": 1782,
+      "warn-opener-14": 3319,
+      "warn-opener-15": 2653
+    }
+  },
   "silentByDesign": [],
   "notes": [
     "Pump & Coast pump / coast blocks are DELIBERATELY coach-silent — sustained + coast runtime consumers not yet wired. silentByDesign is TBD until the manifest generator learns to detect those block spans (Slice 6)."

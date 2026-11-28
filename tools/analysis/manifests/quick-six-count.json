@@ -59,7 +59,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 49
+      "expectedCallBars": 49,
+      "rest": {
+        "restLine": {
+          "scriptId": "rr-75218c80",
+          "slot": "rest/quick-six-count/r1",
+          "text": "You have the whole alphabet. Round two reads the whole phrase — first set is one, two, three, four in straight time, then the long pages. Long breath, shoulders down, eyes up.",
+          "plannedMs": 13021,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 2,
+          "afterOpener": [
+            "li-37725b9e",
+            "warn-round-2"
+          ],
+          "afterOpenerMs": 14729,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 1,
@@ -97,9 +115,39 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 36
+      "expectedCallBars": 36,
+      "rest": null
     }
   ],
+  "ceremonies": {
+    "walkout": {
+      "segments": [
+        "intro-hello",
+        "intro-program-intermediate-steady",
+        "li-b9345f54",
+        "intro-letsgo"
+      ],
+      "plannedMs": 24591,
+      "tracks": 7
+    },
+    "countdownOpeners": {
+      "warn-opener-01": 2453,
+      "warn-opener-02": 1293,
+      "warn-opener-03": 2426,
+      "warn-opener-04": 2893,
+      "warn-opener-05": 2451,
+      "warn-opener-06": 2512,
+      "warn-opener-07": 2019,
+      "warn-opener-08": 2285,
+      "warn-opener-09": 1733,
+      "warn-opener-10": 3893,
+      "warn-opener-11": 2673,
+      "warn-opener-12": 2310,
+      "warn-opener-13": 1782,
+      "warn-opener-14": 3319,
+      "warn-opener-15": 2653
+    }
+  },
   "silentByDesign": [],
   "notes": []
 }

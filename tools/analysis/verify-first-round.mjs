@@ -48,7 +48,9 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
 
+import { ceremonyHealth, judgeCeremonies, parseCeremonyRecord, renderCeremonies } from './ceremonies.mjs'
 import {
+  capturePlatform,
   extractField,
   numField,
   stitchLogRecords,
@@ -117,6 +119,13 @@ export function parseLogcat(logcatText) {
     // from before the rename spells them `puncheokie.*`; read it as written
     // today, or all ~240 stored captures parse to nothing.
     const body = withCurrentTag(recorded)
+    // The walkout, the rest line and the countdown: what the app built for
+    // each, and that it started (`ceremonies.mjs`).
+    const ceremony = parseCeremonyRecord(body, ts)
+    if (ceremony) {
+      events.push(ceremony)
+      continue
+    }
     if (body.includes('workout.runner.start')) {
       events.push({ type: 'runner.start', ts, workout: extractField(body, 'workout'), raw: body })
       continue
@@ -808,9 +817,13 @@ function renderReport(manifestPath, sessionDir, manifest, result) {
       )
     }
   }
+  // Above the rounds when there are several, so it is not below four of them.
+  const ceremonyLines = renderCeremonies(result.ceremonies ?? [])
+  if (several) lines.push(...ceremonyLines)
   for (const round of rounds.filter((r) => r.state === 'judged')) {
     renderRound(lines, round, several)
   }
+  if (!several) lines.push(...ceremonyLines)
   return lines.join('\n')
 }
 
@@ -1074,6 +1087,7 @@ function judgeRound({ events, manifest, round, provenance, t0, window, wholeCapt
     dispatcher,
     reanchorCount: reanchor.total,
     observedCount: observed.length,
+    window,
   }
 }
 
@@ -1172,6 +1186,32 @@ export function verify(manifest, logcatText, options = {}) {
   const judged = perRound.filter((r) => r.state === 'judged')
   const first = perRound[0]
   let health = combineHealth(judged.map((r) => r.health))
+  // What is said around the rounds. A rest is judged between the end of the
+  // round before it and the start of the round after, so each round says
+  // where it began and — when its closing boundary was captured — ended.
+  const ceremonies = judgeCeremonies(
+    events,
+    manifest,
+    perRound.map((r) => ({
+      t0Ts: r.t0 ? r.t0.ts : null,
+      endTs: r.state === 'judged' && r.t0 && r.window?.bounded ? r.t0.ts + r.window.endMs : null,
+    })),
+  )
+  if (ceremonies.length > 0) {
+    const { hard, soft, ...counts } = ceremonyHealth(ceremonies, {
+      lossless: capturePlatform(logcatText) === 'web',
+      suppressed: health.stale === true || health.identityUnknown === true,
+    })
+    const hardFail = health.hardFail || hard
+    const softWarn = health.softWarn || soft
+    health = {
+      ...health,
+      ...counts,
+      hardFail,
+      softWarn,
+      verdict: hardFail ? 'FAIL' : health.stale ? 'STALE' : softWarn ? 'WARN' : 'PASS',
+    }
+  }
   const expected = Math.min(options.expectRounds ?? 0, described.length)
   const notJudged = perRound.slice(0, expected).filter((r) => r.state !== 'judged')
   if (notJudged.length > 0) {
@@ -1205,6 +1245,7 @@ export function verify(manifest, logcatText, options = {}) {
     reanchorCount: first.reanchorCount,
     observedCount: judged.reduce((n, r) => n + r.observedCount, 0),
     rounds: perRound,
+    ceremonies,
     roundsDescribed: described.length,
     roundsJudged: judged.length,
     roundsExpected: expected,
@@ -1258,6 +1299,7 @@ function main() {
         roundsDescribed: result.roundsDescribed,
         roundsJudged: result.roundsJudged,
         roundsExpected: result.roundsExpected,
+        ceremonies: result.ceremonies,
         rounds: result.rounds.map((round) => ({
           roundIndex: round.roundIndex,
           state: round.state,

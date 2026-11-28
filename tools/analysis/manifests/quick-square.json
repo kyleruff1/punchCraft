@@ -59,7 +59,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 40
+      "expectedCallBars": 40,
+      "rest": {
+        "restLine": {
+          "scriptId": "rr-fef50d6c",
+          "slot": "rest/quick-square/r1",
+          "text": "You have the square from both corners. Round two closes it — first set is one, four, three, two in straight time, then the hooks alone. Long breath in, shoulders down.",
+          "plannedMs": 11258,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 2,
+          "afterOpener": [
+            "li-dae49cb4",
+            "warn-round-2"
+          ],
+          "afterOpenerMs": 15074,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 1,
@@ -97,9 +115,39 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 65
+      "expectedCallBars": 65,
+      "rest": null
     }
   ],
+  "ceremonies": {
+    "walkout": {
+      "segments": [
+        "intro-hello",
+        "intro-program-intermediate-steady",
+        "li-2f1c98da",
+        "intro-letsgo"
+      ],
+      "plannedMs": 22442,
+      "tracks": 7
+    },
+    "countdownOpeners": {
+      "warn-opener-01": 2453,
+      "warn-opener-02": 1293,
+      "warn-opener-03": 2426,
+      "warn-opener-04": 2893,
+      "warn-opener-05": 2451,
+      "warn-opener-06": 2512,
+      "warn-opener-07": 2019,
+      "warn-opener-08": 2285,
+      "warn-opener-09": 1733,
+      "warn-opener-10": 3893,
+      "warn-opener-11": 2673,
+      "warn-opener-12": 2310,
+      "warn-opener-13": 1782,
+      "warn-opener-14": 3319,
+      "warn-opener-15": 2653
+    }
+  },
   "silentByDesign": [],
   "notes": []
 }

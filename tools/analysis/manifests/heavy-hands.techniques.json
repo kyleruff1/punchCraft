@@ -77,7 +77,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 69
+      "expectedCallBars": 69,
+      "rest": {
+        "restLine": {
+          "scriptId": "rt-baa970a8",
+          "slot": "rest/heavy-hands/r1",
+          "text": "Good power round. Heavy does not mean tight — open the hands inside the gloves and breathe. Next is hooks off the straight line. First set is two pages: jab, cross, lead hook, cross; then jab, rear hook, lead hook, cross.",
+          "plannedMs": 15304,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 2,
+          "afterOpener": [
+            "lt-e94c24c8",
+            "warn-round-2"
+          ],
+          "afterOpenerMs": 22399,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 1,
@@ -125,7 +143,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 71
+      "expectedCallBars": 71,
+      "rest": {
+        "restLine": {
+          "scriptId": "rt-94c714ea",
+          "slot": "rest/heavy-hands/r2",
+          "text": "That was the hook round. Let the shoulders drop and breathe through the nose if you can. Round three adds uppercuts to the heavy combinations. First set stays jab, cross, lead hook, cross — then we bring the lead uppercut into the finish.",
+          "plannedMs": 15081,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 3,
+          "afterOpener": [
+            "lt-f514b1c7",
+            "warn-round-3"
+          ],
+          "afterOpenerMs": 13343,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 2,
@@ -163,7 +199,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 69
+      "expectedCallBars": 69,
+      "rest": {
+        "restLine": {
+          "scriptId": "rt-7242784d",
+          "slot": "rest/heavy-hands/r3",
+          "text": "Three done. Shake the arms once and let them get heavy again. Final round starts with a seven-shot two-page chain: jab, jab, cross, lead hook; then cross, lead uppercut, cross, breathe. Build pressure without losing form.",
+          "plannedMs": 14852,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 4,
+          "afterOpener": [
+            "lt-b4cf624d",
+            "warn-round-4"
+          ],
+          "afterOpenerMs": 21834,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 3,
@@ -201,9 +255,39 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 70
+      "expectedCallBars": 70,
+      "rest": null
     }
   ],
+  "ceremonies": {
+    "walkout": {
+      "segments": [
+        "intro-hello",
+        "intro-program-intermediate-pressure",
+        "lt-c03640ca",
+        "intro-letsgo"
+      ],
+      "plannedMs": 24452,
+      "tracks": 7
+    },
+    "countdownOpeners": {
+      "warn-opener-01": 2453,
+      "warn-opener-02": 1293,
+      "warn-opener-03": 2426,
+      "warn-opener-04": 2893,
+      "warn-opener-05": 2451,
+      "warn-opener-06": 2512,
+      "warn-opener-07": 2019,
+      "warn-opener-08": 2285,
+      "warn-opener-09": 1733,
+      "warn-opener-10": 3893,
+      "warn-opener-11": 2673,
+      "warn-opener-12": 2310,
+      "warn-opener-13": 1782,
+      "warn-opener-14": 3319,
+      "warn-opener-15": 2653
+    }
+  },
   "silentByDesign": [],
   "notes": []
 }

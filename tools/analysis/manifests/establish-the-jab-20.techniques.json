@@ -77,7 +77,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 63
+      "expectedCallBars": 63,
+      "rest": {
+        "restLine": {
+          "scriptId": "rt-b75d08ac",
+          "slot": "rest/establish-the-jab-20/r1",
+          "text": "Good. You found the lead hand upstairs and downstairs. Next round doubles it and starts turning the corner. First set is jab, jab, cross, lead hook in straight time. Roll the shoulders once and meet the bell ready.",
+          "plannedMs": 15657,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 2,
+          "afterOpener": [
+            "lt-714df084",
+            "warn-round-2"
+          ],
+          "afterOpenerMs": 15035,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 1,
@@ -115,7 +133,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 66
+      "expectedCallBars": 66,
+      "rest": {
+        "restLine": {
+          "scriptId": "rt-6f3ba4d6",
+          "slot": "rest/establish-the-jab-20/r2",
+          "text": "The jab is starting to create openings now. Breathe out long and let the forearms relax. Round three mixes head and body: two pages starting jab, jab, cross, body jab. Keep the lead hand busy without getting stiff.",
+          "plannedMs": 14577,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 3,
+          "afterOpener": [
+            "lt-1feac50f",
+            "warn-round-3"
+          ],
+          "afterOpenerMs": 19975,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 2,
@@ -153,7 +189,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 61
+      "expectedCallBars": 61,
+      "rest": {
+        "restLine": {
+          "scriptId": "rt-bca676d6",
+          "slot": "rest/establish-the-jab-20/r3",
+          "text": "Three rounds in, the jab should feel like a steering wheel. Last round is range control. First set is jabs only in straight time; after that we speed the double one into two. Take a sip if you want it, then hands home.",
+          "plannedMs": 14282,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 4,
+          "afterOpener": [
+            "lt-3a91dbda",
+            "warn-round-4"
+          ],
+          "afterOpenerMs": 13241,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 3,
@@ -181,9 +235,39 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 72
+      "expectedCallBars": 72,
+      "rest": null
     }
   ],
+  "ceremonies": {
+    "walkout": {
+      "segments": [
+        "intro-hello",
+        "intro-program-intermediate-steady",
+        "lt-49af759e",
+        "intro-letsgo"
+      ],
+      "plannedMs": 24011,
+      "tracks": 7
+    },
+    "countdownOpeners": {
+      "warn-opener-01": 2453,
+      "warn-opener-02": 1293,
+      "warn-opener-03": 2426,
+      "warn-opener-04": 2893,
+      "warn-opener-05": 2451,
+      "warn-opener-06": 2512,
+      "warn-opener-07": 2019,
+      "warn-opener-08": 2285,
+      "warn-opener-09": 1733,
+      "warn-opener-10": 3893,
+      "warn-opener-11": 2673,
+      "warn-opener-12": 2310,
+      "warn-opener-13": 1782,
+      "warn-opener-14": 3319,
+      "warn-opener-15": 2653
+    }
+  },
   "silentByDesign": [],
   "notes": []
 }

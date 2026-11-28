@@ -26,6 +26,7 @@ import {
   runQuery,
   sameCommit,
   isEmulatorDevice,
+  judgedSuffix,
   renderSummaryMd,
   ringGateVerdict,
   ringsCell,
@@ -603,6 +604,11 @@ describe('how far a drive was meant to run', () => {
     const meta = { suiteId: 's', device: 'emulator-5556', release: true, hostSha: 'abc1234', timingGate: 'off' }
     const row = { workoutId: 'body-work', vocab: 'numbers', verdict: 'PASS', reason: null, verifyExit: 0, elapsedMs: 0 }
     expect(renderSummaryMd([{ ...row, roundsJudged: '4 of 4 rounds' }], meta)).toContain('| 0 · 4 of 4 rounds |')
+    expect(renderSummaryMd([{ ...row, roundsJudged: '4 of 4 rounds', ceremonies: '7 of 7 ceremonies' }], meta)).toContain(
+      '| 0 · 4 of 4 rounds · 7 of 7 ceremonies |',
+    )
+    expect(judgedSuffix({ ceremonies: '1 of 1 ceremonies' })).toBe(' · 1 of 1 ceremonies')
+    expect(judgedSuffix({})).toBe('')
     // A row from before rows said keeps the bare exit code.
     expect(renderSummaryMd([row], meta)).toContain('| PASS |  | 0 |')
   })

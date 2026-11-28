@@ -59,7 +59,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 64
+      "expectedCallBars": 64,
+      "rest": {
+        "restLine": {
+          "scriptId": "rt-cf408fc1",
+          "slot": "rest/quick-level-change/r1",
+          "text": "Every bar changed floors and the stance held. Round two changes floors inside the phrase — first set is jab, body cross, lead hook, body rear hook in straight time. Breathe, and keep the hands up while you rest.",
+          "plannedMs": 15533,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 2,
+          "afterOpener": [
+            "lt-472fc08b",
+            "warn-round-2"
+          ],
+          "afterOpenerMs": 15863,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 1,
@@ -97,9 +115,39 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 66
+      "expectedCallBars": 66,
+      "rest": null
     }
   ],
+  "ceremonies": {
+    "walkout": {
+      "segments": [
+        "intro-hello",
+        "intro-program-intermediate-steady",
+        "lt-78559047",
+        "intro-letsgo"
+      ],
+      "plannedMs": 24704,
+      "tracks": 7
+    },
+    "countdownOpeners": {
+      "warn-opener-01": 2453,
+      "warn-opener-02": 1293,
+      "warn-opener-03": 2426,
+      "warn-opener-04": 2893,
+      "warn-opener-05": 2451,
+      "warn-opener-06": 2512,
+      "warn-opener-07": 2019,
+      "warn-opener-08": 2285,
+      "warn-opener-09": 1733,
+      "warn-opener-10": 3893,
+      "warn-opener-11": 2673,
+      "warn-opener-12": 2310,
+      "warn-opener-13": 1782,
+      "warn-opener-14": 3319,
+      "warn-opener-15": 2653
+    }
+  },
   "silentByDesign": [],
   "notes": []
 }

@@ -93,7 +93,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 61
+      "expectedCallBars": 61,
+      "rest": {
+        "restLine": {
+          "scriptId": "rr-1c96caa8",
+          "slot": "rest/three-round-fundamentals/r1",
+          "text": "Good first round. Let the arms hang for a breath, then bring the hands back home. Round two changes levels: first set is one, two, one, two — then one-bee, two, three, two on page two. Stay loose and be ready on the bell.",
+          "plannedMs": 14630,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 2,
+          "afterOpener": [
+            "li-e9655c36",
+            "warn-round-2"
+          ],
+          "afterOpenerMs": 18321,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 1,
@@ -151,7 +169,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 59
+      "expectedCallBars": 59,
+      "rest": {
+        "restLine": {
+          "scriptId": "rr-965f34ff",
+          "slot": "rest/three-round-fundamentals/r2",
+          "text": "That round added the floor change. Take two slow breaths and shake out the shoulders. Last round puts the pieces together; first set is one, two, three, two in straight time. Hear the four-count before the bell.",
+          "plannedMs": 13323,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 3,
+          "afterOpener": [
+            "li-b82bd64f",
+            "warn-round-3"
+          ],
+          "afterOpenerMs": 13620,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 2,
@@ -199,9 +235,39 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 59
+      "expectedCallBars": 59,
+      "rest": null
     }
   ],
+  "ceremonies": {
+    "walkout": {
+      "segments": [
+        "intro-hello",
+        "intro-program-intermediate-steady",
+        "li-a8aa2fa9",
+        "intro-letsgo"
+      ],
+      "plannedMs": 21384,
+      "tracks": 7
+    },
+    "countdownOpeners": {
+      "warn-opener-01": 2453,
+      "warn-opener-02": 1293,
+      "warn-opener-03": 2426,
+      "warn-opener-04": 2893,
+      "warn-opener-05": 2451,
+      "warn-opener-06": 2512,
+      "warn-opener-07": 2019,
+      "warn-opener-08": 2285,
+      "warn-opener-09": 1733,
+      "warn-opener-10": 3893,
+      "warn-opener-11": 2673,
+      "warn-opener-12": 2310,
+      "warn-opener-13": 1782,
+      "warn-opener-14": 3319,
+      "warn-opener-15": 2653
+    }
+  },
   "silentByDesign": [],
   "notes": []
 }

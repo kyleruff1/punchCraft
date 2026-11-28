@@ -59,7 +59,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 78
+      "expectedCallBars": 78,
+      "rest": {
+        "restLine": {
+          "scriptId": "rr-870a0091",
+          "slot": "rest/quick-one-two/r1",
+          "text": "That is the pair at every speed. Round two puts the double jab in front of it — first set is one, one, two with the fourth slot open, straight time. Breathe out long and come back to guard.",
+          "plannedMs": 14248,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 2,
+          "afterOpener": [
+            "li-af76bc31",
+            "warn-round-2"
+          ],
+          "afterOpenerMs": 14115,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 1,
@@ -97,9 +115,39 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 89
+      "expectedCallBars": 89,
+      "rest": null
     }
   ],
+  "ceremonies": {
+    "walkout": {
+      "segments": [
+        "intro-hello",
+        "intro-program-intermediate-steady",
+        "li-8bf49aaa",
+        "intro-letsgo"
+      ],
+      "plannedMs": 24224,
+      "tracks": 7
+    },
+    "countdownOpeners": {
+      "warn-opener-01": 2453,
+      "warn-opener-02": 1293,
+      "warn-opener-03": 2426,
+      "warn-opener-04": 2893,
+      "warn-opener-05": 2451,
+      "warn-opener-06": 2512,
+      "warn-opener-07": 2019,
+      "warn-opener-08": 2285,
+      "warn-opener-09": 1733,
+      "warn-opener-10": 3893,
+      "warn-opener-11": 2673,
+      "warn-opener-12": 2310,
+      "warn-opener-13": 1782,
+      "warn-opener-14": 3319,
+      "warn-opener-15": 2653
+    }
+  },
   "silentByDesign": [],
   "notes": []
 }

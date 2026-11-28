@@ -38,6 +38,13 @@ import { TRANSPORT_TICKS_PER_PULSE } from '../../src/domain/timing/TimingEngine'
 import { expandTimeline } from '../../src/domain/programs/CueTimeline'
 import { planRoundCoachSchedule } from '../../src/domain/coach/roundCoachSchedule'
 import { disciplineOf } from '../../src/domain/workout/discipline'
+import {
+  countdownOpeners,
+  expectedRest,
+  expectedWalkout,
+  type ExpectedRest,
+  type ExpectedWalkout,
+} from './ceremony-plan'
 import type {
   CompiledCoachSlot,
 } from '../../src/domain/programs/workoutScore'
@@ -138,6 +145,17 @@ interface FirstRoundManifest {
    * needs them yet.
    */
   rounds: readonly ManifestRound[]
+  /**
+   * What is said around the rounds (`ceremony-plan.ts`): the walkout here,
+   * and each rest's line and countdown on the round it follows. A manifest
+   * without this is from before ceremonies had expectations, and the
+   * verifier judges none.
+   */
+  ceremonies: {
+    walkout: ExpectedWalkout | null
+    /** The lines a countdown may open with, and how long each is. */
+    countdownOpeners: Readonly<Record<string, number>>
+  }
   silentByDesign: readonly {
     reason: string
     cueId: string
@@ -154,6 +172,8 @@ export interface ManifestRound {
   coachEvents: readonly ExpectedCoachEvent[]
   /** Bars the runner plans a per-bar call for, in this round. */
   expectedCallBars: number
+  /** The rest after this round: its line and its countdown. `null` after the last. */
+  rest: ExpectedRest | null
 }
 
 function tickToMs(tick: number): number {
@@ -349,6 +369,7 @@ export function buildFirstRoundManifest(
       restAfterMs: scheduled.restAfterMs,
       coachEvents: events,
       expectedCallBars: click.calls,
+      rest: expectedRest(workout, roundIndex, vocabulary),
     }
   })
   const notes: string[] = []
@@ -376,6 +397,10 @@ export function buildFirstRoundManifest(
       timelineHash: compiled.identity.timelineHash,
     },
     rounds,
+    ceremonies: {
+      walkout: expectedWalkout(workout, vocabulary),
+      countdownOpeners: countdownOpeners(),
+    },
     silentByDesign: [],
     notes,
   }

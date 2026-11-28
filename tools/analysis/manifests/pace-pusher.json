@@ -57,7 +57,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 90
+      "expectedCallBars": 90,
+      "rest": {
+        "restLine": {
+          "scriptId": "rr-9ac31a2c",
+          "slot": "rest/pace-pusher/r1",
+          "text": "First ladder is done. The next one adds a second one before the two. First set is one, one, two with the fourth slot empty in straight time; then the exact same shape climbs the rates. Breathe and keep the shoulders loose.",
+          "plannedMs": 15331,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 2,
+          "afterOpener": [
+            "li-64ee149b",
+            "warn-round-2"
+          ],
+          "afterOpenerMs": 14035,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 1,
@@ -95,7 +113,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 80
+      "expectedCallBars": 80,
+      "rest": {
+        "restLine": {
+          "scriptId": "rr-42e49bfa",
+          "slot": "rest/pace-pusher/r2",
+          "text": "Good. Round three changes the ladder shape to one, two, three, then an empty slot. Same rule: straight, time-and-a-half, double. The hook should arrive on time, not early.",
+          "plannedMs": 12440,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 3,
+          "afterOpener": [
+            "li-bec1ffe7",
+            "warn-round-3"
+          ],
+          "afterOpenerMs": 12779,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 2,
@@ -133,7 +169,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 74
+      "expectedCallBars": 74,
+      "rest": {
+        "restLine": {
+          "scriptId": "rr-186a29e3",
+          "slot": "rest/pace-pusher/r3",
+          "text": "Final ladder mixes everything you have used. First is two pages: one, two, three, two; then one, two, five, two. After that the same four-shot ideas move through the faster grids. Hear the tempo and let it pull you, not rush you.",
+          "plannedMs": 16560,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 4,
+          "afterOpener": [
+            "li-2f74ee91",
+            "warn-round-4"
+          ],
+          "afterOpenerMs": 19037,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 3,
@@ -181,9 +235,39 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 84
+      "expectedCallBars": 84,
+      "rest": null
     }
   ],
+  "ceremonies": {
+    "walkout": {
+      "segments": [
+        "intro-hello",
+        "intro-program-intermediate-pressure",
+        "li-6d258006",
+        "intro-letsgo"
+      ],
+      "plannedMs": 23822,
+      "tracks": 7
+    },
+    "countdownOpeners": {
+      "warn-opener-01": 2453,
+      "warn-opener-02": 1293,
+      "warn-opener-03": 2426,
+      "warn-opener-04": 2893,
+      "warn-opener-05": 2451,
+      "warn-opener-06": 2512,
+      "warn-opener-07": 2019,
+      "warn-opener-08": 2285,
+      "warn-opener-09": 1733,
+      "warn-opener-10": 3893,
+      "warn-opener-11": 2673,
+      "warn-opener-12": 2310,
+      "warn-opener-13": 1782,
+      "warn-opener-14": 3319,
+      "warn-opener-15": 2653
+    }
+  },
   "silentByDesign": [],
   "notes": []
 }

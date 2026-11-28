@@ -59,7 +59,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 78
+      "expectedCallBars": 78,
+      "rest": {
+        "restLine": {
+          "scriptId": "rr-9f50ce39",
+          "slot": "rest/quick-heavy-two/r1",
+          "text": "Heavy hands come from the floor, not the shoulders. Round two is the hooks with weight — first set is one, four, three, two in straight time. Breathe deep and keep the knees bent.",
+          "plannedMs": 11000,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 2,
+          "afterOpener": [
+            "li-a2c31b41",
+            "warn-round-2"
+          ],
+          "afterOpenerMs": 14795,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 1,
@@ -97,9 +115,39 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 62
+      "expectedCallBars": 62,
+      "rest": null
     }
   ],
+  "ceremonies": {
+    "walkout": {
+      "segments": [
+        "intro-hello",
+        "intro-program-intermediate-steady",
+        "li-3a24a1c3",
+        "intro-letsgo"
+      ],
+      "plannedMs": 24160,
+      "tracks": 7
+    },
+    "countdownOpeners": {
+      "warn-opener-01": 2453,
+      "warn-opener-02": 1293,
+      "warn-opener-03": 2426,
+      "warn-opener-04": 2893,
+      "warn-opener-05": 2451,
+      "warn-opener-06": 2512,
+      "warn-opener-07": 2019,
+      "warn-opener-08": 2285,
+      "warn-opener-09": 1733,
+      "warn-opener-10": 3893,
+      "warn-opener-11": 2673,
+      "warn-opener-12": 2310,
+      "warn-opener-13": 1782,
+      "warn-opener-14": 3319,
+      "warn-opener-15": 2653
+    }
+  },
   "silentByDesign": [],
   "notes": []
 }

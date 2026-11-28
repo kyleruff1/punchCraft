@@ -77,7 +77,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 78
+      "expectedCallBars": 78,
+      "rest": {
+        "restLine": {
+          "scriptId": "rr-80735cd8",
+          "slot": "rest/speed-combos/r1",
+          "text": "Good speed, now let the hands loosen. Next round is doubles at pace. First set is two pages: one, one, two, one; then two, three, two, breathe. The empty slots matter just as much as the fast ones.",
+          "plannedMs": 14844,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 2,
+          "afterOpener": [
+            "li-1d8b0b11",
+            "warn-round-2"
+          ],
+          "afterOpenerMs": 19595,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 1,
@@ -115,7 +133,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 70
+      "expectedCallBars": 70,
+      "rest": {
+        "restLine": {
+          "scriptId": "rr-10078192",
+          "slot": "rest/speed-combos/r2",
+          "text": "Two rounds down. Drop the shoulders and slow your breathing. Round three makes you read longer pages at speed. First up is double one, two with the fourth slot open; then the one-two-three-two comes back in straight time.",
+          "plannedMs": 13160,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 3,
+          "afterOpener": [
+            "li-33940228",
+            "warn-round-3"
+          ],
+          "afterOpenerMs": 12340,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 2,
@@ -163,7 +199,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 76
+      "expectedCallBars": 76,
+      "rest": {
+        "restLine": {
+          "scriptId": "rr-ae2ec416",
+          "slot": "rest/speed-combos/r3",
+          "text": "Last round coming. You do not need to outrun the click; you need to own the openings. First set is one, two, three with the fourth slot empty at double-time. Then we change the shape without changing the discipline.",
+          "plannedMs": 15426,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 4,
+          "afterOpener": [
+            "li-b3d182ff",
+            "warn-round-4"
+          ],
+          "afterOpenerMs": 14600,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 3,
@@ -201,9 +255,39 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 89
+      "expectedCallBars": 89,
+      "rest": null
     }
   ],
+  "ceremonies": {
+    "walkout": {
+      "segments": [
+        "intro-hello",
+        "intro-program-intermediate-sprint",
+        "li-34f88a99",
+        "intro-letsgo"
+      ],
+      "plannedMs": 22311,
+      "tracks": 7
+    },
+    "countdownOpeners": {
+      "warn-opener-01": 2453,
+      "warn-opener-02": 1293,
+      "warn-opener-03": 2426,
+      "warn-opener-04": 2893,
+      "warn-opener-05": 2451,
+      "warn-opener-06": 2512,
+      "warn-opener-07": 2019,
+      "warn-opener-08": 2285,
+      "warn-opener-09": 1733,
+      "warn-opener-10": 3893,
+      "warn-opener-11": 2673,
+      "warn-opener-12": 2310,
+      "warn-opener-13": 1782,
+      "warn-opener-14": 3319,
+      "warn-opener-15": 2653
+    }
+  },
   "silentByDesign": [],
   "notes": []
 }

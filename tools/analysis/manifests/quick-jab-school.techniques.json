@@ -59,7 +59,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 66
+      "expectedCallBars": 66,
+      "rest": {
+        "restLine": {
+          "scriptId": "rt-452b0592",
+          "slot": "rest/quick-jab-school/r1",
+          "text": "Good. The lead hand is home. Round two puts the rear hand behind it — first set is jab, cross, jab, cross in straight time, then body jabs at double-time. Roll the shoulders once and meet the bell ready.",
+          "plannedMs": 13628,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 2,
+          "afterOpener": [
+            "lt-157a3f69",
+            "warn-round-2"
+          ],
+          "afterOpenerMs": 15075,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 1,
@@ -97,9 +115,39 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 73
+      "expectedCallBars": 73,
+      "rest": null
     }
   ],
+  "ceremonies": {
+    "walkout": {
+      "segments": [
+        "intro-hello",
+        "intro-program-intermediate-steady",
+        "lt-49af759e",
+        "intro-letsgo"
+      ],
+      "plannedMs": 24011,
+      "tracks": 7
+    },
+    "countdownOpeners": {
+      "warn-opener-01": 2453,
+      "warn-opener-02": 1293,
+      "warn-opener-03": 2426,
+      "warn-opener-04": 2893,
+      "warn-opener-05": 2451,
+      "warn-opener-06": 2512,
+      "warn-opener-07": 2019,
+      "warn-opener-08": 2285,
+      "warn-opener-09": 1733,
+      "warn-opener-10": 3893,
+      "warn-opener-11": 2673,
+      "warn-opener-12": 2310,
+      "warn-opener-13": 1782,
+      "warn-opener-14": 3319,
+      "warn-opener-15": 2653
+    }
+  },
   "silentByDesign": [],
   "notes": []
 }

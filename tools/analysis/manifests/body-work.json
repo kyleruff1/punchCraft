@@ -67,7 +67,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 66
+      "expectedCallBars": 66,
+      "rest": {
+        "restLine": {
+          "scriptId": "rr-3658e672",
+          "slot": "rest/body-work/r1",
+          "text": "Good body work starts with your balance, not with reaching down. Round two digs deeper: first set is two-bee, three-bee, two-bee with the fourth slot open. Keep the elbows close and take a drink only if you need it.",
+          "plannedMs": 12855,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 2,
+          "afterOpener": [
+            "li-ee8fb1f3",
+            "warn-round-2"
+          ],
+          "afterOpenerMs": 14355,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 1,
@@ -105,7 +123,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 63
+      "expectedCallBars": 63,
+      "rest": {
+        "restLine": {
+          "scriptId": "rr-49f3ddfa",
+          "slot": "rest/body-work/r2",
+          "text": "You have the basic body lines. Next round mixes floors and sides. First two pages are one, two-bee, three, two; then one-bee, four-bee, three, breathe. Keep your eyes up while the targets change.",
+          "plannedMs": 13562,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 3,
+          "afterOpener": [
+            "li-f473ecd2",
+            "warn-round-3"
+          ],
+          "afterOpenerMs": 20136,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 2,
@@ -143,7 +179,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 57
+      "expectedCallBars": 57,
+      "rest": {
+        "restLine": {
+          "scriptId": "rr-31bcdde1",
+          "slot": "rest/body-work/r3",
+          "text": "Last round. Let the ribs expand on a long inhale and keep the hands relaxed. First set is one, two-bee, three, four-bee in straight time. Then we coast briefly before the six-bee and five-bee finishes.",
+          "plannedMs": 13754,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 4,
+          "afterOpener": [
+            "li-f6e081be",
+            "warn-round-4"
+          ],
+          "afterOpenerMs": 15081,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 3,
@@ -181,9 +235,39 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 61
+      "expectedCallBars": 61,
+      "rest": null
     }
   ],
+  "ceremonies": {
+    "walkout": {
+      "segments": [
+        "intro-hello",
+        "intro-program-intermediate-steady",
+        "li-2ba7c178",
+        "intro-letsgo"
+      ],
+      "plannedMs": 24020,
+      "tracks": 7
+    },
+    "countdownOpeners": {
+      "warn-opener-01": 2453,
+      "warn-opener-02": 1293,
+      "warn-opener-03": 2426,
+      "warn-opener-04": 2893,
+      "warn-opener-05": 2451,
+      "warn-opener-06": 2512,
+      "warn-opener-07": 2019,
+      "warn-opener-08": 2285,
+      "warn-opener-09": 1733,
+      "warn-opener-10": 3893,
+      "warn-opener-11": 2673,
+      "warn-opener-12": 2310,
+      "warn-opener-13": 1782,
+      "warn-opener-14": 3319,
+      "warn-opener-15": 2653
+    }
+  },
   "silentByDesign": [],
   "notes": []
 }

@@ -57,7 +57,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 67
+      "expectedCallBars": 67,
+      "rest": {
+        "restLine": {
+          "scriptId": "rt-b6b54f24",
+          "slot": "rest/progressive-buildup/r1",
+          "text": "That is the idea: add without losing what came before. Round two starts with jab, cross, jab, cross in straight time, then gives you a coast bar to feel the spacing. Breathe easy and remember the shape.",
+          "plannedMs": 13945,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 2,
+          "afterOpener": [
+            "lt-4909e30e",
+            "warn-round-2"
+          ],
+          "afterOpenerMs": 14812,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 1,
@@ -85,7 +103,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 59
+      "expectedCallBars": 59,
+      "rest": {
+        "restLine": {
+          "scriptId": "rt-99ae66c8",
+          "slot": "rest/progressive-buildup/r2",
+          "text": "Good. Now the lead hook becomes part of the chain. First set next round is jab, cross, lead hook with the fourth slot empty; then we close it with jab, cross, lead hook, cross. Keep building, never scrambling.",
+          "plannedMs": 13608,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 3,
+          "afterOpener": [
+            "lt-b537fb0b",
+            "warn-round-3"
+          ],
+          "afterOpenerMs": 12980,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 2,
@@ -113,7 +149,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 68
+      "expectedCallBars": 68,
+      "rest": {
+        "restLine": {
+          "scriptId": "rt-93e0fcd5",
+          "slot": "rest/progressive-buildup/r3",
+          "text": "Last round is where the pieces become phrases. First two-page set is jab, cross, lead hook, cross; then jab, cross, lead uppercut, breathe. After that the square shows up. Take a breath and see the pages before the bell.",
+          "plannedMs": 15240,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 4,
+          "afterOpener": [
+            "lt-ef220899",
+            "warn-round-4"
+          ],
+          "afterOpenerMs": 21561,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 3,
@@ -141,9 +195,39 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 43
+      "expectedCallBars": 43,
+      "rest": null
     }
   ],
+  "ceremonies": {
+    "walkout": {
+      "segments": [
+        "intro-hello",
+        "intro-program-intermediate-steady",
+        "lt-44a231a7",
+        "intro-letsgo"
+      ],
+      "plannedMs": 23853,
+      "tracks": 7
+    },
+    "countdownOpeners": {
+      "warn-opener-01": 2453,
+      "warn-opener-02": 1293,
+      "warn-opener-03": 2426,
+      "warn-opener-04": 2893,
+      "warn-opener-05": 2451,
+      "warn-opener-06": 2512,
+      "warn-opener-07": 2019,
+      "warn-opener-08": 2285,
+      "warn-opener-09": 1733,
+      "warn-opener-10": 3893,
+      "warn-opener-11": 2673,
+      "warn-opener-12": 2310,
+      "warn-opener-13": 1782,
+      "warn-opener-14": 3319,
+      "warn-opener-15": 2653
+    }
+  },
   "silentByDesign": [],
   "notes": []
 }

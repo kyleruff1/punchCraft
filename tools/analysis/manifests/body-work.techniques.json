@@ -67,7 +67,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 66
+      "expectedCallBars": 66,
+      "rest": {
+        "restLine": {
+          "scriptId": "rt-0fab502a",
+          "slot": "rest/body-work/r1",
+          "text": "Good body work starts with your balance, not with reaching down. Round two digs deeper: first set is body cross, body lead hook, body cross with the fourth slot open. Keep the elbows close and take a drink only if you need it.",
+          "plannedMs": 14880,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 2,
+          "afterOpener": [
+            "lt-944153c8",
+            "warn-round-2"
+          ],
+          "afterOpenerMs": 16195,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 1,
@@ -105,7 +123,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 61
+      "expectedCallBars": 61,
+      "rest": {
+        "restLine": {
+          "scriptId": "rt-20bc3302",
+          "slot": "rest/body-work/r2",
+          "text": "You have the basic body lines. Next round mixes floors and sides. First two pages are jab, body cross, lead hook, cross; then body jab, body rear hook, lead hook, breathe. Keep your eyes up while the targets change.",
+          "plannedMs": 15460,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 3,
+          "afterOpener": [
+            "lt-1ff0fd36",
+            "warn-round-3"
+          ],
+          "afterOpenerMs": 23325,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 2,
@@ -143,7 +179,25 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 55
+      "expectedCallBars": 55,
+      "rest": {
+        "restLine": {
+          "scriptId": "rt-b2b44fae",
+          "slot": "rest/body-work/r3",
+          "text": "Last round. Let the ribs expand on a long inhale and keep the hands relaxed. First set is jab, body cross, lead hook, body rear hook in straight time. Then we coast briefly before the body rear uppercut and body lead uppercut finishes.",
+          "plannedMs": 15887,
+          "tracks": 1
+        },
+        "countdown": {
+          "round": 4,
+          "afterOpener": [
+            "lt-0a60b373",
+            "warn-round-4"
+          ],
+          "afterOpenerMs": 16532,
+          "tracks": 5
+        }
+      }
     },
     {
       "roundIndex": 3,
@@ -181,9 +235,39 @@
           "source": "clickScript.schedule"
         }
       ],
-      "expectedCallBars": 59
+      "expectedCallBars": 59,
+      "rest": null
     }
   ],
+  "ceremonies": {
+    "walkout": {
+      "segments": [
+        "intro-hello",
+        "intro-program-intermediate-steady",
+        "lt-72babf95",
+        "intro-letsgo"
+      ],
+      "plannedMs": 24619,
+      "tracks": 7
+    },
+    "countdownOpeners": {
+      "warn-opener-01": 2453,
+      "warn-opener-02": 1293,
+      "warn-opener-03": 2426,
+      "warn-opener-04": 2893,
+      "warn-opener-05": 2451,
+      "warn-opener-06": 2512,
+      "warn-opener-07": 2019,
+      "warn-opener-08": 2285,
+      "warn-opener-09": 1733,
+      "warn-opener-10": 3893,
+      "warn-opener-11": 2673,
+      "warn-opener-12": 2310,
+      "warn-opener-13": 1782,
+      "warn-opener-14": 3319,
+      "warn-opener-15": 2653
+    }
+  },
   "silentByDesign": [],
   "notes": []
 }
