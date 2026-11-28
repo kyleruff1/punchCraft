@@ -2008,6 +2008,73 @@ listed at the end, not claimed. Branch `feat/every-round`.
 | N-22: a pause counts the time up to the pause | `bdcc665d` |
 | N-23: the header shows the time left while paused | `c6e63607` |
 
+### What it measured
+
+**The emulator run: all 22, both vocabularies, whole workouts.** A native
+release build of `c01684ef` on four emulators at once (`npm run emu:suite --
+--vocab=both --jobs=4`), two hours 36 minutes, 10.2 hours of driving.
+**44 of 44 PASS**, every one on its first attempt.
+
+| What | Result |
+|---|---|
+| Rounds judged | 126 of 126 |
+| Lead-ins matched, by name and time | 398 of 398 |
+| Calls sent, of those the runner plans | 8,006 of 8,006 |
+| Walkouts, rest lines and countdowns as planned | 208 of 208 |
+| Rings | 29,932 — 27,299 shown lit, 2,633 kept dim |
+| Bars that did not light all their rings | 0 |
+| Rings painted more than 100 ms late | 0 — the latest was 16.7 ms, one frame |
+| Ring clock against session clock, per round | −0.2 to +0.7 ms |
+| Log lines lost | 0 |
+
+The round clocks, which is N-18 on a native build across every workout: the
+boundary record trails the work clock's zero by 6.8 to 33.3 ms in round 1
+(median 12.9, 44 rounds) and by 4.9 to 21.1 ms in later rounds (median 8.2,
+82 rounds). September's build read 79.8 ms in round 1 on the same emulator.
+The ring tokens place each round's work clock within 1.5 ms of one instant.
+
+What it listed and did not judge: the app's 50 ms loop stalled and caught up
+32 times across the 44 drives, with four emulators sharing the machine. No
+ring was late for it.
+
+*What that run is not.* Its timing was not judged — the suite marked every
+drive "not judged" and ran no timing analyzer. Nothing was heard. It is an
+emulator on this PC, with simulated punches.
+
+**The reference, rebuilt from it.** `tools/pc/suite/device-reference/` now
+holds 44 files, each saying `emulator`, build `c01684ef`, 2026-11-28: 126
+rounds, 8,404 dispatches. The 24 that replaced a tablet capture keep the
+tablet's own lateness from 2026-09-08 beside the emulator's. That clears
+the ten comparisons skipped since N-15, and gives technique names a
+reference for the first time.
+
+**The PC, same commit.** Two runs, six browsers at a time.
+
+| | All 22, round 1 and its rest | All 22, both vocabularies, whole workouts |
+|---|---|---|
+| Verdicts | 22 of 22 PASS | 44 of 44 PASS |
+| Rounds judged, of those meant to be driven | 22 of 22 | 126 of 126 |
+| Lead-ins matched | 72 of 72 | 398 of 398 |
+| Calls sent, of those planned | 1,379 of 1,379 | 8,006 of 8,006 |
+| Ceremonies as planned | 66 of 66 | 208 of 208 |
+| Clips that made no sound, or were cut | 0 | 0 |
+| Rings | 4,758 — 4,374 lit, 384 dim | 29,932 — 27,299 lit, 2,633 dim |
+| Bars that did not light all their rings | 0 | 0 |
+| Latest ring | 8.7 ms | 15.1 ms |
+| Errors on the page | 0 | 0 |
+| Time | 23 minutes, with the build | an hour and 52 minutes |
+
+The whole-workout run and the emulator run agree to the ring: 29,932, with
+the same 27,299 lit and 2,633 dim.
+
+**Parity, the PC against the native build.** Both runs, against the
+rebuilt reference: **nothing differs and nothing is skipped.** The
+whole-workout run is the same in all 44 — 8,404 of 8,404 dispatches across
+126 of 126 rounds, and not one more or fewer on either side. The default
+run is the same in all 22 on round 1. So for every sample workout, in both
+vocabularies and in every round, a browser and a native Android build say
+the same clip, with the same words, due at the same time, leading the same
+ring.
 ### Findings
 
 #### N-20 · The check on "were all the calls made" was lenient · fixed
@@ -2191,6 +2258,24 @@ Not reproduced, so not changed.
   heredoc turned `\b` into the control character, and the rule it was part
   of silently matched nothing. A test caught it. The files touched since
   were scanned for control characters; that one was the only one.
+
+### Still unproven
+
+- **All of it on the tablet.** Every native result above is an emulator on
+  this PC. What only the tablet settles is listed in §7.
+- **The closing-bell fix (N-21) has not been heard**, and no suite reaches
+  it: a drive ends on the workout's last boundary and never leaves the
+  screen. It rests on its tests.
+- **The ring warning is still 100 ms.** The plan was to halve it once all
+  22 had run on a GitHub runner with the rings judged. Only One-Two has
+  (PR 398: painted 12.8 ms, latest 17.2). The manual run of all 22 follows
+  this branch being pushed.
+- **The re-drive of a failed drive** (`emu:suite --jobs`) did not run here:
+  nothing failed. Its decision rule has tests; the path was not seen to run.
+- **A round's calls are counted, not named**, and a rest with no authored
+  script is not checked. Neither arises in the 22 samples' rests; the first
+  is true of every round.
+- **N-24 to N-28 are open**, by decision: found, pinned, not fixed.
 
 ---
 
@@ -2414,12 +2499,36 @@ minutes: `npm run pc:suite`, then `npm run pc:parity` (§3h, §3i). Run it
 before any tablet session; a correlator, sound or ring failure there is a
 failure here.
 
-**The tablet suite, once — it is what the PC compares itself with.** Ten of
-the 22 workouts play a call clip re-recorded since the September captures and
-cannot be compared until the suite runs again (N-15): the `qa-audio-verify`
-loop, then `npm run pc:parity -- --build-reference tools/analysis/suites/<run>`.
-What that run alone can say: the tablet's start latency and delivered breath
-with the re-recorded clips, which the PC cannot stand in for.
+**Then, what needs a native build but not the tablet.** Tablet tests are run
+on the emulator (Kyle, 2026-11-28): `npm run emu:suite` drives the tablet's
+verify suite on a native release build — every round, the walkout, rest
+line and countdown, the rings against the session clock, the round clocks
+(§3j). The reference the PC compares itself with can be rebuilt from such a
+run (`npm run pc:parity -- --build-reference tools/analysis/suites/<run>`);
+each file says an emulator wrote it and keeps the tablet's own September
+lateness beside it.
+
+**What stays owed to the real tablet.** An emulator run is not a tablet run,
+and nothing below is settled by one:
+
+- **Its timing constants.** An emulator on this PC is a PC. Start latency,
+  delivered breath, `CALL_DISPATCH_LAG_MS` and every other measured
+  constant are the tablet's to give — with the clips re-recorded since
+  September, which no tablet capture has yet played (N-15).
+- **Anything by ear or eye**, the fixes in §3j among them: the closing bell
+  ringing out when the screen is left inside it (N-21); the header holding
+  the time left through a pause (N-23); a pause tapped in a round's last
+  instant ringing the bell and holding the rest (N-22). And the rings as
+  seen, on the tablet's own display.
+- **Its own database.** Migrations 009 and 010 have run on native SQLite in
+  an emulator, over a database a September build wrote. They have not run on
+  the tablet's, which is older and larger.
+- **Gloves and Bluetooth.** All of it.
+- **How many log lines it loses.** The device checks only warn on a missing
+  line because the tablet's log drops them; how often is the tablet's to say.
+- **The five things found and not fixed** (§3j, N-24 to N-28) are worth
+  meeting on the device before deciding which to fix: lock the screen or
+  take a call mid-round (N-24) first.
 
 **Bluetooth (H-3) — the one that matters most.**
 - Gloves connected → Velocity Lab → Live → back → start a workout → punches

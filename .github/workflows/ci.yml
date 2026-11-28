@@ -121,12 +121,18 @@ jobs:
   # not start its audio, the suite says the sound tap did not start, warns,
   # and judges the rest.
   #
-  # Not yet seen on a runner: the rest that now follows round 1 in every
-  # drive (the bell, the rest line, the countdown), and the rings — whether
-  # each one lit, and how late it was painted. A ring painted more than
-  # 100 ms late warns, and a shared four-processor machine may well do that.
-  # That is one reason the job stays out of the gate until it has held for a
-  # while.
+  # Seen on a runner once, for one workout (2026-11-27, PR 398): the rest that
+  # follows round 1 (the bell, the rest line, the countdown) and the rings —
+  # One-Two, 194 of 194 lit, painted 12.8 ms after their time, the latest
+  # 17.2. Not yet seen for all 22. A ring painted more than 100 ms late warns,
+  # and a shared four-processor machine may do that; the 100 is to be halved
+  # once a manual run of all 22 says it can be. That is one reason the job
+  # stays out of the gate until it has held for a while.
+  #
+  # Since 2026-11-28 the correlator is told the drive is round 1, judges the
+  # walkout, the rest line and the countdown against what the app built, and
+  # parity compares with a reference a native build wrote
+  # (`tools/pc/suite/device-reference/`, each file names its device).
   pc-sync:
     name: pc sync (advisory)
     runs-on: ubuntu-latest
@@ -145,7 +151,7 @@ jobs:
       - run: npm ci
       - name: Drive the PC suite
         run: npm run pc:suite ${{ github.event_name != 'workflow_dispatch' && '-- --only quick-one-two' || '' }}
-      - name: Compare what it said with the tablet
+      - name: Compare what it said with the device reference
         if: ${{ !cancelled() }}
         run: npm run pc:parity
       # The captures and reports, whatever the verdict: a failure here is

@@ -54,41 +54,76 @@ Enable Developer Options → USB debugging, then verify:
 adb devices -l
 ```
 
-## An Android emulator, when there is no tablet
+## An Android emulator: where the tablet's tests run
 
-A release build of the app runs in an Android emulator on this PC. First
+A release build of the app runs in an Android emulator on this PC, and the
+tablet's verify suite drives it. **Tablet tests are run here** (Kyle,
+2026-11-28) — everything native that is neither Bluetooth nor timing. First
 done 2026-11-27.
 
-**What it is good for:** the app's native path with nothing attached —
-Hermes, the UI-thread ring clock, the native audio players, expo-sqlite and
-its migrations, the QA deep link, and the tablet's own verify suite.
+```bash
+npm run emu:suite                                   # all 22, whole workouts, one emulator
+npm run emu:suite -- --vocab=both --jobs=4          # both vocabularies, four emulators: about three hours
+npm run emu:suite -- --only=quick-one-two           # one workout
+npm run emu:suite -- --first-round-only             # round 1 of each
+npm run emu:suite -- --dry-run                      # say what it would do
+npm run emu:prepare                                 # once per worktree: see "From a worktree"
+```
+
+`emu:suite` does the whole loop: starts `punchcraft-emu` if it is not up,
+builds x86_64 from **this checkout's** `android/` when the APK is not HEAD's,
+installs it when the device has another, grants the two Bluetooth
+permissions so no prompt appears, switches QA mode on, and runs
+`verify-suite.mjs` with `--expect-release --require-sha`. Anything else on
+its command line goes to the suite. It refuses a device that is not an
+emulator, a dirty tree (the build would not be a commit), and a checkout
+with no `android/`. It never falls back to the main checkout's build.
+
+`--jobs N` runs N emulators at once — read-only instances of the one AVD, on
+ports 5556, 5558, … — from a shared queue, and writes one merged summary. A
+drive that fails is driven again alone before it is reported: a starved
+emulator drops frames. **Do not commit while it runs:** `--require-sha`
+compares the installed build with HEAD at the start of every drive.
+
+**What it judges.** Every round of every workout against the manifest (lead-ins
+by name and time, calls by count); the walkout, each rest's line and each
+countdown; the rings, timed against the session clock; and the round clocks.
+The summary's `verify` cell reads `0 · 4 of 4 rounds · 7 of 7 ceremonies`.
 
 **What it is not:** the tablet.
 
-- No gloves. It has no Bluetooth; the app asks for the permission twice
-  (at launch and on the live screen) and the second prompt holds the workout
-  until it is answered. Decline both.
+- No gloves. It has no Bluetooth.
 - **Every timing figure from it is a PC number.** Its processor and audio
   path are this PC's, and no tablet constant is set from an emulator. The
   tooling enforces most of that (N-19 in the findings doc): the app's QA run
   record says `emulator: true`, `observed-timing.mjs` refuses such a
   capture, and the verify suite asks the device and does not run the timing
-  analyzer for one. **Not enforced:** a capture taken by hand from an
-  emulator running a build older than `38d556f9` — an old APK installed to
-  test an upgrade — says nothing about its device. Do not analyze one.
+  analyzer for one — its timing column reads "not judged", and the **work
+  axis** is printed in its place: per round, how many ring tokens place the
+  work clock and how far the work-entered boundary record trails its zero.
+  Those are the app's own two clocks with no audio in them, and mean on an
+  emulator what they mean on the tablet. **Not enforced:** a capture taken
+  by hand from an emulator running a build older than `38d556f9` — an old
+  APK installed to test an upgrade — says nothing about its device. Do not
+  analyze one, and do not build a parity reference from one.
+- Nothing by ear or eye, and not the tablet's own database.
 
 **The device.** AVD `punchcraft-emu`: Pixel Tablet profile (2560×1600),
 Android 15 (API 35, Google APIs, x86_64), 4 GB. `helioscape-dev`
-(`emulator-5554`) is another project's — leave it alone.
+(`emulator-5554`) is another project's — leave it alone; `emu:suite` starts
+at port 5556 for that reason.
+
+By hand, when the script is not what is wanted:
 
 ```bash
-emulator -avd punchcraft-emu -no-window -no-snapshot -no-boot-anim -gpu host -port 5556   # → emulator-5556
-adb -s emulator-5556 emu kill                                                            # stop it
+"$ANDROID_HOME/emulator/emulator" -avd punchcraft-emu -no-window -no-snapshot -no-boot-anim -gpu host -port 5556   # → emulator-5556
+adb -s emulator-5556 emu kill                                                                                      # stop it
 ```
 
-(`emulator` is `%ANDROID_HOME%emulatoremulator.exe`; it is not on the PATH.)
+(`emulator` is `%ANDROID_HOME%\emulator\emulator.exe`; it is not on the PATH.)
 
-**The build.** x86_64, the emulator's processor — four minutes here.
+**The build.** x86_64, the emulator's processor — about four minutes cold,
+about a minute after a JS-only change. `emu:suite` runs it; by hand:
 
 ```bash
 cd android && ./gradlew assembleRelease -PreactNativeArchitectures=x86_64 && cd ..
@@ -96,27 +131,27 @@ adb -s emulator-5556 install -r android/app/build/outputs/apk/release/app-releas
 ```
 
 *From a worktree:* `android/` is git-ignored and exists only in the main
-checkout. Copy its sources into the worktree — everything except
-`app/build`, `app/.cxx`, `.gradle` and `build` — and build there. Node
-finds `node_modules` by walking up to the main checkout's, so the native
-modules' build output lands there. The first such build also set
-`externalNativeBuild { cmake { buildStagingDirectory 'F:/pcx-n18' } }` in
-the copy's `android { }` block, against Windows's path limit (a worktree's
-root is 43 characters longer); whether it was needed was not tested.
+checkout. `npm run emu:prepare` copies its sources into the worktree —
+everything except `app/build`, `app/.cxx`, `.gradle`, `.kotlin` and `build` — and the
+build runs there. Node finds `node_modules` by walking up to the main
+checkout's, so the native modules' build output lands there. Nothing else is
+needed: an earlier note here set a CMake staging directory against Windows's
+path limit, and a cold build from a brand-new worktree has since passed
+without it.
 
-**Driving it.** QA mode must be on — Settings → QA mode, once per install.
-The suite mutes the emulator and restores it.
+**QA mode and the two prompts.** `emu:suite` handles both. QA mode is one
+row in the app's settings table; the script writes it as root, which an
+emulator's userdebug image allows and a tablet does not — the QA link itself
+still cannot switch QA mode on, by design. By hand: Settings → QA mode, once
+per install, and
 
 ```bash
-node tools/analysis/verify-suite.mjs --only=quick-one-two --device=emulator-5556 --expect-release --out=tools/analysis/suites/<name>
+adb -s emulator-5556 shell pm grant com.kyleruff.punchcraft android.permission.BLUETOOTH_SCAN
+adb -s emulator-5556 shell pm grant com.kyleruff.punchcraft android.permission.BLUETOOTH_CONNECT
 ```
 
-On an emulator the suite reports the verdict and the correlator's stats,
-marks timing "not judged", and prints the **work axis** in its place — per
-round, how many ring tokens place the work clock and how far the
-work-entered boundary record trails its zero. Those are the app's own two
-clocks with no audio in them, and they mean on an emulator what they mean
-on the tablet. The onset columns of its table are this PC's.
+so that neither permission prompt appears (the second one holds a workout
+until it is answered).
 
 **Reading the database.** The image is a userdebug one, so:
 
@@ -125,12 +160,20 @@ adb -s emulator-5556 root
 adb -s emulator-5556 shell sqlite3 /data/data/com.kyleruff.punchcraft/files/SQLite/punchcraft.db "SELECT id FROM schema_migrations"
 ```
 
+(`adb root` restarts the device's adb daemon and ends a log capture that is
+running. Not during a drive.)
+
 **Testing an upgrade.** `artifacts/` in the main checkout holds September's
 release APKs, built for every processor, x86_64 included. Install one, run
 a workout to the end, then install the new build over it (`-r`: same id,
 same debug keystore, so the data stays). The new build's migrations then
 run on a database an old build wrote. An old build's QA link could still
 switch QA mode on, and the switch survives the upgrade.
+
+**What only the real tablet settles** is kept as a list in the findings doc
+(`docs/handoff/08-review-and-roadmap.md`, §7): its timing constants,
+anything by ear or eye, its own database, gloves and Bluetooth, and how many
+log lines it loses.
 
 ## Installing SDK components (after Story 1 lock)
 
@@ -171,8 +214,10 @@ Added 2026-11-25. Everything here runs on the workstation with no tablet.
 | `npm run pc:glove-check` | Serves the PC glove check on `http://127.0.0.1:8787/` (loopback only; `PORT=` moves it). Open it in Chrome or Edge. See below. |
 | `npm run pc:app` | Builds the app for a browser and serves it on `http://127.0.0.1:8788/` (loopback only; `PORT=` moves it; `-- --no-build` serves the last build). See below. |
 | `npm run pc:smoke` | Builds, then drives the PC app in a headless Chrome or Edge: boot, a workout on simulated punches, stop, save, reload, the saved database read back out of the browser, then History and the session's summary. Fails on any error on the page. About a minute after the build. Also runs in CI as an advisory job. |
-| `npm run pc:suite` | The tablet's verify suite on the PC: drives every sample workout in a headless browser (round 1 and the rest after it; `-- --full` for whole workouts; `-- --only a,b`), has the tablet's correlator judge each, listens to what the page plays — calls, bells, intro, countdown, rest line — and checks that every ring lit. All 22 take about 22 minutes, six at a time; `--full` is 10 to 20 minutes a workout. Builds first, replacing `dist/pc-app/` — do not run `pc:app` or `pc:smoke` beside it. See `tools/pc/suite/README.md`. |
+| `npm run pc:suite` | The tablet's verify suite on the PC: drives every sample workout in a headless browser (round 1 and the rest after it; `-- --full` for whole workouts; `-- --only a,b`), has the tablet's correlator judge every round the drive was meant to complete — lead-ins by name, calls by count, and the walkout, rest line and countdown against what the app built — listens to what the page plays, and checks every ring: lit, and when. All 22 take about 22 minutes, six at a time; `--full` is 10 to 20 minutes a workout. Builds first, replacing `dist/pc-app/` — do not run `pc:app` or `pc:smoke` beside it. See `tools/pc/suite/README.md`. |
 | `npm run pc:parity` | Compares the newest `pc:suite` run with the device reference (`tools/pc/suite/device-reference/`), in every round both hold whole: what was said, in what order, at what scheduled time. `-- --build-reference <suite folder>` rebuilds the reference after a suite run on the tablet or the emulator; each file says which. |
+| `npm run emu:suite` | The tablet's verify suite on an Android emulator, in one command: starts `punchcraft-emu`, builds x86_64 from this checkout when the APK is not HEAD's, installs it, grants the Bluetooth permissions, switches QA mode on, runs the suite with `--expect-release --require-sha`. `-- --jobs=4` runs four emulators; `-- --vocab=both --jobs=4` is all 44 whole workouts in about three hours. **This is where tablet tests are run.** Do not commit while it runs. See "An Android emulator" above. |
+| `npm run emu:prepare` | Once per worktree: copies `android/` (sources only) from the main checkout, so the emulator build can run from the worktree. |
 | `npm run tablet:reload` | Restarts Metro, cold-restarts the app on the tablet, waits for it to come up. `--no-metro` restarts only the app; `--dry-run` says what it would do. **Not yet proven on the device** — see the script's header. |
 
 **The PC glove check** (added 2026-11-25) is the first piece of the PC
