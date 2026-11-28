@@ -23,7 +23,12 @@
  *       [--only=a,b] [--device=<serial>] [--expect-release] [--first-round-only]
  *       [--sim=captured-jam|alternating-1-2|none] [--sim-force] [--sim-bpm=N]
  *       [--gh-ledger] [--dry-run] [--tap-fallback] [--keep-volume] [--out=<dir>]
- *       [--timing-gate=off|warn|fail]
+ *       [--timing-gate=off|warn|fail] [--require-sha[=<sha>]]
+ *
+ * `--require-sha` makes "the installed build is this commit" a condition
+ * rather than a warning: the first drive whose build is another commit FAILS
+ * and the suite stops, because every drive after it would test the wrong
+ * code. Bare, it requires this checkout's HEAD.
  *
  * Each drive is judged twice: by `verify-first-round.mjs` (did the coach say
  * the right thing at the right mark) and by `observed-timing.mjs` (did the
@@ -102,6 +107,8 @@ export function parseArgs(argv) {
     keepVolume: false,
     out: undefined,
     timingGate: 'fail',
+    /** undefined: only warn on a build from another commit. 'HEAD' or a sha: fail and stop. */
+    requireSha: undefined,
   }
   for (const a of argv) {
     if (a === '--all') args.all = true
@@ -120,7 +127,12 @@ export function parseArgs(argv) {
     else if (a === '--keep-volume') args.keepVolume = true
     else if (a.startsWith('--out=')) args.out = a.slice('--out='.length)
     else if (a.startsWith('--timing-gate=')) args.timingGate = a.slice('--timing-gate='.length)
+    else if (a === '--require-sha') args.requireSha = 'HEAD'
+    else if (a.startsWith('--require-sha=')) args.requireSha = a.slice('--require-sha='.length)
     else throw new Error(`unknown argument: ${a}`)
+  }
+  if (args.requireSha !== undefined && !/^(HEAD|[0-9a-f]{7,40})$/.test(args.requireSha)) {
+    throw new Error(`--require-sha takes a commit id of 7 to 40 hex digits, got '${args.requireSha}'`)
   }
   if (!['off', 'warn', 'fail'].includes(args.timingGate)) {
     throw new Error(`--timing-gate must be off, warn or fail, got '${args.timingGate}'`)
@@ -278,6 +290,25 @@ export function timingVerdictFromExit(code, gate) {
       // logcat fails a drive that may well have been perfect.
       return 'WARN'
   }
+}
+
+/** Whether two commit ids name the same commit: one is a prefix of the other. */
+export function sameCommit(a, b) {
+  if (!a || !b || a === 'unknown' || b === 'unknown') return false
+  return a.startsWith(b) || b.startsWith(a)
+}
+
+/**
+ * Why a drive is refused under `--require-sha`, or `null` when the installed
+ * build is the commit required (or none is).
+ *
+ * A build that cannot say what it is — no `gitSha`, or `unknown` — is
+ * refused too: "could not tell" is not "the right build".
+ */
+export function buildRefusal({ installed, required }) {
+  if (!required) return null
+  if (sameCommit(installed, required)) return null
+  return `build-mismatch: the installed build is ${installed || 'unknown'}, and --require-sha asked for ${required}`
 }
 
 /**
@@ -761,6 +792,14 @@ async function driveOne(ctx, job, attempt = 1) {
         fail(`build-mismatch: expected a release build, qa.run reports dev=${row.build.dev}`, 'FAIL')
         return finish()
       }
+      const wrongBuild = buildRefusal({ installed: row.build.gitSha, required: ctx.requiredSha })
+      if (wrongBuild !== null) {
+        // Not this drive alone: every drive after it would test the same
+        // wrong build, so the suite stops here.
+        fail(wrongBuild, 'FAIL')
+        row.stopsSuite = true
+        return finish()
+      }
       if (row.build.gitSha && ctx.hostSha !== 'unknown' && !row.build.gitSha.startsWith(ctx.hostSha) && !ctx.hostSha.startsWith(row.build.gitSha)) {
         slog(`   WARN: build gitSha ${row.build.gitSha} ≠ host ${ctx.hostSha} — the installed bundle is not this checkout`)
         row.build.shaMismatch = true
@@ -1054,7 +1093,8 @@ async function main() {
     }
   }
   const deviceIsEmulator = isEmulatorDevice({ serial: deviceId, qemu: prop('ro.kernel.qemu'), characteristics: prop('ro.build.characteristics') })
-  const ctx = { args, deviceId, deviceIsEmulator, slog, suiteDir, suiteId, hostSha, rows: [], activeCleanup: null }
+  const requiredSha = args.requireSha === 'HEAD' ? hostSha : args.requireSha
+  const ctx = { args, deviceId, deviceIsEmulator, slog, suiteDir, suiteId, hostSha, requiredSha, rows: [], activeCleanup: null }
   slog(`suite ${suiteId} · device ${deviceId} · ${jobs.length} drives · launch ${args.launch} · host sha ${hostSha}`)
   if (args.expectRelease) slog('expecting a RELEASE build (qa.run must report dev=false); swap back with `npm run android` afterwards')
   if (deviceIsEmulator) slog('this device is an EMULATOR — verdicts and the work axis stand; timing is not judged, and no tablet constant is set from anything it reports')
@@ -1086,10 +1126,16 @@ async function main() {
 
   let exitCode = 0
   try {
-    for (const job of jobs) {
+    let stoppedAfter = null
+    for (const [index, job] of jobs.entries()) {
+      if (stoppedAfter !== null) break
       const row = await driveOne(ctx, job)
       ctx.rows.push(row)
+      if (row.stopsSuite) stoppedAfter = index
       writeFileSync(join(suiteDir, 'summary.json'), JSON.stringify({ suiteId, deviceId, args, rows: ctx.rows }, null, 2) + '\n', 'utf8')
+    }
+    if (stoppedAfter !== null) {
+      slog(`stopping: ${jobs.length - stoppedAfter - 1} drive(s) not run — they would have tested the same wrong build`)
     }
     const judged = ctx.rows.filter((r) => !r.superseded)
     exitCode = aggregateVerdicts(judged.map((r) => r.verdict))

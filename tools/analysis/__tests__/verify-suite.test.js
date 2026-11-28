@@ -7,6 +7,7 @@
 
 import {
   aggregateVerdicts,
+  buildRefusal,
   appendLedgerRow,
   budgetMs,
   buildRunUrl,
@@ -23,6 +24,7 @@ import {
   planJobs,
   quoteForDeviceShell,
   runQuery,
+  sameCommit,
   isEmulatorDevice,
   renderSummaryMd,
   timingRefusal,
@@ -269,6 +271,13 @@ describe('args', () => {
     expect(parseArgs(['--all', '--expect-release']).launch).toBe('cold')
     expect(parseArgs(['--all', '--launch=cold']).launch).toBe('cold')
   })
+  it('takes --require-sha bare (this checkout) or with a commit id, and nothing else', () => {
+    expect(parseArgs(['--all']).requireSha).toBeUndefined()
+    expect(parseArgs(['--all', '--require-sha']).requireSha).toBe('HEAD')
+    expect(parseArgs(['--all', '--require-sha=8a080194']).requireSha).toBe('8a080194')
+    expect(() => parseArgs(['--all', '--require-sha=main'])).toThrow(/--require-sha/)
+    expect(() => parseArgs(['--all', '--require-sha=abc'])).toThrow(/--require-sha/)
+  })
   it('rejects a run with nothing selected, a bad vocab, or an unknown flag', () => {
     expect(() => parseArgs([])).toThrow(/--all or --only/)
     expect(() => parseArgs(['--all', '--vocab=loud'])).toThrow(/--vocab/)
@@ -450,5 +459,33 @@ describe('an emulator is a PC (findings doc, N-19)', () => {
       expect(md).toContain('| 0 PASS |')
       expect(md).not.toContain('not judged')
     })
+  })
+})
+
+describe('--require-sha: the installed build must be the commit asked for', () => {
+  it('knows the same commit by either id being a prefix of the other', () => {
+    expect(sameCommit('8a080194', '8a080194c0ffee')).toBe(true)
+    expect(sameCommit('8a080194c0ffee', '8a080194')).toBe(true)
+    expect(sameCommit('8a080194', '6b47e616')).toBe(false)
+    expect(sameCommit('unknown', 'unknown')).toBe(false)
+    expect(sameCommit('', '8a080194')).toBe(false)
+    expect(sameCommit(undefined, '8a080194')).toBe(false)
+  })
+
+  it('refuses nothing when no commit is required', () => {
+    expect(buildRefusal({ installed: '6b47e616', required: undefined })).toBeNull()
+  })
+
+  it('lets the required build through', () => {
+    expect(buildRefusal({ installed: '8a080194', required: '8a080194c0ffee' })).toBeNull()
+  })
+
+  it('refuses another commit, naming both', () => {
+    expect(buildRefusal({ installed: '6b47e616', required: '8a080194' })).toBe('build-mismatch: the installed build is 6b47e616, and --require-sha asked for 8a080194')
+  })
+
+  it('refuses a build that cannot say what it is', () => {
+    expect(buildRefusal({ installed: 'unknown', required: '8a080194' })).toMatch(/installed build is unknown/)
+    expect(buildRefusal({ installed: null, required: '8a080194' })).toMatch(/installed build is unknown/)
   })
 })
