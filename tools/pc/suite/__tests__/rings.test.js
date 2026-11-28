@@ -3,7 +3,7 @@
  * clock starts at 10 000 on the page's clock; a bar of two rings is due at
  * work 4 000 and 4 500.
  */
-import { RING_LATE_WARN_MS, ringReport, ringVerdict } from '../rings.mjs'
+import { RING_CLOCK_SKEW_WARN_MS, RING_LATE_WARN_MS, ringReport, ringVerdict } from '../rings.mjs'
 
 const WORK = 10_000
 const at = (monoMs, code, fields) => ({
@@ -201,5 +201,148 @@ describe('round by round, and the app’s loop', () => {
     expect(ringVerdict(report).soft).toEqual([
       'the app logged no forensics records, so its loop could not be checked',
     ])
+  })
+})
+
+describe('a ring step that says which frame lit it', () => {
+  /**
+   * A ring lit on the frame `frameLate` after its time, with the ring clock
+   * reading `clockLate` past it, and the record reaching the log
+   * `recordLate` after that time — a thread-hop later, as it does.
+   */
+  const stepped = (
+    cueId,
+    ordinal,
+    scheduledMs,
+    { frameLate, clockLate, recordLate = frameLate + 25, row = 'lit', from = ordinal - 1 },
+  ) =>
+    at(WORK + scheduledMs + recordLate, 'workout.ring.visual', {
+      cueId,
+      ordinal,
+      from,
+      workElapsedMs: scheduledMs + clockLate,
+      frameMs: WORK + scheduledMs + frameLate,
+      row,
+    })
+
+  it('is timed by that frame, not by when its record was written', () => {
+    const report = ringReport(
+      run(
+        bar('a', 4_000),
+        stepped('a', 0, 4_000, { frameLate: 4, clockLate: 3, recordLate: 60 }),
+        stepped('a', 1, 4_500, { frameLate: 6, clockLate: 5, recordLate: 90 }),
+      ),
+    )
+    expect(report.stamped).toBe(2)
+    expect(report.paintedLate).toMatchObject({ n: 2, minMs: 4, maxMs: 6 })
+    expect(ringVerdict(report).verdict).toBe('PASS')
+  })
+
+  it('reports the ring clock’s own view beside it', () => {
+    const report = ringReport(
+      run(
+        bar('a', 4_000),
+        stepped('a', 0, 4_000, { frameLate: 4, clockLate: 3 }),
+        stepped('a', 1, 4_500, { frameLate: 6, clockLate: 5 }),
+      ),
+    )
+    expect(report.ringClockLate).toMatchObject({ n: 2, minMs: 3, maxMs: 5 })
+    expect(report.ringClockSkewByRound).toEqual([
+      expect.objectContaining({ roundIndex: 0, n: 2, medianMs: 1 }),
+    ])
+  })
+
+  it('warns when the two clocks run apart — the shape of N-18', () => {
+    // Round 1 before the fix: every ring 35 ms after its time by the session
+    // clock, and 3 ms after it by the ring clock's own reading. Judged on the
+    // ring clock alone this is a clean run.
+    const report = ringReport(
+      run(
+        bar('a', 4_000),
+        stepped('a', 0, 4_000, { frameLate: 35, clockLate: 3 }),
+        stepped('a', 1, 4_500, { frameLate: 35, clockLate: 3 }),
+      ),
+    )
+    expect(report.ringClockLate.maxMs).toBe(3)
+    expect(report.paintedLate.medianMs).toBe(35)
+    expect(report.ringClockSkewByRound[0].medianMs).toBe(32)
+    expect(32).toBeGreaterThan(RING_CLOCK_SKEW_WARN_MS)
+    const verdict = ringVerdict(report)
+    expect(verdict.verdict).toBe('WARN')
+    expect(verdict.soft).toEqual([
+      expect.stringMatching(/the ring clock ran apart from the session clock — round 1 by 32 ms/),
+    ])
+  })
+
+  it('says round by round which one ran apart', () => {
+    const report = ringReport(
+      run(
+        bar('a', 4_000),
+        stepped('a', 0, 4_000, { frameLate: 35, clockLate: 3 }),
+        stepped('a', 1, 4_500, { frameLate: 35, clockLate: 3 }),
+        at(WORK + 70_000, 'workout.round.boundary', {
+          transition: 'work-entered',
+          roundIndex: 1,
+          workElapsedMs: 0,
+          monotonicTimeMs: WORK + 70_000,
+        }),
+        at(WORK + 70_000 + 1_040, 'workout.cue.tokenDue', {
+          roundIndex: 1,
+          cueId: 'b',
+          ordinal: 0,
+          tokenIndex: 0,
+          scheduledMs: 1_000,
+          workElapsedMs: 1_040,
+          monotonicTimeMs: WORK + 70_000 + 1_040,
+        }),
+        at(WORK + 70_000 + 1_030, 'workout.ring.visual', {
+          cueId: 'b',
+          ordinal: 0,
+          from: -1,
+          workElapsedMs: 1_004,
+          frameMs: WORK + 70_000 + 1_005,
+          row: 'lit',
+        }),
+        at(WORK + 80_000, 'workout.round.boundary', {
+          transition: 'rest-entered',
+          roundIndex: 1,
+          monotonicTimeMs: WORK + 80_000,
+        }),
+      ),
+    )
+    expect(report.ringClockSkewByRound.map((r) => [r.roundIndex, r.medianMs])).toEqual([
+      [0, 32],
+      [1, 1],
+    ])
+    expect(ringVerdict(report).soft[0]).toMatch(/round 1 by 32 ms/)
+    expect(ringVerdict(report).soft[0]).not.toMatch(/round 2/)
+  })
+
+  it('counts apart the rings on a row the app holds dim, and on another bar’s row', () => {
+    const report = ringReport(
+      run(
+        bar('a', 4_000),
+        bar('b', 6_000),
+        stepped('a', 0, 4_000, { frameLate: 4, clockLate: 3, row: 'masked' }),
+        stepped('a', 1, 4_500, { frameLate: 4, clockLate: 3, row: 'masked' }),
+        stepped('b', 0, 6_000, { frameLate: 4, clockLate: 3, row: 'lit' }),
+        stepped('b', 1, 6_500, { frameLate: 4, clockLate: 3, row: 'other' }),
+      ),
+    )
+    // The walk reached all four; light was shown on one.
+    expect(report.lit).toBe(4)
+    expect(report.rows).toEqual({ lit: 1, masked: 2, other: 1, unrecorded: 0 })
+  })
+
+  it('times a capture from before the record said by when the record was written, and says so', () => {
+    const report = ringReport(
+      run(bar('a', 4_000), painted('a', 0, 4_000, 5), painted('a', 1, 4_500, 9)),
+    )
+    expect(report.stamped).toBe(0)
+    expect(report.paintedLate).toMatchObject({ n: 2, minMs: 5, maxMs: 9 })
+    expect(report.ringClockLate.n).toBe(0)
+    expect(report.ringClockSkewByRound).toEqual([])
+    expect(report.rows).toEqual({ lit: 0, masked: 0, other: 0, unrecorded: 2 })
+    expect(ringVerdict(report).verdict).toBe('PASS')
   })
 })
