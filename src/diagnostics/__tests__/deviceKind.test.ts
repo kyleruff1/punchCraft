@@ -4,8 +4,9 @@
  * The emulator strings are the real ones, read off the Android 15 Google APIs
  * image this PC runs (`getprop ro.product.model`, `ro.build.fingerprint`), and
  * the classic AOSP emulator's. The device strings are real shipped tablets
- * and phones — including Google's own, because "the brand is google" is true
- * of both an emulator and a Pixel and must decide nothing.
+ * and phones — the project's own tablet first, and Google's own too, because
+ * "the brand is google" is true of both an emulator and a Pixel and must
+ * decide nothing.
  */
 import { describeDevice, isAndroidEmulator } from '../deviceKind'
 
@@ -29,6 +30,13 @@ const EMULATORS: Array<[string, string, string]> = [
 ]
 
 const DEVICES: Array<[string, string, string]> = [
+  // The one that matters most: a false positive here would have the analyzer
+  // refuse the tablet's own captures. Strings from docs/hardware-baseline.md.
+  [
+    'the tablet this app runs on',
+    'Lenovo TB125FU',
+    'Lenovo/TB125FU/TB125FU:13/TP1A.220624.014/S101018_250416_ROW:user/release-keys',
+  ],
   [
     'a Pixel Tablet',
     'Pixel Tablet',
@@ -73,9 +81,9 @@ describe('describeDevice', () => {
       deviceModel: 'sdk_gphone64_x86_64',
       emulator: true,
     })
-    const [, tablet, tabletFingerprint] = DEVICES[1]!
+    const [, tablet, tabletFingerprint] = DEVICES[0]!
     expect(describeDevice('android', { Model: tablet, Fingerprint: tabletFingerprint })).toEqual({
-      deviceModel: 'SM-X200',
+      deviceModel: 'Lenovo TB125FU',
       emulator: false,
     })
   })
