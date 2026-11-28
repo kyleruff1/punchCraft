@@ -284,6 +284,55 @@ describe('a pause between two ticks', () => {
     expect(h.session.resume()).toEqual([])
   })
 })
+describe('the time left, while paused', () => {
+  it('is the time left in the round that is being held', () => {
+    const h = harness()
+    h.session.start()
+    h.run(4_000)
+    expect(h.session.snapshot().phaseRemainingMs).toBe(6_000)
+    h.session.pause()
+    // It read 0: a paused session was asked how long `paused` lasts.
+    expect(h.session.snapshot().phaseRemainingMs).toBe(6_000)
+    h.run(30_000)
+    expect(h.session.snapshot().phaseRemainingMs).toBe(6_000)
+    h.session.resume()
+    h.run(1_000)
+    expect(h.session.snapshot().phaseRemainingMs).toBe(5_000)
+  })
+
+  it('is the time left in a held rest, and in a held countdown', () => {
+    const h = harness(ROUNDS, 3_000)
+    h.session.start()
+    h.run(1_000)
+    h.session.pause()
+    expect(h.session.snapshot().phaseRemainingMs).toBe(2_000)
+    h.session.resume()
+    h.run(2_000 + 10_000 + 1_000)
+    expect(h.session.snapshot().phase).toBe('rest')
+    h.session.pause()
+    expect(h.session.snapshot().phaseRemainingMs).toBe(4_000)
+  })
+
+  it('is still nothing when there is no phase in hand', () => {
+    const h = harness()
+    expect(h.session.snapshot().phaseRemainingMs).toBe(0)
+    h.session.start()
+    h.run(1_000)
+    h.session.pause()
+    h.session.cancel()
+    expect(h.session.snapshot().phaseRemainingMs).toBe(0)
+  })
+
+  it('does not let a paused session run out: time passing changes nothing', () => {
+    const h = harness()
+    h.session.start()
+    h.run(9_900)
+    h.session.pause()
+    h.run(60_000)
+    expect(h.seen.map((t) => t.type)).not.toContain('rest-entered')
+    expect(h.session.snapshot()).toMatchObject({ phase: 'paused', phaseRemainingMs: 100 })
+  })
+})
 describe('cancel (doc §25)', () => {
   it('stops immediately and accumulates nothing further', () => {
     const h = harness()

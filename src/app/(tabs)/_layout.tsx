@@ -97,8 +97,11 @@ function wordmarkTabButton(app: WordmarkApp) {
  * store directly because the tabs header lives OUTSIDE the live
  * screen's tree; renders nothing while no session is running, so the
  * other tabs and the idle landing keep a clean header.
+ *
+ * Exported for its test (`pauseBetweenTicks.test.tsx`); a route file's named
+ * exports are not routes.
  */
-function HeaderRoundClock(): React.JSX.Element {
+export function HeaderRoundClock(): React.JSX.Element {
   const live = useLive()
   // Clock only — the round counter moved to its own badge on the right
   // (Kyle 2026-09-05, workout-page markup).

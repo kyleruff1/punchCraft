@@ -302,8 +302,18 @@ export class WorkoutSessionClock {
     return this.phase === 'countdown' || this.phase === 'work' || this.phase === 'rest'
   }
 
+  /**
+   * How long the phase in hand lasts — while paused, the phase being HELD.
+   *
+   * A paused session is part-way through a countdown, a round or a rest,
+   * and how much of it is left is the one thing a paused screen has to
+   * show. This answered for `paused` itself, which has no length, so
+   * `snapshot()` reported nothing left and the header read 0:00 for as
+   * long as the pause lasted. `advance` is unaffected: it accumulates
+   * nothing while paused and never asks.
+   */
   private currentPhaseDurationMs(): number | null {
-    switch (this.phase) {
+    switch (this.phase === 'paused' ? this.phaseBeforePause : this.phase) {
       case 'countdown':
         return this.countdownMs
       case 'work':

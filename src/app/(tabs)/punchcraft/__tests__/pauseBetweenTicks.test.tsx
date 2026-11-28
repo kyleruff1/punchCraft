@@ -12,6 +12,7 @@ import React, { useImperativeHandle } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { View } from 'react-native'
 
+import { HeaderRoundClock } from '../../_layout'
 import { useWorkoutRunner, TICK_INTERVAL_MS, type WorkoutRunner } from '../_useWorkoutRunner'
 import { createFakeClock, type FakeClock } from '@testing/fakeClock'
 import { defaultRecipe } from '@domain/workout/WorkoutRecipe'
@@ -252,6 +253,53 @@ describe('a pause between two ticks', () => {
     expect(getLive().phase).toBe('rest')
     h.tick(1)
     expect(getLive()).toMatchObject({ phase: 'work', roundIndex: 1 })
+    h.unmount()
+  })
+})
+
+describe('the header while paused', () => {
+  /** What the header prints for the time left: the tabs header, as rendered. */
+  const headerClock = (): string => {
+    let tree!: ReactTestRenderer
+    act(() => {
+      tree = create(<HeaderRoundClock />)
+    })
+    const text = tree.root.findByProps({ testID: 'round-countdown' }).props.children as string
+    act(() => {
+      tree.unmount()
+    })
+    return text
+  }
+
+  it('shows the time left in the round, not 0:00', async () => {
+    const h = await inRoundOne(1_000)
+    expect(headerClock()).toBe('0:03')
+    h.do((runner) => runner.pause())
+    expect(getLive().phase).toBe('paused')
+    // It read 0:00 for as long as the pause lasted: a paused session has no
+    // phase of its own to be part-way through, and "none" was shown as zero.
+    expect(headerClock()).toBe('0:03')
+    h.drift(45_000)
+    h.tick(3)
+    expect(headerClock()).toBe('0:03')
+
+    h.do((runner) => runner.resume())
+    h.tick(ticksIn(1_000))
+    expect(headerClock()).toBe('0:02')
+    h.unmount()
+  })
+
+  it('shows the time left in a rest and in the countdown too', async () => {
+    const h = await mount()
+    h.do((runner) => runner.start())
+    h.tick(ticksIn(400))
+    h.do((runner) => runner.pause())
+    expect(headerClock()).toBe('0:01')
+    h.do((runner) => runner.resume())
+    h.tick(ticksIn(COUNTDOWN_MS - 400) + ticksIn(WORK_MS) + ticksIn(500))
+    expect(getLive().phase).toBe('rest')
+    h.do((runner) => runner.pause())
+    expect(headerClock()).toBe('0:02')
     h.unmount()
   })
 })
