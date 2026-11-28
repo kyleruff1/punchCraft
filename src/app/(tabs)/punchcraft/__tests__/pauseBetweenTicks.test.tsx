@@ -62,7 +62,8 @@ function round(order: number, isLast: boolean): ProgramRound {
 
 const WORKOUT: GeneratedWorkout = {
   id: 'pause-between-ticks-fixture',
-  recipe: defaultRecipe(),
+  // The click on, as every sample workout has it: a resume restarts it.
+  recipe: { ...defaultRecipe(), metronome: { enabled: true, volume: 0.6 } },
   schedule: [round(1, false), round(2, true)],
   roundPunchTargets: [4, 4],
   expectedTechniqueDistribution: {},
@@ -80,9 +81,21 @@ class SilentSource implements PunchEventSource {
   stop(): void {}
 }
 
-/** A voice output that only counts the bells it was asked for. */
+/** A voice output that only counts the bells, and the click starts, it was asked for. */
 class CountingBells implements VoiceOutputPort {
   bells = 0
+  /** The click track: only how often it was started and stopped. */
+  readonly metronome = {
+    starts: 0,
+    stops: 0,
+    start(): void {
+      this.starts += 1
+    },
+    stop(): void {
+      this.stops += 1
+    },
+    setVolume(): void {},
+  }
   playAsset(id: VoiceAssetId): void {
     if (id === 'bell') this.bells += 1
   }
@@ -272,7 +285,9 @@ describe('the header while paused', () => {
   }
 
   it('shows the time left in the round, not 0:00', async () => {
-    const h = await inRoundOne(1_000)
+    // 2.6 s left: clear of a whole second, where the store's throttle would
+    // decide which side of it the header shows.
+    const h = await inRoundOne(1_400)
     expect(headerClock()).toBe('0:03')
     h.do((runner) => runner.pause())
     expect(getLive().phase).toBe('paused')
@@ -300,6 +315,57 @@ describe('the header while paused', () => {
     expect(getLive().phase).toBe('rest')
     h.do((runner) => runner.pause())
     expect(headerClock()).toBe('0:02')
+    h.unmount()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Found, not fixed (findings doc, §3j). Each test below PINS TODAY'S
+// BEHAVIOUR so that it is on the record and a fix has something to turn
+// over. None of them says the behaviour is wanted.
+
+describe('found, not fixed: time away from the app counts as round time', () => {
+  it('fires every boundary it slept through at once, and rings every bell', async () => {
+    // Nothing in `src` listens for the app going to the background. The
+    // runner's tick is a JS interval, which a backgrounded app does not get,
+    // and the session clock is monotonic, which does not stop. So the first
+    // tick after coming back sees all the time away as one step.
+    const h = await mount()
+    h.do((runner) => runner.start())
+    h.tick(ticksIn(COUNTDOWN_MS) + ticksIn(500))
+    expect(getLive()).toMatchObject({ phase: 'work', roundIndex: 0 })
+    const before = h.boundaries.length
+    const bells = h.output.bells
+
+    // Ten minutes in the background: no ticks.
+    h.drift(10 * 60_000)
+    h.tick(1)
+
+    // Every boundary, in one tick. (And each line carries the round the
+    // session ENDED in: the rest that closed round 1 is logged as round 2’s.
+    // Only `work-entered` carries its own.)
+    expect(h.boundaries.slice(before)).toEqual(['rest-entered@1', 'work-entered@1', 'completed@1'])
+    expect(h.output.bells).toBe(bells + 3)
+    expect(getLive().phase).toBe('completed')
+    h.unmount()
+  })
+})
+
+describe('found, not fixed: resuming in a rest starts the click', () => {
+  it('starts the metronome on `resumed` whatever phase was held', async () => {
+    // The click is meant to play during work only, and every rest tears it
+    // down. `resumed` restarts it without asking which phase is resuming, so
+    // a pause and resume inside a rest starts it — until the next round's
+    // bell restarts it again.
+    const h = await mount()
+    h.do((runner) => runner.start())
+    h.tick(ticksIn(COUNTDOWN_MS) + ticksIn(WORK_MS) + ticksIn(500))
+    expect(getLive().phase).toBe('rest')
+    const starts = h.output.metronome.starts
+    h.do((runner) => runner.pause())
+    h.do((runner) => runner.resume())
+    expect(getLive().phase).toBe('rest')
+    expect(h.output.metronome.starts).toBe(starts + 1)
     h.unmount()
   })
 })

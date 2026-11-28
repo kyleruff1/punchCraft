@@ -1887,7 +1887,7 @@ exactly that; I read only its clocks.
   its manifests cover round 1. In later rounds the suite judges what the app
   played and fails a clip the app itself logged it could not play; nothing
   says what a later round *should* have played. Manifests for every round
-  would close it.
+  would close it. **Closed in §3j.**
 - **A browser playlist sets its volume on the current audio element only**
   (expo-audio's web `AudioPlaylist`), so a volume change mid-ceremony could
   leave the next clip at the old one. The suite warns when one ceremony
@@ -1901,6 +1901,7 @@ exactly that; I read only its clocks.
   workout ends with the live screen out of focus, and I have not reproduced
   it: in every whole-workout drive here the screen was in focus and the
   closing bell rang whole. A design reviewer raised it against the plan.
+  **It is real, and wider than "out of focus": fixed in §3j (N-21).**
 
 ### Corrections to my own work in this batch
 
@@ -1971,6 +1972,225 @@ exactly that; I read only its clocks.
 - As before: the tablet's speaker delay and start latency, whether its
   processor keeps up, anything by ear — and ten of the 22 parity
   comparisons, until the tablet suite runs again (N-15).
+
+## 3j. The every-round batch
+
+**The ask:** check every round, not only the first; the painted ring on a
+native build; the emulator suite in one command; an audit of pause, resume
+and skip; and two loose ends — the closing bell, and the rings check on CI.
+Then: **tablet tests are run on the emulator.** So the suite run PR 398 owed
+the tablet is an emulator run here, and what only the real tablet settles is
+listed at the end, not claimed. Branch `feat/every-round`.
+
+### What landed
+
+| What | Commit |
+|---|---|
+| A capture's clock runs on through midnight | `4f65bde3` |
+| Three suite counters that matched `workouts.` where the app logs `workout.` | `fb82ead8` |
+| `--require-sha`: the suite stops on a build that is not the commit asked for | `4312abd6` |
+| `npm run emu:suite` and `emu:prepare` | `fe58d8ad` |
+| `emu:suite --jobs N`: several emulators at once | `65cf8956` |
+| The ring check's core moved to `tools/analysis/` | `f9951c6d` |
+| The ring records say when, from where, and whether light was shown | `e8333110` |
+| Rings are timed against the session clock | `4e486b67` |
+| Rings from a device capture, without blaming a lost line on the app | `2866bd54` |
+| The verify suite judges the rings | `9022da71` |
+| What the runner dispatches in a round, pinned | `e7e5f7e6` |
+| One domain function plans a round's calls and lead-ins | `8af12bc0` |
+| N-20: the manifest counts the calls the runner schedules | `d4e1d328` |
+| The correlator judges every round a manifest describes | `6e7ba5cd` |
+| Manifests hold every round | `aa3a8f83` |
+| Suites say how far a drive was meant to run | `07ea4c54` |
+| The walkout, the rest line and the countdown have an expectation | `b854081e` |
+| Parity compares every round and names its device | `19c1af11` |
+| N-21: the closing bell rings out | `7c69d97a` |
+| N-22: a pause counts the time up to the pause | `bdcc665d` |
+| N-23: the header shows the time left while paused | `c6e63607` |
+
+### Findings
+
+#### N-20 · The check on "were all the calls made" was lenient · fixed
+
+The manifest tool carried its own copy of the rule that prunes a call which
+cannot finish before its ring. The copy and the runner had drifted: in 20 of
+the 44 manifests the expected number of calls in round 1 was short by one
+(14), two (4) or three (2). A capture that dispatched more calls than
+expected read as "105 %" and passed, so nothing looked wrong — and a round
+could have lost up to three calls and still passed.
+
+The runner's rule now lives in one domain function,
+`planRoundCoachSchedule` (`src/domain/coach/roundCoachSchedule.ts`), which
+the runner and the generator both call. Its output is the runner's, pinned
+before the move and unchanged after it; every one of 8,404 dispatches in the
+44 stored whole-workout captures is in it. More calls than the plan holds is
+now a warning: the manifest and the build disagree.
+
+*What that costs:* the manifest is that function's output, so the
+correlator proves the device carried the schedule out, not that the rule is
+right. The function has hand-computed tests of its own for that.
+
+#### A correction to §3i: "29,932 of 29,932 rings lit" overstated it
+
+The app deliberately keeps some bars dim — every bar with no call, and the
+first two measures of each round — and the record that was counted is
+written for those too. It proved the walk reached every ring, not that light
+was shown. The ring record now says which (`row: lit | masked | other`), and
+the report counts them apart: on a native build, 194 rings in One-Two's
+round 1 are 180 lit and 14 dim.
+
+#### The ring's own clock could not see the fault it should catch
+
+Judged on the ring clock alone, the pre-N-18 round 1 read 2.8 ms late where
+it was 35. A ring step now logs the frame's own time and the work time the
+UI thread read, and lateness is the frame's time against the session clock's
+schedule. The gap between the two views warns above 20 ms — that gap *is*
+N-18.
+
+#### Every round is judged
+
+A manifest holds every round; the correlator judges each round the capture
+holds whole, against its own part; and the suites say how many rounds a
+drive was meant to complete, so that judging every round cannot quietly
+become judging fewer. Against the 44 stored whole-workout PC captures: 126
+of 126 rounds judged, 398 of 398 lead-ins matched, 8,006 of 8,006 planned
+calls sent. Removing one lead-in from round 2 of a real capture fails
+round 2 and nothing else.
+
+Around the rounds: the walkout, each rest's line and each countdown are held
+to what the app logs as it builds them (`tools/analysis/ceremony-plan.ts`,
+`ceremonies.mjs`). The countdown opens with one of fifteen lines picked at
+random, so its length is checked less the opener's. Against the same 44
+captures: 44 walkouts, 82 rest lines and 82 countdowns, all as planned, all
+fifteen openers drawn.
+
+*What is still counted, not named:* the calls. A round's lead-ins are
+checked by name and time; its calls only by how many.
+
+**September's tablet captures do not match today's ceremony expectations**,
+and should not: `6ae99754` (2026-09-11) re-rendered the send-off clip 1,090
+ms shorter and the "round N" clips by −1,253 to +522 ms, after those
+captures were taken. Every mismatch is that constant, per clip. A capture is
+only comparable with the manifest of the commit that built it — which is
+what `--require-sha` is for.
+
+#### N-21 · The closing bell was cut when the screen was left inside its ring · fixed
+
+§3i recorded this as seen and not chased. It is real. The last round closes
+on a bell 1,180 ms long; with the workout over, nothing holds the audio once
+the athlete leaves the screen (Exit, "See summary"), and `release()` freed
+the bell with everything else. The wait written to prevent exactly that,
+`msUntilQuiet()`, reads the speech window, which bells are kept out of on
+purpose — so for the closing bell it read zero.
+
+`release()` now spares a bell that is still ringing and frees it when its
+ring ends. A bell still never blocks speech.
+
+#### N-22 · Every pause dropped up to a tick of the round · fixed
+
+`pause()` froze the session clock at the last tick, and `resume()` set the
+anchor to its own instant. The time between the last tick and the tap was
+never counted, so the round ran that much long: up to 50 ms a pause. The
+mirror of N-18, unseen for the same reason — every test paused on a tick.
+
+`pause()` now advances first. A pause in the last tick of a round therefore
+enters the rest, rings its bell, and holds the rest.
+
+#### N-23 · The header read 0:00 for as long as a pause lasted · fixed
+
+A paused session was asked how long `paused` lasts. It now answers for the
+phase it is holding.
+
+#### Found, and not fixed
+
+Each has a test that **pins today's behaviour**, so it is on the record and
+a fix has something to turn over. None of the tests says the behaviour is
+wanted.
+
+- **N-24 · Time away from the app counts as round time.** Nothing in `src`
+  listens for the app going to the background. The runner's tick is a JS
+  interval, which a backgrounded app does not get; the session clock is
+  monotonic, which does not stop. The first tick back sees all the time away
+  as one step: ten minutes away from round 1 of a two-round workout fires
+  the rest, round 2 and the end at once, with three bells, and the workout
+  is over. *(`pauseBetweenTicks.test.tsx`.)* This is the one most likely to
+  be met: a phone call, a notification pulled down, the screen locking.
+- **N-25 · Resuming in a rest starts the click.** The click is meant to play
+  in work only. `resumed` restarts it without asking which phase resumed, so
+  a pause and resume inside a rest starts it, until the next bell restarts
+  it. *(Same file.)* I found this reading the runner for N-22; it was not in
+  the plan.
+- **N-26 · A call can be cut by a timer left over from before a pause.** Each
+  call parks its player once its clip ends, from a timer that carries a
+  per-clip counter and does nothing if the clip has been sent again. A pause
+  clears the counters, so the next send of the same clip starts at 1 again —
+  the number the old timer holds. Pause and resume within a clip's length
+  plus 200 ms of a call, with the same call due again, and the old timer
+  pauses the player sounding the new call. `release()` avoids clearing the
+  counters for this reason and says so; `cancel(safety)` clears them.
+  Narrow: one call, cut by about 300 ms.
+  *(`stalePreArmAfterPause.test.ts`, with a control: no pause, no cut.)*
+- **N-27 · After a resume the avatar holds a strike pose until the next
+  punch.** Its pose is a function of ticks since its punch began; a resume
+  starts a new transport at tick 0 and the punch's tick is not resampled, so
+  the age is negative, which is clamped to "just begun" — the strike.
+  *(`avatarAfterResume.test.ts`: the two pure halves; the hook that joins
+  them is a worklet and is not run.)*
+- **N-28 · A boundary's log line carries the round the session ended in.**
+  When one tick crosses several boundaries, the `rest-entered` that closed
+  round 1 is logged as round 2's. Only `work-entered` carries its own. It
+  needs N-24 to happen; the correlator finds a later round's end by that
+  field. *(Pinned inside the N-24 test.)*
+
+Read, and not tested:
+
+- **The tick that opens a round pairs a stale reading with a fresh clock.**
+  When the session clock itself opens a round, the bell is sent, and the
+  rest of that tick then uses the work clock as it stood before the bell
+  with `clock.now()` after it. Whatever is dispatched in that one tick logs
+  its lateness short by the bell's cost. Measurement only: nothing is heard
+  or drawn differently.
+- **The ceremony players follow the phase by one render.** The intro, the
+  countdown and the rest line are paused and stopped from React effects
+  (`live.tsx`, the three phase effects), which run after the render that
+  shows the new phase. So each is behind a boundary or a pause by a render.
+  The bell is sent from the tick itself and is not.
+- **The header's time can show a second high for up to 250 ms.** The store
+  the header reads is refreshed about every 250 ms within a phase, on
+  purpose. Not a clock difference: the round's timing is identical.
+
+#### Seen once, not explained
+
+`tools/pc/glove-check/__tests__/bundle.test.js` failed all three of its
+tests once in a full run (the suite took 6.4 s), passed alone, passed in the
+next full run, and passed with the processor saturated by 24 busy loops. Its
+`beforeAll` bundles the page with esbuild under jest's default 5 s hook
+limit, so a slow disk during a 16-worker run is the consistent explanation.
+Not reproduced, so not changed.
+
+### Corrections to my own work in this batch
+
+- **I committed once with the gate failing, and once on a failing run.** The
+  first time I chained the commit after the check with `;`. The second time
+  I piped the gate into `tail` before `&&`, so the commit followed `tail`'s
+  exit code — and that run was the glove-check failure above. The tree was
+  re-run clean before anything else was built on it. The gate now runs from
+  a script that commits only on its own exit code.
+- **The first reference I built from a "native" capture said `tablet`.** It
+  was an emulator's, from before the build said so. The suite's row now
+  records what it asked the device, and the reference builder believes the
+  row first.
+- **Two of my own characterisations were wrong until tested.** I expected
+  the rest that closed round 1 to be logged as round 1's (N-28), and a
+  fixture with the click off to show the click starting (N-25 needed the
+  click on, as every sample has it). Both are why these are tests, not prose.
+- **I asserted that the work clock reads the round's length once a rest has
+  begun.** It reads the length plus whatever the crossing tick overshot by,
+  as it always has. I removed the assertion; it was not the subject.
+- **A regular expression of mine reached a file as a backspace.** A shell
+  heredoc turned `\b` into the control character, and the rule it was part
+  of silently matched nothing. A test caught it. The files touched since
+  were scanned for control characters; that one was the only one.
 
 ---
 
