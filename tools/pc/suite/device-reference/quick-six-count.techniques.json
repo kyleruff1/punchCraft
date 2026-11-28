@@ -1,0 +1,170 @@
+{
+ "formatVersion": 2,
+ "workoutId": "quick-six-count",
+ "vocab": "techniques",
+ "timelineHash": "v2:62cee320",
+ "source": {
+  "suite": "1795845018877",
+  "capturedOn": "2026-11-28",
+  "device": "emulator",
+  "build": "c01684ef",
+  "simulatedPunches": "captured-jam",
+  "verdict": "PASS",
+  "correlator": "matched=6 extras=0 reanchor=0"
+ },
+ "rounds": [
+  {
+   "roundIndex": 0,
+   "dispatches": [
+    { "kind": "call", "slot": "call/1-2-3-4", "dispatchAtMs": 2402, "durationMs": 1877, "firstNodeMs": 4800, "text": "Jab, cross, hook, rear hook!" },
+    { "kind": "call", "slot": "call/1-2-3-4", "dispatchAtMs": 7202, "durationMs": 1877, "firstNodeMs": 9600, "text": "Jab, cross, hook, rear hook!" },
+    { "kind": "call", "slot": "call/1-2-3-4", "dispatchAtMs": 12002, "durationMs": 1877, "firstNodeMs": 14400, "text": "Jab, cross, hook, rear hook!" },
+    { "kind": "call", "slot": "call/1-2-3-4", "dispatchAtMs": 16802, "durationMs": 1877, "firstNodeMs": 19200, "text": "Jab, cross, hook, rear hook!" },
+    { "kind": "call", "slot": "call/1-2-3-4", "dispatchAtMs": 21602, "durationMs": 1877, "firstNodeMs": 24000, "text": "Jab, cross, hook, rear hook!" },
+    { "kind": "call", "slot": "call/1-2-3-4", "dispatchAtMs": 26402, "durationMs": 1877, "firstNodeMs": 28800, "text": "Jab, cross, hook, rear hook!" },
+    { "kind": "call", "slot": "call/1-2-3-4", "dispatchAtMs": 31202, "durationMs": 1877, "firstNodeMs": 33600, "text": "Jab, cross, hook, rear hook!" },
+    { "kind": "call", "slot": "call/1-2-3-4", "dispatchAtMs": 36002, "durationMs": 1877, "firstNodeMs": 38400, "text": "Jab, cross, hook, rear hook!" },
+    {
+     "kind": "lead-in",
+     "slot": "lead-in/quick-six-count/r1s2",
+     "dispatchAtMs": 39321,
+     "durationMs": 9908,
+     "text": "Jab, cross, lead uppercut, rear uppercut — straight time, twelve bars. Straight line, then both uppercuts. Bend for the lead uppercuts and sixes."
+    },
+    { "kind": "call", "slot": "call/1-2-5-6", "dispatchAtMs": 49979, "durationMs": 2300, "firstNodeMs": 52800, "text": "Jab, cross, lead upper, rear upper!" },
+    { "kind": "call", "slot": "call/1-2-5-6", "dispatchAtMs": 54779, "durationMs": 2300, "firstNodeMs": 57600, "text": "Jab, cross, lead upper, rear upper!" },
+    { "kind": "call", "slot": "call/1-2-5-6", "dispatchAtMs": 59579, "durationMs": 2300, "firstNodeMs": 62400, "text": "Jab, cross, lead upper, rear upper!" },
+    { "kind": "call", "slot": "call/1-2-5-6", "dispatchAtMs": 64379, "durationMs": 2300, "firstNodeMs": 67200, "text": "Jab, cross, lead upper, rear upper!" },
+    { "kind": "call", "slot": "call/1-2-5-6", "dispatchAtMs": 69179, "durationMs": 2300, "firstNodeMs": 72000, "text": "Jab, cross, lead upper, rear upper!" },
+    { "kind": "call", "slot": "call/1-2-5-6", "dispatchAtMs": 73979, "durationMs": 2300, "firstNodeMs": 76800, "text": "Jab, cross, lead upper, rear upper!" },
+    { "kind": "call", "slot": "call/1-2-5-6", "dispatchAtMs": 78779, "durationMs": 2300, "firstNodeMs": 81600, "text": "Jab, cross, lead upper, rear upper!" },
+    { "kind": "call", "slot": "call/1-2-5-6", "dispatchAtMs": 83579, "durationMs": 2300, "firstNodeMs": 86400, "text": "Jab, cross, lead upper, rear upper!" },
+    { "kind": "call", "slot": "call/1-2-5-6", "dispatchAtMs": 88379, "durationMs": 2300, "firstNodeMs": 91200, "text": "Jab, cross, lead upper, rear upper!" },
+    { "kind": "call", "slot": "call/1-2-5-6", "dispatchAtMs": 93179, "durationMs": 2300, "firstNodeMs": 96000, "text": "Jab, cross, lead upper, rear upper!" },
+    {
+     "kind": "lead-in",
+     "slot": "lead-in/quick-six-count/r1s3",
+     "dispatchAtMs": 97458,
+     "durationMs": 13421,
+     "text": "Big phrase — two pages: jab, cross, lead hook, rear hook, lead uppercut, rear uppercut, empty, empty. Straight time, ten times through. The whole alphabet, then breathe."
+    },
+    { "kind": "call", "slot": "call/1-2-3-4-5-6-.-.", "dispatchAtMs": 111629, "durationMs": 3050, "firstNodeMs": 115200, "text": "Jab, cross, hook, rear hook, lead upper, rear upper!" },
+    { "kind": "call", "slot": "call/1-2-3-4-5-6-.-.", "dispatchAtMs": 118829, "durationMs": 3050, "firstNodeMs": 122400, "text": "Jab, cross, hook, rear hook, lead upper, rear upper!" },
+    { "kind": "call", "slot": "call/1-2-3-4-5-6-.-.", "dispatchAtMs": 126029, "durationMs": 3050, "firstNodeMs": 129600, "text": "Jab, cross, hook, rear hook, lead upper, rear upper!" },
+    { "kind": "call", "slot": "call/1-2-3-4-5-6-.-.", "dispatchAtMs": 133229, "durationMs": 3050, "firstNodeMs": 136800, "text": "Jab, cross, hook, rear hook, lead upper, rear upper!" },
+    { "kind": "call", "slot": "call/1-2-3-4-5-6-.-.", "dispatchAtMs": 140429, "durationMs": 3050, "firstNodeMs": 144000, "text": "Jab, cross, hook, rear hook, lead upper, rear upper!" },
+    { "kind": "call", "slot": "call/1-2-3-4-5-6-.-.", "dispatchAtMs": 147629, "durationMs": 3050, "firstNodeMs": 151200, "text": "Jab, cross, hook, rear hook, lead upper, rear upper!" },
+    { "kind": "call", "slot": "call/1-2-3-4-5-6-.-.", "dispatchAtMs": 154829, "durationMs": 3050, "firstNodeMs": 158400, "text": "Jab, cross, hook, rear hook, lead upper, rear upper!" },
+    { "kind": "call", "slot": "call/1-2-3-4-5-6-.-.", "dispatchAtMs": 162029, "durationMs": 3050, "firstNodeMs": 165600, "text": "Jab, cross, hook, rear hook, lead upper, rear upper!" },
+    { "kind": "call", "slot": "call/1-2-3-4-5-6-.-.", "dispatchAtMs": 169229, "durationMs": 3050, "firstNodeMs": 172800, "text": "Jab, cross, hook, rear hook, lead upper, rear upper!" },
+    { "kind": "call", "slot": "call/1-2-3-4-5-6-.-.", "dispatchAtMs": 176429, "durationMs": 3050, "firstNodeMs": 180000, "text": "Jab, cross, hook, rear hook, lead upper, rear upper!" },
+    {
+     "kind": "lead-in",
+     "slot": "lead-in/quick-six-count/r1s4",
+     "dispatchAtMs": 180440,
+     "durationMs": 8600,
+     "text": "Jab, rear uppercut, lead hook — time-and-a-half, twenty bars. Jab, rear uppercut, hook. Up, then around."
+    },
+    { "kind": "call", "slot": "call/1-6-3-.", "dispatchAtMs": 189790, "durationMs": 1489, "firstNodeMs": 192000, "text": "Jab, rear upper, hook!" },
+    { "kind": "call", "slot": "call/1-6-3-.", "dispatchAtMs": 192190, "durationMs": 1489, "firstNodeMs": 194400, "text": "Jab, rear upper, hook!" },
+    { "kind": "call", "slot": "call/1-6-3-.", "dispatchAtMs": 194590, "durationMs": 1489, "firstNodeMs": 196800, "text": "Jab, rear upper, hook!" },
+    { "kind": "call", "slot": "call/1-6-3-.", "dispatchAtMs": 196990, "durationMs": 1489, "firstNodeMs": 199200, "text": "Jab, rear upper, hook!" },
+    { "kind": "call", "slot": "call/1-6-3-.", "dispatchAtMs": 199390, "durationMs": 1489, "firstNodeMs": 201600, "text": "Jab, rear upper, hook!" },
+    { "kind": "call", "slot": "call/1-6-3-.", "dispatchAtMs": 201790, "durationMs": 1489, "firstNodeMs": 204000, "text": "Jab, rear upper, hook!" },
+    { "kind": "call", "slot": "call/1-6-3-.", "dispatchAtMs": 204190, "durationMs": 1489, "firstNodeMs": 206400, "text": "Jab, rear upper, hook!" },
+    { "kind": "call", "slot": "call/1-6-3-.", "dispatchAtMs": 206590, "durationMs": 1489, "firstNodeMs": 208800, "text": "Jab, rear upper, hook!" },
+    { "kind": "call", "slot": "call/1-6-3-.", "dispatchAtMs": 208990, "durationMs": 1489, "firstNodeMs": 211200, "text": "Jab, rear upper, hook!" },
+    { "kind": "call", "slot": "call/1-6-3-.", "dispatchAtMs": 211390, "durationMs": 1489, "firstNodeMs": 213600, "text": "Jab, rear upper, hook!" },
+    { "kind": "call", "slot": "call/1-6-3-.", "dispatchAtMs": 213790, "durationMs": 1489, "firstNodeMs": 216000, "text": "Jab, rear upper, hook!" },
+    { "kind": "call", "slot": "call/1-6-3-.", "dispatchAtMs": 216190, "durationMs": 1489, "firstNodeMs": 218400, "text": "Jab, rear upper, hook!" },
+    { "kind": "call", "slot": "call/1-6-3-.", "dispatchAtMs": 218590, "durationMs": 1489, "firstNodeMs": 220800, "text": "Jab, rear upper, hook!" },
+    { "kind": "call", "slot": "call/1-6-3-.", "dispatchAtMs": 220990, "durationMs": 1489, "firstNodeMs": 223200, "text": "Jab, rear upper, hook!" },
+    { "kind": "call", "slot": "call/1-6-3-.", "dispatchAtMs": 223390, "durationMs": 1489, "firstNodeMs": 225600, "text": "Jab, rear upper, hook!" },
+    { "kind": "call", "slot": "call/1-6-3-.", "dispatchAtMs": 225790, "durationMs": 1489, "firstNodeMs": 228000, "text": "Jab, rear upper, hook!" },
+    { "kind": "call", "slot": "call/1-6-3-.", "dispatchAtMs": 228190, "durationMs": 1489, "firstNodeMs": 230400, "text": "Jab, rear upper, hook!" },
+    { "kind": "call", "slot": "call/1-6-3-.", "dispatchAtMs": 230590, "durationMs": 1489, "firstNodeMs": 232800, "text": "Jab, rear upper, hook!" },
+    { "kind": "call", "slot": "call/1-6-3-.", "dispatchAtMs": 232990, "durationMs": 1489, "firstNodeMs": 235200, "text": "Jab, rear upper, hook!" },
+    { "kind": "call", "slot": "call/1-6-3-.", "dispatchAtMs": 235390, "durationMs": 1489, "firstNodeMs": 237600, "text": "Jab, rear upper, hook!" }
+   ],
+   "tokensDue": 204
+  },
+  {
+   "roundIndex": 1,
+   "dispatches": [
+    { "kind": "call", "slot": "call/1-2-3-4", "dispatchAtMs": 2402, "durationMs": 1877, "firstNodeMs": 4800, "text": "Jab, cross, hook, rear hook!" },
+    { "kind": "call", "slot": "call/1-2-3-4", "dispatchAtMs": 7202, "durationMs": 1877, "firstNodeMs": 9600, "text": "Jab, cross, hook, rear hook!" },
+    { "kind": "call", "slot": "call/1-2-3-4", "dispatchAtMs": 12002, "durationMs": 1877, "firstNodeMs": 14400, "text": "Jab, cross, hook, rear hook!" },
+    { "kind": "call", "slot": "call/1-2-3-4", "dispatchAtMs": 16802, "durationMs": 1877, "firstNodeMs": 19200, "text": "Jab, cross, hook, rear hook!" },
+    { "kind": "call", "slot": "call/1-2-3-4", "dispatchAtMs": 21602, "durationMs": 1877, "firstNodeMs": 24000, "text": "Jab, cross, hook, rear hook!" },
+    { "kind": "call", "slot": "call/1-2-3-4", "dispatchAtMs": 26402, "durationMs": 1877, "firstNodeMs": 28800, "text": "Jab, cross, hook, rear hook!" },
+    { "kind": "call", "slot": "call/1-2-3-4", "dispatchAtMs": 31202, "durationMs": 1877, "firstNodeMs": 33600, "text": "Jab, cross, hook, rear hook!" },
+    { "kind": "call", "slot": "call/1-2-3-4", "dispatchAtMs": 36002, "durationMs": 1877, "firstNodeMs": 38400, "text": "Jab, cross, hook, rear hook!" },
+    { "kind": "call", "slot": "call/1-2-3-4", "dispatchAtMs": 40802, "durationMs": 1877, "firstNodeMs": 43200, "text": "Jab, cross, hook, rear hook!" },
+    { "kind": "call", "slot": "call/1-2-3-4", "dispatchAtMs": 45602, "durationMs": 1877, "firstNodeMs": 48000, "text": "Jab, cross, hook, rear hook!" },
+    { "kind": "call", "slot": "call/1-2-3-4", "dispatchAtMs": 50402, "durationMs": 1877, "firstNodeMs": 52800, "text": "Jab, cross, hook, rear hook!" },
+    {
+     "kind": "lead-in",
+     "slot": "lead-in/quick-six-count/r2s2",
+     "dispatchAtMs": 54449,
+     "durationMs": 13143,
+     "text": "Big phrase — two pages: jab, cross, lead hook, cross, jab, cross, lead uppercut, cross. Straight time, eight times through. The four-count, then the same line with the uppercut."
+    },
+    { "kind": "call", "slot": "call/1-2-3-2-1-2-5-2", "dispatchAtMs": 68342, "durationMs": 3137, "firstNodeMs": 72000, "text": "Jab, cross, hook, cross, jab, cross, lead upper, cross!" },
+    { "kind": "call", "slot": "call/1-2-3-2-1-2-5-2", "dispatchAtMs": 75542, "durationMs": 3137, "firstNodeMs": 79200, "text": "Jab, cross, hook, cross, jab, cross, lead upper, cross!" },
+    { "kind": "call", "slot": "call/1-2-3-2-1-2-5-2", "dispatchAtMs": 82742, "durationMs": 3137, "firstNodeMs": 86400, "text": "Jab, cross, hook, cross, jab, cross, lead upper, cross!" },
+    { "kind": "call", "slot": "call/1-2-3-2-1-2-5-2", "dispatchAtMs": 89942, "durationMs": 3137, "firstNodeMs": 93600, "text": "Jab, cross, hook, cross, jab, cross, lead upper, cross!" },
+    { "kind": "call", "slot": "call/1-2-3-2-1-2-5-2", "dispatchAtMs": 97142, "durationMs": 3137, "firstNodeMs": 100800, "text": "Jab, cross, hook, cross, jab, cross, lead upper, cross!" },
+    { "kind": "call", "slot": "call/1-2-3-2-1-2-5-2", "dispatchAtMs": 104342, "durationMs": 3137, "firstNodeMs": 108000, "text": "Jab, cross, hook, cross, jab, cross, lead upper, cross!" },
+    { "kind": "call", "slot": "call/1-2-3-2-1-2-5-2", "dispatchAtMs": 111542, "durationMs": 3137, "firstNodeMs": 115200, "text": "Jab, cross, hook, cross, jab, cross, lead upper, cross!" },
+    {
+     "kind": "lead-in",
+     "slot": "lead-in/quick-six-count/r2s3",
+     "dispatchAtMs": 117067,
+     "durationMs": 13012,
+     "text": "Big phrase — two pages: jab, cross, lead hook, rear hook, lead uppercut, rear uppercut, empty, empty. Straight time, eight times through. Say the alphabet with your hands."
+    },
+    { "kind": "call", "slot": "call/1-2-3-4-5-6-.-.", "dispatchAtMs": 130829, "durationMs": 3050, "firstNodeMs": 134400, "text": "Jab, cross, hook, rear hook, lead upper, rear upper!" },
+    { "kind": "call", "slot": "call/1-2-3-4-5-6-.-.", "dispatchAtMs": 138029, "durationMs": 3050, "firstNodeMs": 141600, "text": "Jab, cross, hook, rear hook, lead upper, rear upper!" },
+    { "kind": "call", "slot": "call/1-2-3-4-5-6-.-.", "dispatchAtMs": 145229, "durationMs": 3050, "firstNodeMs": 148800, "text": "Jab, cross, hook, rear hook, lead upper, rear upper!" },
+    { "kind": "call", "slot": "call/1-2-3-4-5-6-.-.", "dispatchAtMs": 152429, "durationMs": 3050, "firstNodeMs": 156000, "text": "Jab, cross, hook, rear hook, lead upper, rear upper!" },
+    { "kind": "call", "slot": "call/1-2-3-4-5-6-.-.", "dispatchAtMs": 159629, "durationMs": 3050, "firstNodeMs": 163200, "text": "Jab, cross, hook, rear hook, lead upper, rear upper!" },
+    { "kind": "call", "slot": "call/1-2-3-4-5-6-.-.", "dispatchAtMs": 166829, "durationMs": 3050, "firstNodeMs": 170400, "text": "Jab, cross, hook, rear hook, lead upper, rear upper!" },
+    { "kind": "call", "slot": "call/1-2-3-4-5-6-.-.", "dispatchAtMs": 174029, "durationMs": 3050, "firstNodeMs": 177600, "text": "Jab, cross, hook, rear hook, lead upper, rear upper!" },
+    { "kind": "call", "slot": "call/1-2-3-4-5-6-.-.", "dispatchAtMs": 181229, "durationMs": 3050, "firstNodeMs": 184800, "text": "Jab, cross, hook, rear hook, lead upper, rear upper!" },
+    {
+     "kind": "lead-in",
+     "slot": "lead-in/quick-six-count/r2s4",
+     "dispatchAtMs": 184869,
+     "durationMs": 8360,
+     "text": "Jab, cross, lead uppercut, rear uppercut — straight time, nine bars. Straight line, both uppercuts. Finish the round in the legs."
+    },
+    { "kind": "call", "slot": "call/1-2-5-6", "dispatchAtMs": 193979, "durationMs": 2300, "firstNodeMs": 196800, "text": "Jab, cross, lead upper, rear upper!" },
+    { "kind": "call", "slot": "call/1-2-5-6", "dispatchAtMs": 198779, "durationMs": 2300, "firstNodeMs": 201600, "text": "Jab, cross, lead upper, rear upper!" },
+    { "kind": "call", "slot": "call/1-2-5-6", "dispatchAtMs": 203579, "durationMs": 2300, "firstNodeMs": 206400, "text": "Jab, cross, lead upper, rear upper!" },
+    { "kind": "call", "slot": "call/1-2-5-6", "dispatchAtMs": 208379, "durationMs": 2300, "firstNodeMs": 211200, "text": "Jab, cross, lead upper, rear upper!" },
+    { "kind": "call", "slot": "call/1-2-5-6", "dispatchAtMs": 213179, "durationMs": 2300, "firstNodeMs": 216000, "text": "Jab, cross, lead upper, rear upper!" },
+    { "kind": "call", "slot": "call/1-2-5-6", "dispatchAtMs": 217979, "durationMs": 2300, "firstNodeMs": 220800, "text": "Jab, cross, lead upper, rear upper!" },
+    { "kind": "call", "slot": "call/1-2-5-6", "dispatchAtMs": 222779, "durationMs": 2300, "firstNodeMs": 225600, "text": "Jab, cross, lead upper, rear upper!" },
+    { "kind": "call", "slot": "call/1-2-5-6", "dispatchAtMs": 227579, "durationMs": 2300, "firstNodeMs": 230400, "text": "Jab, cross, lead upper, rear upper!" },
+    { "kind": "call", "slot": "call/1-2-5-6", "dispatchAtMs": 232379, "durationMs": 2300, "firstNodeMs": 235200, "text": "Jab, cross, lead upper, rear upper!" }
+   ],
+   "tokensDue": 200
+  }
+ ],
+ "timing": {
+  "dispatchLateMs": {
+   "n": 89,
+   "minMs": 0,
+   "medianMs": 27,
+   "p95Ms": 66,
+   "maxMs": 68
+  },
+  "ringTokenLateMs": {
+   "n": 404,
+   "minMs": 0,
+   "medianMs": 0.9,
+   "p95Ms": 67.6,
+   "maxMs": 72.6
+  }
+ }
+}
