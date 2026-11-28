@@ -775,6 +775,13 @@ async function driveOne(ctx, job, attempt = 1) {
     sessionDir: dir,
     manifest: job.manifestFile,
     timelineHash: manifest.identity?.timelineHash ?? null,
+    /**
+     * Whether the device was an emulator — asked of the device itself, not
+     * read from the capture, which only says so on a build new enough to
+     * (N-19). Whatever reads this row later can tell an emulator run from a
+     * tablet's without the capture's help.
+     */
+    deviceIsEmulator: ctx.deviceIsEmulator === true,
     url,
     budgetMs: budget,
     verdict: 'ERROR',

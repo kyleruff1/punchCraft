@@ -84,10 +84,11 @@ within a bar — so that is not a rule.
 
 **The page.** Any error on the page fails the drive — the smoke test's rule.
 
-**Parity.** `pc:parity` compares round 1 of each workout with the tablet
-reference in `tablet-reference/`: which clip, its words, when it was due,
-how long it is, and when the ring it leads is due must match dispatch for
-dispatch. Lateness is shown side by side and never compared.
+**Parity.** `pc:parity` compares each workout with the device reference in
+`device-reference/`, in every round both hold whole: which clip, its words,
+when it was due, how long it is, and when the ring it leads is due must
+match dispatch for dispatch. Lateness is shown side by side, each figure
+under the name of the device it is from, and never compared.
 
 ## What it cannot tell you
 
@@ -131,26 +132,36 @@ Each must FAIL, on its own rule. `late-rings` holds back animation frames
 only: stalling the whole page would delay the calls with the rings and prove
 nothing about either.
 
-## The tablet reference
+## The device reference
 
-`tablet-reference/*.json` is round 1 of each workout as a tablet suite's
-captures recorded it, with the build and date it came from. After a tablet
-suite run, rebuild it:
+`device-reference/*.json` is each workout as a native build's suite captures
+recorded it — every round the capture holds whole — with the device, build
+and date it came from. After a suite run on the tablet or the emulator,
+rebuild it:
 
 ```
-npm run pc:parity -- --build-reference tools/analysis/suites/<the tablet run>
+npm run pc:parity -- --build-reference tools/analysis/suites/<the run>
 ```
+
+A reference says which device wrote it: `tablet` or `emulator`. What is said
+and when it is due is the same code on both, so either will do for that.
+The lateness beside it will not — an emulator on this PC is a PC — so a
+reference built from an emulator run keeps the tablet's own lateness from
+the file it replaces, under the date it was taken, and the report shows
+both. A PC capture is refused: the reference is what the PC is compared
+with. A file written before references held every round (`round1`, no
+`rounds`) still reads, as round 1.
 
 Parity **skips** a workout, with a note, when its timeline or one of its
-clips has changed since the tablet capture: a re-recorded clip is a different
+clips has changed since the device capture: a re-recorded clip is a different
 length, so it is sent at a different time. A skipped workout is not compared
 at all. As of 2026-11-26 ten of the 22 are skipped — four call clips were
-re-recorded after the September capture — and stay so until the tablet suite
+re-recorded after the September capture — and stay so until a device suite
 runs again.
 
-The tablet's log drops lines under load. A PC run that holds everything the
-tablet's capture holds, in order, plus one or two dispatches more, is read as
-the same with lines lost, and the report says so.
+A device's log drops lines under load. A PC run that holds everything the
+device's capture holds, in order, plus one or two dispatches more over the
+whole workout, is read as the same with lines lost, and the report says so.
 
 ## Running it
 
