@@ -21,6 +21,8 @@
     "check": "npm run typecheck && npm run typecheck:tools && npm run lint && npm run format:check && npm run guard:velocity-terminology && npm run guard:playlist-sample-rate",
     "hooks:install": "git config core.hooksPath .githooks",
     "tablet:reload": "node tools/dev/reload-tablet.mjs",
+    "emu:suite": "node tools/dev/emu-suite.mjs",
+    "emu:prepare": "node tools/dev/emu-suite.mjs --prepare",
     "pc:glove-check": "node tools/pc/glove-check/serve.mjs",
     "pc:app": "node tools/pc/app/serve.mjs",
     "pc:smoke": "node tools/pc/app/smoke.mjs",
