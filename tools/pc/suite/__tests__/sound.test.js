@@ -11,6 +11,7 @@ import {
   renderSoundReport,
   soundReport,
   soundVerdict,
+  STARTING_MS,
 } from '../sound.mjs'
 
 const record = (code, fields) => ({
@@ -98,7 +99,37 @@ const played = (
       ]),
 ]
 const LIMITS = { floorMs: 150, truncationMs: 150 }
+/**
+ * The bell that marks the fixture's one boundary — the round starting — logged
+ * by name and heard in full. Every round boundary must have one, so every
+ * report built below does.
+ */
+const BELL_FILE = 'bell.0123456789abcdef0123456789abcdef.wav'
+const bellRecord = {
+  wallMs: 0,
+  monoMs: WORK_STARTS,
+  level: 'info',
+  args: [
+    '[INFO] workout.voice.play',
+    'clip playing',
+    { asset: 'bell', volume: 1, dispatchMs: WORK_STARTS, playId: 'bell-1' },
+  ],
+}
+const bellEvents = played(99, WORK_STARTS, {
+  durationMs: 1_180,
+  heardMs: 1_100,
+  startAfter: 60,
+}).map((event) => (event.type === 'play' ? { ...event, src: BELL_FILE } : event))
 const SENT = WORK_STARTS + 2_600 + 40
+/**
+ * The last line of a capture. What a clip did is judged against when the
+ * capture stopped, so every report says when that was: a minute after the
+ * round started, unless a test is about the end itself.
+ */
+const stopped = (atMs = WORK_STARTS + 60_000) => ({
+  ...record('workout.qa.sim', {}),
+  monoMs: atMs,
+})
 
 describe('playsFrom', () => {
   it('makes one play of each call to play(), with the sound that followed it', () => {
@@ -313,8 +344,13 @@ describe('clipTimings', () => {
 
 describe('soundReport', () => {
   const ready = { type: 'tap-ready', atMs: 1, state: 'running', sampleRate: 48_000 }
-  const report = (records, events) =>
-    soundReport([...round, ...records], [ready, ...events], LIMITS)
+  /** The capture runs on for a minute after the round starts, unless told when it stopped. */
+  const report = (records, events, stoppedAtMs = WORK_STARTS + 60_000) =>
+    soundReport(
+      [...round, bellRecord, ...records, stopped(stoppedAtMs)],
+      [ready, ...bellEvents, ...events],
+      LIMITS,
+    )
 
   it('counts a clean drive and gives the gap before the ring', () => {
     const r = report(
@@ -403,6 +439,18 @@ describe('soundReport', () => {
     })
   })
 
+  it('does not call silent a clip sent as the capture stopped: it had no time to sound', () => {
+    // A drive ends three seconds into the next round. This call was sent
+    // 130 ms before that; a call first sounds some 70 ms after it is sent.
+    const sentAsItStopped = report(call(2_600), [], SENT + 130)
+    expect(sentAsItStopped.clips).toMatchObject({ played: 1, unfinished: 1, silent: [] })
+    expect(soundVerdict(sentAsItStopped, { floorRatio: 0.02 }).hard).toEqual([])
+    // Sent half a second before the end and still nothing: that is silence.
+    const hadItsChance = report(call(2_600), [], SENT + STARTING_MS)
+    expect(hadItsChance.clips).toMatchObject({ unfinished: 0 })
+    expect(hadItsChance.clips.silent).toHaveLength(1)
+  })
+
   it('judges the gap before a ring for calls only; a lead-in is heard and counted', () => {
     const r = report(call(2_600, { kind: 'lead-in', slot: 'lead-in/x' }), played(7, SENT + 1))
     expect(r.calls.n).toBe(0)
@@ -441,7 +489,14 @@ describe('soundReport', () => {
 describe('soundVerdict', () => {
   const ready = { type: 'tap-ready', atMs: 1, state: 'running', sampleRate: 48_000 }
   const verdict = (records, events, floorRatio = 0.02) =>
-    soundVerdict(soundReport([...round, ...records], [ready, ...events], LIMITS), { floorRatio })
+    soundVerdict(
+      soundReport(
+        [...round, bellRecord, ...records, stopped()],
+        [ready, ...bellEvents, ...events],
+        LIMITS,
+      ),
+      { floorRatio },
+    )
 
   it('passes a drive where every clip sounded, whole, and clear of its ring', () => {
     expect(verdict(call(2_600), played(7, SENT + 1))).toEqual({
@@ -500,10 +555,11 @@ describe('soundVerdict', () => {
       soft: ['the sound tap did not start, so no clip was listened to'],
     })
     const oneElement = soundReport(
-      [...round, ...call(2_600)],
+      [...round, bellRecord, ...call(2_600)],
       [
         ready,
         { id: 3, type: 'tap-failed', atMs: 2, error: 'already connected' },
+        ...bellEvents,
         ...played(7, SENT + 1),
       ],
       LIMITS,
@@ -512,5 +568,264 @@ describe('soundVerdict', () => {
       verdict: 'WARN',
       soft: ['the sound tap could not listen to 1 element(s): already connected'],
     })
+  })
+})
+
+describe('what is and is not a clip being cut', () => {
+  const ready = { type: 'tap-ready', atMs: 1, state: 'running', sampleRate: 48_000 }
+  const stopped = (monoMs) => ({
+    wallMs: 0,
+    monoMs,
+    level: 'info',
+    args: ['[INFO] workout.warn', 'round warning stopped', {}],
+  })
+  const report = (records, events) =>
+    soundReport(
+      [...round, bellRecord, ...records, stopped()],
+      [ready, ...bellEvents, ...events],
+      LIMITS,
+    )
+
+  it('is not cut when the app stopped it and said so', () => {
+    const events = played(7, SENT + 1, { stoppedAt: 300 })
+    const stopAt = events.at(-1).atMs
+    expect(report(call(2_600), events).clips.cutShort).toHaveLength(1)
+    expect(report([...call(2_600), stopped(stopAt + 4)], events).clips.cutShort).toEqual([])
+  })
+
+  it('never takes a bell for a call, though it rang in the same instant', () => {
+    const bell = played(3, SENT + 1).map((e) =>
+      e.type === 'play' ? { ...e, src: 'bell.0123456789abcdef0123456789abcdef.wav' } : e,
+    )
+    const r = report(call(2_600), bell)
+    expect(r.clips.silent).toEqual([expect.objectContaining({ element: null })])
+    expect(r.otherKinds).toEqual({ bell: 1 })
+  })
+
+  it('does not count the source-less element a call’s player starts on as a play of anything', () => {
+    const phantom = [
+      { id: 1, type: 'play', atMs: SENT, src: '' },
+      { id: 1, type: 'emptied', atMs: SENT + 3, positionMs: 0 },
+    ]
+    const r = report(call(2_600, { path: 'fresh' }), [...phantom, ...played(2, SENT + 3)])
+    expect(r.clips).toMatchObject({ heard: 1, silent: [], cutShort: [] })
+    expect(r.otherPlays).toBe(0)
+  })
+})
+
+describe('bells', () => {
+  const ready = { type: 'tap-ready', atMs: 1, state: 'running', sampleRate: 48_000 }
+  const boundary = (transition, roundIndex, atMs) =>
+    record('workout.round.boundary', { transition, roundIndex, monotonicTimeMs: atMs })
+  const bellAt = (atMs, volume = 1) => ({
+    ...bellRecord,
+    monoMs: atMs,
+    args: [bellRecord.args[0], 'clip playing', { asset: 'bell', volume, dispatchMs: atMs }],
+  })
+  const rung = (id, atMs, how = {}) =>
+    played(id, atMs, { durationMs: 1_180, heardMs: 1_100, startAfter: 60, ...how }).map((event) =>
+      event.type === 'play' ? { ...event, src: BELL_FILE } : event,
+    )
+  const REST = WORK_STARTS + 240_000
+  const judged = (records, events) => {
+    const report = soundReport(
+      [...round, bellRecord, ...call(2_600), ...records],
+      [ready, ...bellEvents, ...played(7, SENT + 1), ...events],
+      LIMITS,
+    )
+    return { report, verdict: soundVerdict(report, { floorRatio: 0.02 }) }
+  }
+
+  it('finds the bell at every round start, round end and finish, and says how soon it sounds', () => {
+    const { report, verdict } = judged(
+      [boundary('rest-entered', 0, REST), bellAt(REST - 1)],
+      rung(98, REST - 1),
+    )
+    expect(report.bells).toMatchObject({
+      expected: 2,
+      rung: 2,
+      missing: [],
+      silent: [],
+      cutShort: [],
+    })
+    expect(report.bells.afterBoundary).toMatchObject({ n: 2, minMs: 59, maxMs: 60 })
+    expect(verdict.verdict).toBe('PASS')
+  })
+
+  it('fails a boundary the app rang no bell for', () => {
+    const { verdict } = judged([boundary('rest-entered', 0, REST)], [])
+    expect(verdict.hard).toEqual(['1 round boundary(ies) had no bell — first: rest of round 1'])
+  })
+
+  it('fails a bell that rang and made no sound', () => {
+    const { verdict } = judged(
+      [boundary('completed', 1, REST), bellAt(REST)],
+      rung(98, REST, { heardMs: null }),
+    )
+    expect(verdict.hard).toEqual(['1 bell(s) rang and made no sound — first: completed of round 2'])
+  })
+
+  it('fails a bell stopped before its end', () => {
+    const { verdict } = judged(
+      [boundary('rest-entered', 0, REST), bellAt(REST)],
+      rung(98, REST, { stoppedAt: 400 }),
+    )
+    expect(verdict.hard).toEqual([
+      '1 bell(s) were stopped before their end — first: rest of round 1',
+    ])
+  })
+
+  it('does not call a bell silent that was rung at volume 0', () => {
+    const { verdict } = judged(
+      [boundary('rest-entered', 0, REST), bellAt(REST, 0)],
+      rung(98, REST, { heardMs: null }),
+    )
+    expect(verdict.verdict).toBe('PASS')
+  })
+
+  it('expects no bell where none belongs: the countdown before round 1', () => {
+    const { report } = judged([boundary('countdown-entered', -1, WORK_STARTS - 25_000)], [])
+    expect(report.bells.expected).toBe(1)
+  })
+
+  it('judges any other clip the app plays by name the same way', () => {
+    const named = {
+      ...bellRecord,
+      monoMs: 30_000,
+      args: [
+        bellRecord.args[0],
+        'clip playing',
+        { asset: 'li-2ba7c178', volume: 1, dispatchMs: 30_000 },
+      ],
+    }
+    const heard = played(50, 30_001, { durationMs: 4_000, heardMs: 3_900 }).map((e) =>
+      e.type === 'play' ? { ...e, src: 'li-2ba7c178.0123456789abcdef0123456789abcdef.wav' } : e,
+    )
+    expect(judged([named], heard).report.named).toMatchObject({
+      played: 1,
+      heard: 1,
+      silent: [],
+      cutShort: [],
+    })
+    expect(judged([named], []).verdict.hard).toEqual([
+      '1 named clip(s) were played and made no sound — first: li-2ba7c178',
+    ])
+  })
+})
+
+describe('the intro, the countdown and the rest line in the verdict', () => {
+  const ready = { type: 'tap-ready', atMs: 1, state: 'running', sampleRate: 48_000 }
+  const HASH = '0123456789abcdef0123456789abcdef'
+  const said = (code, message, fields, monoMs) => ({
+    wallMs: 0,
+    monoMs,
+    level: 'info',
+    args: [`[INFO] ${code}`, message, fields],
+  })
+  const clip = (id, name, atMs, durationMs, stoppedAt = durationMs) => [
+    { id, type: 'play', atMs, src: `${name}.${HASH}.wav`, volume: 1, positionMs: 0, durationMs },
+    { id, type: 'sound-start', atMs: atMs + 70 },
+    { id, type: 'sound-end', atMs: atMs + stoppedAt - 20, peak: 0.4 },
+    { id, type: 'pause', atMs: atMs + stoppedAt, positionMs: stoppedAt, durationMs },
+  ]
+  const countdown = (tracks) => [
+    said('workout.warn', 'round warning prepared', { tracks }, 100_000),
+    said('workout.warn', 'round warning playing', {}, 142_603),
+  ]
+  const judged = (records, events) =>
+    soundVerdict(
+      soundReport(
+        [...round, bellRecord, ...call(2_600), ...records],
+        [ready, ...bellEvents, ...played(7, SENT + 1), ...events],
+        LIMITS,
+      ),
+      { floorRatio: 0.02 },
+    )
+
+  it('passes a countdown that played whole', () => {
+    expect(judged(countdown(1), clip(60, 'warn-round-2', 142_603, 5_419))).toEqual({
+      verdict: 'PASS',
+      hard: [],
+      soft: [],
+    })
+  })
+
+  it('fails one that did not play as the app said it would', () => {
+    const v = judged(countdown(3), clip(60, 'warn-opener-08', 142_603, 2_261))
+    expect(v.verdict).toBe('FAIL')
+    expect(v.hard).toEqual([
+      '1 ceremony(ies) did not play as the app said — first: countdown 1: 1 of its 3 clips played: nothing followed warn-opener-08',
+    ])
+  })
+
+  it('warns, and no more, when the bell cut the countdown', () => {
+    const cut = clip(60, 'warn-round-2', 142_603, 5_419, 4_000)
+    const v = judged(
+      [...countdown(1), said('workout.warn', 'round warning stopped', {}, 146_605)],
+      cut,
+    )
+    expect(v).toEqual({
+      verdict: 'WARN',
+      hard: [],
+      soft: ['the bell cut the countdown 1: 1419 ms of it was never heard'],
+    })
+  })
+})
+
+describe('round by round', () => {
+  it('gives the gap before the ring for each round, and prints it when there is more than one', () => {
+    const ready = { type: 'tap-ready', atMs: 1, state: 'running', sampleRate: 48_000 }
+    const secondRound = [
+      record('workout.round.boundary', {
+        transition: 'rest-entered',
+        roundIndex: 0,
+        monotonicTimeMs: 250_000,
+      }),
+      record('workout.round.boundary', {
+        transition: 'work-entered',
+        roundIndex: 1,
+        workElapsedMs: 0,
+        monotonicTimeMs: 310_000,
+      }),
+      record('workout.cue.tokenDue', {
+        roundIndex: 1,
+        workElapsedMs: 4_040,
+        monotonicTimeMs: 314_040,
+        scheduledMs: 4_000,
+      }),
+      record('workout.clickScript.dispatch', {
+        kind: 'call',
+        slot: 'call/1-2',
+        traceId: 'call/1-2#2600',
+        dispatchAtMs: 2_600,
+        lateMs: 10,
+        durationMs: 1_000,
+        firstNodeMs: 4_000,
+        breathMs: 400,
+        monotonicTimeMs: 312_610,
+      }),
+      record('workout.voice.play', {
+        kind: 'click-script',
+        text: 'One, two!',
+        durationMs: 1_000,
+        volume: 1,
+        path: 'armed',
+        dispatchMs: 312_610,
+        traceId: 'call/1-2#2600',
+        playId: 'p-r2',
+      }),
+    ]
+    const report = soundReport(
+      [...round, bellRecord, ...call(2_600), ...secondRound],
+      [ready, ...bellEvents, ...played(7, SENT + 1), ...played(7, 312_611)],
+      LIMITS,
+    )
+    expect(report.calls.byRound.map((r) => [r.roundIndex, r.n, r.minMs])).toEqual([
+      [0, 1, 294],
+      [1, 1, 324],
+    ])
+    expect(renderSoundReport(report, 'x')).toContain(
+      'gap before the ring, round by round (least / median ms): round 1: 294 / 294 over 1 · round 2: 324 / 324 over 1',
+    )
   })
 })

@@ -10,12 +10,17 @@
 //   npm run pc:suite -- --only quick-one-two --fault cut     a call that stops early
 //   npm run pc:suite -- --only quick-one-two --fault late    a call that starts late and runs into its ring
 //
-// A fault touches every fourth play of a short clip that an element already
-// holds — the calls, on their reused players. It has to be installed before
+//   npm run pc:suite -- --only quick-one-two --fault mute-bell   every bell rung in silence
+//   npm run pc:suite -- --only quick-one-two --fault cut-countdown   each countdown clip stopped half a second in
+//   npm run pc:suite -- --only quick-one-two --fault late-rings      every animation frame held back a quarter of a second
+//
+// The first three touch every fourth play of a call: a short clip on a
+// reused player, played from a downloaded copy — which is how a call is told
+// from a bell or a silence file, both short too. It has to be installed before
 // the sound tap, so that the tap still reports the play at the moment the
 // app asked for it and the fault sits between that and the real `play()`.
 
-export const FAULTS = ['mute', 'cut', 'late']
+export const FAULTS = ['mute', 'cut', 'late', 'mute-bell', 'cut-countdown', 'late-rings']
 
 /** A clip shorter than this is a call; lead-ins run to several seconds. */
 export const CALL_MAX_SEC = 2
@@ -25,15 +30,54 @@ export const CUT_AFTER_MS = 300
 export const LATE_BY_MS = 700
 /** One play in this many is broken. */
 export const EVERY = 4
+/** `late-rings` holds every animation frame back by this much: about four frames a second. */
+export const LATE_FRAME_MS = 250
 
 /**
  * Self-contained: it is turned into text and run in the page.
  *
  * @param {any} scope the page's global object
  * @param {string} kind one of `FAULTS`
- * @param {{ callMaxSec: number, cutAfterMs: number, lateByMs: number, every: number }} how
+ * @param {{ callMaxSec: number, cutAfterMs: number, lateByMs: number, every: number, lateFrameMs: number }} how
  */
 export function installFault(scope, kind, how) {
+  if (kind === 'late-rings') {
+    // The rings are painted from the screen's animation frames; the calls are
+    // sent from a timer. Holding back the frames alone makes rings late and
+    // leaves every call where it was — a stall of the whole page would move
+    // both, and show nothing about rings.
+    const nativeFrame = scope.requestAnimationFrame.bind(scope)
+    const nativeCancel = scope.cancelAnimationFrame.bind(scope)
+    const held = new scope.Map()
+    let lastId = 1_000_000_000
+    scope.requestAnimationFrame = (callback) => {
+      // Every frame, by the same amount: frames held for some stretches and
+      // not others would overtake one another, and the animation library
+      // does not survive its frames arriving out of order.
+      // The page keeps the id it is given and may cancel with it at any
+      // point: while the frame is being held, or after it has been passed on.
+      const id = (lastId += 1)
+      const entry = { timer: undefined, frame: undefined }
+      entry.timer = scope.setTimeout(() => {
+        entry.timer = undefined
+        entry.frame = nativeFrame((timestamp) => {
+          held.delete(id)
+          callback(timestamp)
+        })
+      }, how.lateFrameMs)
+      held.set(id, entry)
+      return id
+    }
+    scope.cancelAnimationFrame = (id) => {
+      const entry = held.get(id)
+      if (!entry) return nativeCancel(id)
+      held.delete(id)
+      if (entry.timer !== undefined) scope.clearTimeout(entry.timer)
+      if (entry.frame !== undefined) nativeCancel(entry.frame)
+      return undefined
+    }
+    return
+  }
   const media = scope.HTMLMediaElement.prototype
   const nativePlay = media.play
   const nativePause = media.pause
@@ -53,7 +97,21 @@ export function installFault(scope, kind, how) {
   }
   /** @this {any} the element */
   media.play = function play(...args) {
-    const call = Number.isFinite(this.duration) && this.duration < how.callMaxSec
+    const source = String(this.currentSrc || this.src || '')
+    if (kind === 'mute-bell') {
+      // The build's own file, by name.
+      if (/\/bell\.[^/]*$/.test(source)) this.muted = true
+      return nativePlay.apply(this, args)
+    }
+    if (kind === 'cut-countdown') {
+      // The countdown's own clips, by name. A stopped clip never ends, so
+      // the app's playlist never starts the next one either.
+      if (/\/warn-[^/]*$/.test(source))
+        scope.setTimeout(() => nativePause.call(this), how.cutAfterMs)
+      return nativePlay.apply(this, args)
+    }
+    const call =
+      Number.isFinite(this.duration) && this.duration < how.callMaxSec && source.startsWith('blob:')
     if (!call) return nativePlay.apply(this, args)
     seen += 1
     if (seen % how.every !== 0) {
@@ -89,6 +147,7 @@ export function faultSource(kind) {
     cutAfterMs: CUT_AFTER_MS,
     lateByMs: LATE_BY_MS,
     every: EVERY,
+    lateFrameMs: LATE_FRAME_MS,
   }
   return `(${installFault.toString()})(globalThis, ${JSON.stringify(kind)}, ${JSON.stringify(how)})`
 }

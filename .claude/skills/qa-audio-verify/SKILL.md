@@ -36,12 +36,18 @@ the observers' summary beside every verdict.
 ### The same suite on the PC
 
 `npm run pc:suite` drives the same 22 workouts from the same QA link in a
-headless browser, with no tablet: about 20 minutes for all of them. The
-correlator is this skill's, unchanged, on a capture in this skill's layout.
-The timing half is different, and has to be: `observed-timing.mjs` **refuses
-a PC capture**, because the playhead observer above means nothing in a
-browser. The PC listens to the sound itself instead and judges that
-(`tools/pc/suite/README.md`).
+headless browser, with no tablet: about 22 minutes for all of them, each
+through round 1 and the rest after it. The correlator is this skill's,
+unchanged, on a capture in this skill's layout. The timing half is
+different, and has to be: `observed-timing.mjs` **refuses a PC capture**,
+because every onset in it is corrected by this tablet's measured start
+latency and every constant it proposes is this tablet's. The PC listens to
+the sound itself instead and judges that — calls, bells, the intro, the
+countdown and the rest line — and checks that every ring lit
+(`tools/pc/suite/README.md`). The playback observer does run there, read
+through `src/audio/observedStatus.web.ts`, and the PC suite reports how it
+compares with the sound; that reading is the browser's and changes nothing
+on this device.
 
 Use it first. What is said, in what order and when is code both devices run,
 so a correlator failure there is a failure here, found without the tablet.
@@ -117,6 +123,18 @@ npm run android
 The suite mutes the media stream (`cmd media_session volume --stream 3
 --set 0`, keyevent fallback) and restores it on exit and on Ctrl-C. Pass
 `--keep-volume` to leave it alone.
+
+### On an emulator
+
+The same loop runs against an Android emulator with no tablet attached:
+`--device=emulator-5556`, an x86_64 release build. Recipe and limits:
+`docs/dev-setup.md`, "An Android emulator". The verdict, the correlator and
+the work-axis lines mean what they mean on the tablet. **Its timing figures
+are this PC's.** The suite knows an emulator when it sees one: it marks
+timing "not judged", does not run the timing analyzer, prints the work axis
+in its place, and appends nothing to the ledger (N-19 in the findings doc).
+The analyzer itself refuses an emulator's capture, as it does a PC's — but
+only from a build new enough to say what wrote it (`38d556f9`).
 
 ### Single-workout quick check
 

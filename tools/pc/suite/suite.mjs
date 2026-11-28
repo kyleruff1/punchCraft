@@ -44,6 +44,7 @@ import { loadTimingConstants } from '../../analysis/timing-constants.mjs'
 import { fieldsOf, recordsOf } from './capture.mjs'
 import { driveState, driveWorkout } from './drive.mjs'
 import { FAULTS } from './faults.mjs'
+import { ringReport, ringVerdict } from './rings.mjs'
 import { renderSoundReport, soundReport, soundVerdict } from './sound.mjs'
 import { spread } from './stats.mjs'
 
@@ -133,6 +134,32 @@ export function parseArgs(argv) {
 }
 
 /**
+ * What the app itself said went wrong, across the whole capture.
+ *
+ * `couldNotPlay` is every clip it logged failing to play or failing to find:
+ * a fault in any round. `skipped` and `deferred` are calls it chose not to
+ * make — the coach lane was busy — which is the app working as designed, and
+ * is counted.
+ *
+ * @param {import('../app/recordTap.mjs').PageRecord[]} records
+ */
+export function admissions(records) {
+  const named = (code, key) =>
+    recordsOf(records, code).map(
+      (r) => `${code.replace('workout.', '')}: ${fieldsOf(r)[key] ?? fieldsOf(r).text ?? '?'}`,
+    )
+  return {
+    couldNotPlay: [
+      ...named('workout.voice.playFailed', 'asset'),
+      ...named('workout.voice.clipMissing', 'asset'),
+      ...named('workout.slotDispatcher.assetMissing', 'assetId'),
+    ],
+    skipped: recordsOf(records, 'workout.clickScript.skipped').length,
+    deferred: recordsOf(records, 'workout.slotDispatcher.deferred').length,
+  }
+}
+
+/**
  * How late this machine ran the workout's own loop — reported, never judged.
  *
  * `dispatch` is how long after its scheduled time each clip was sent to play;
@@ -164,6 +191,7 @@ export function lateness(records) {
  * @param {string} input.nonce the nonce the link carried
  * @param {{ verdict: string, hard: string[], soft: string[] } | null} [input.sound] the sound gate's word, if it listened
  * @param {string} [input.soundGate] `fail` (a hard sound finding fails the drive), `warn` or `off`
+ * @param {{ hard: string[], soft: string[] } | null} [input.rings] the ring check's word
  * @returns {{ verdict: string, reasons: string[] }}
  */
 export function driveVerdict({
@@ -173,6 +201,7 @@ export function driveVerdict({
   nonce,
   sound = null,
   soundGate = 'fail',
+  rings = null,
 }) {
   const state = driveState(drive.records)
   const broke = (reason) => ({ verdict: 'ERROR', reasons: [reason] })
@@ -188,6 +217,15 @@ export function driveVerdict({
     reasons.push(reason)
   }
   if (drive.reason === 'over-budget') worsen('ERROR', 'the round did not end within its budget')
+  // What the app itself logged it could not do, in any round. The correlator
+  // reads these for round 1 only; nothing else reads them at all.
+  const { couldNotPlay } = admissions(drive.records)
+  if (couldNotPlay.length > 0) {
+    worsen(
+      'FAIL',
+      `the app logged ${couldNotPlay.length} clip(s) it could not play — first: ${couldNotPlay[0]}`,
+    )
+  }
   if (drive.problems.length > 0) {
     worsen('FAIL', `${drive.problems.length} error(s) on the page: ${drive.problems[0]}`)
   }
@@ -198,6 +236,10 @@ export function driveVerdict({
     // correlator failed.
     for (const finding of sound.hard) worsen(soundGate === 'fail' ? 'FAIL' : 'WARN', finding)
     for (const finding of sound.soft) worsen('WARN', finding)
+  }
+  if (rings) {
+    for (const finding of rings.hard) worsen('FAIL', finding)
+    for (const finding of rings.soft) worsen('WARN', finding)
   }
   if (drive.staged?.gitSha !== hostSha) {
     worsen('WARN', `the build is ${drive.staged?.gitSha}, the checkout is ${hostSha}`)
@@ -216,6 +258,25 @@ const clock = (elapsedMs) =>
   `${Math.floor(elapsedMs / 60_000)}:${String(Math.round(elapsedMs / 1000) % 60).padStart(2, '0')}`
 
 /**
+ * The app's playback observer against the audio elements, over every drive,
+ * as one paragraph — or null when no drive had anything to compare.
+ *
+ * @param {any[]} rows
+ * @returns {string | null}
+ */
+export function observerLine(rows) {
+  const reports = rows.map((r) => r.sound?.observer).filter((o) => o && o.compared > 0)
+  if (reports.length === 0) return null
+  const sum = (pick) => reports.reduce((n, o) => n + pick(o), 0)
+  // The furthest apart the two were, either way round, in any drive.
+  const apart = (key) => {
+    const ends = reports.flatMap((o) => [o[key].minMs, o[key].maxMs]).filter(Number.isFinite)
+    return ends.length === 0 ? '—' : String(Math.max(...ends.map(Math.abs)))
+  }
+  return `The app timed ${sum((o) => o.records)} plays by its players’ status events, and ${sum((o) => o.compared)} of them could be held against the audio element that played them. The two differ by at most ${apart('startMs')} ms on when a clip began and ${apart('endMs')} ms on when it ended. ${sum((o) => o.unseen.length)} sounded that the observer never saw start; ${sum((o) => o.unheard.length)} it saw start made no sound. Reported, not judged — each drive’s \`sound-report.md\` has its own figures.`
+}
+
+/**
  * `summary.md`. The tablet suite's table is not reused: its columns are the
  * tablet's instruments, and a PC row under those headings would be read as
  * a tablet measurement.
@@ -232,7 +293,7 @@ export function renderSummary(rows, meta) {
   const L = [
     `# PC suite — ${meta.suiteId}`,
     '',
-    `checkout ${meta.hostSha} · ${meta.args.full ? 'whole workouts' : 'round 1'} · ${meta.args.jobs ?? 1} at a time · simulated punches: ${meta.args.sim} · sound ${meta.args.sound ? `gate: ${meta.args.soundGate}` : 'not listened to'} · ${path.basename(meta.browser)}`,
+    `checkout ${meta.hostSha} · ${meta.args.full ? 'whole workouts' : 'round 1 and its rest'} · ${meta.args.jobs ?? 1} at a time · simulated punches: ${meta.args.sim} · sound ${meta.args.sound ? `gate: ${meta.args.soundGate}` : 'not listened to'} · ${path.basename(meta.browser)}`,
     '',
     ...(meta.args.fault
       ? [
@@ -242,8 +303,8 @@ export function renderSummary(rows, meta) {
       : []),
     `**${tally || 'nothing ran'}**`,
     '',
-    '| workout | vocab | verdict | correlator | page errors | clips heard | silent / cut short | last sound → ring due, least / median ms | dispatch late, median / p95 ms | ring token late, median / p95 ms | took |',
-    '|---|---|---|---|---|---|---|---|---|---|---|',
+    '| workout | vocab | verdict | correlator | page errors | clips heard | silent / cut short | last sound → ring due, least / median ms | rings lit | ring painted late, median / most ms | dispatch late, median / p95 ms | ring token late, median / p95 ms | took |',
+    '|---|---|---|---|---|---|---|---|---|---|---|---|---|',
   ]
   for (const r of rows) {
     const d = r.lateness?.dispatch
@@ -252,8 +313,11 @@ export function renderSummary(rows, meta) {
     const heard = s ? `${s.clips.heard} of ${s.clips.played}` : '—'
     const lost = s ? `${s.clips.silent.length} / ${s.clips.cutShort.length}` : '—'
     const gap = s ? `${ms(s.calls.breath.minMs)} / ${ms(s.calls.breath.medianMs)}` : '—'
+    const g = r.rings
+    const lit = g ? `${g.lit} of ${g.rings}` : '—'
+    const painted = g ? `${ms(g.paintedLate.medianMs)} / ${ms(g.paintedLate.maxMs)}` : '—'
     L.push(
-      `| ${r.workoutId} | ${r.vocab} | ${r.verdict} | ${r.stats ?? '—'} | ${r.pageProblems.length} | ${heard} | ${lost} | ${gap} | ${ms(d?.medianMs)} / ${ms(d?.p95Ms)} | ${ms(t?.medianMs)} / ${ms(t?.p95Ms)} | ${clock(r.elapsedMs)} |`,
+      `| ${r.workoutId} | ${r.vocab} | ${r.verdict} | ${r.stats ?? '—'} | ${r.pageProblems.length} | ${heard} | ${lost} | ${gap} | ${lit} | ${painted} | ${ms(d?.medianMs)} / ${ms(d?.p95Ms)} | ${ms(t?.medianMs)} / ${ms(t?.p95Ms)} | ${clock(r.elapsedMs)} |`,
     )
   }
   const explained = rows.filter((r) => r.reasons.length > 0)
@@ -262,6 +326,8 @@ export function renderSummary(rows, meta) {
     for (const r of explained)
       for (const reason of r.reasons) L.push(`- **${r.workoutId}** (${r.vocab}): ${reason}`)
   }
+  const observer = observerLine(rows)
+  if (observer) L.push('', '## The app’s own observer', '', observer)
   L.push(
     '',
     '## How to read this',
@@ -269,6 +335,7 @@ export function renderSummary(rows, meta) {
     '- **correlator** is the tablet’s own first-round verifier, run on this capture against the same manifest. What is said, in what order and when is code both devices share.',
     '- **The sound columns are measured**, not modelled: each call and lead-in is listened to in the page, and “last sound → ring due” is the gap between a call’s last sound and the scheduled time of the ring it leads. A clip that makes no sound, one cut short, or a call still sounding when its ring is due fails the drive. Each drive’s folder has the full `sound-report.md`.',
     '- **The lateness columns are this PC’s**, under whatever else it was doing. They are reported, not judged, and no tablet constant is ever set from them. The ring token is the runner’s 50 ms loop, not the painted ring.',
+    '- **Rounds after the first have no independent check.** The correlator and its manifests cover round 1. In later rounds the suite judges what the app played — that it sounded, whole, clear of its ring — and fails a clip the app itself logged it could not play. Nothing says what a later round should have played.',
     '- **The tablet’s audio path is not judged here.** Its timing analyzer refuses a capture from a browser.',
     '',
   )
@@ -318,7 +385,9 @@ async function runJob({ job, args, executable, baseUrl, suiteId, suiteDir, hostS
   const dir = path.join(suiteDir, job.dirName)
   const manifestPath = path.join(MANIFESTS_DIR, job.manifestFile)
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
-  const budget = budgetMs(manifest, { firstRoundOnly: !args.full })
+  // A round-1 run goes on through the rest that follows, to the next bell.
+  const firstRest = args.full ? 0 : (manifest.scheduleMs?.[0]?.restMs ?? 0)
+  const budget = budgetMs(manifest, { firstRoundOnly: !args.full }) + firstRest
   const nonce = `pc-${suiteId}-${job.dirName}`
   // Several drives run at once, so a drive's lines are kept and printed
   // together when it is done; only its start is announced as it happens.
@@ -350,6 +419,8 @@ async function runJob({ job, args, executable, baseUrl, suiteId, suiteDir, hostS
       'utf8',
     )
   }
+  const rings = ringReport(drive.records)
+  writeFileSync(path.join(dir, 'rings-report.json'), JSON.stringify(rings, null, 2) + '\n', 'utf8')
   // A drive that never reached a round has nothing for the correlator to read.
   const reached = driveState(drive.records).workEntered
   const judged = reached
@@ -362,6 +433,7 @@ async function runJob({ job, args, executable, baseUrl, suiteId, suiteDir, hostS
     nonce,
     sound: sound ? soundVerdict(sound, { floorRatio: FLOOR_BREACH_SOFT_RATIO }) : null,
     soundGate: args.soundGate,
+    rings: reached ? ringVerdict(rings) : null,
   })
   const row = {
     workoutId: job.workoutId,
@@ -387,7 +459,9 @@ async function runJob({ job, args, executable, baseUrl, suiteId, suiteDir, hostS
     visibility: drive.visibility,
     pageProblems: drive.problems,
     lateness: lateness(drive.records),
+    admissions: admissions(drive.records),
     sound,
+    rings,
     recorded: drive.recorded,
     elapsedMs: drive.elapsedMs,
   }
@@ -402,6 +476,9 @@ async function runJob({ job, args, executable, baseUrl, suiteId, suiteDir, hostS
       `   sound: ${sound.clips.heard} of ${sound.clips.played} clips heard · last sound → ring ${ms(gap.minMs)} least, ${ms(gap.medianMs)} median · ${sound.clips.silent.length} silent · ${sound.clips.cutShort.length} cut short`,
     )
   }
+  lines.push(
+    `   rings: ${rings.lit} of ${rings.rings} lit · painted ${ms(rings.paintedLate.medianMs)} ms after their time (most ${ms(rings.paintedLate.maxMs)})`,
+  )
   for (const reason of reasons) lines.push(`   ! ${reason}`)
   console.info(lines.join('\n'))
   return row
@@ -467,7 +544,7 @@ async function main() {
   const served = await serveWebApp({ port: 0 })
   args.jobs ??= defaultJobs()
   console.info(
-    `PC suite ${suiteId}: ${jobs.length} drive(s), ${args.full ? 'whole workouts' : 'round 1'}, ${args.jobs} at a time → ${suiteDir}`,
+    `PC suite ${suiteId}: ${jobs.length} drive(s), ${args.full ? 'whole workouts' : 'round 1 and its rest'}, ${args.jobs} at a time → ${suiteDir}`,
   )
   let rows
   try {

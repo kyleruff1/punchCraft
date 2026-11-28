@@ -176,6 +176,11 @@ export default function QaRunLauncher(): React.JSX.Element {
       // the tablet's.
       platform: safe(build.platform),
       platformVersion: safe(String(build.platformVersion)),
+      // …and whether that device is an emulator. An emulator on the PC is a
+      // PC: the analyzer refuses its capture as well (findings doc, N-19).
+      // The model is there so a refusal can be checked by eye.
+      emulator: safe(build.emulator),
+      deviceModel: safe(build.deviceModel ?? null),
       installationId: safe(build.installationId ?? null),
     })
     setOutcome({

@@ -145,6 +145,21 @@ describe('work axis fit', () => {
     const r1 = report.fit.find((r) => r.roundIndex === 1)
     expect(r1).toMatchObject({ offsetMs: 310000, boundaryOffsetMs: 310000, disagreementMs: 0 })
   })
+  it('notes an opening boundary that trails its fit, and says what the gap can hold', () => {
+    // Round 0's boundary record 68 ms after its work clock's zero — the shape
+    // of round 1 in a September tablet capture (findings doc, N-18).
+    const opening = (monotonicTimeMs) => rec('10:00:10.000', 'workout.round.boundary', { transition: 'work-entered', roundIndex: 0, workElapsedMs: 0, monotonicTimeMs })
+    const text = capture().replace(opening(10000), opening(10068))
+    expect(text).not.toBe(capture())
+    const report = analyze(text, CONSTANTS)
+    expect(report.fit.find((r) => r.roundIndex === 0)).toMatchObject({ offsetMs: 10000, boundaryOffsetMs: 10068, disagreementMs: 68 })
+    const note = report.notes.find((n) => n.startsWith('round 0: the work-entered boundary trails the tokenDue fit by 68 ms'))
+    // A note, not a warning — and no longer explained away as log latency.
+    expect(note).toMatch(/N-18/)
+    expect(note).not.toMatch(/log site/)
+    expect(report.verdict.soft.some((s) => s.startsWith('round 0: tokenDue fit'))).toBe(false)
+    expect(report.verdict.hard.some((s) => s.startsWith('round 0: tokenDue fit'))).toBe(false)
+  })
   it('falls back to the boundary when a round has no tokenDue', () => {
     const fit = fitWorkAxis([], [{ transition: 'work-entered', roundIndex: 0, workElapsedMs: 0, monotonicTimeMs: 500 }])
     expect(fit.get(0)).toMatchObject({ offsetMs: 500, n: 0, source: 'boundary' })
@@ -536,6 +551,25 @@ describe('a capture the tablet did not write', () => {
     expect(() => analyze(named, CONSTANTS)).toThrow(NotATabletCapture)
   })
 
+  // The same fixture with the QA run record naming its device.
+  const naming = (...fields) => {
+    const named = capture().replace("gitSha: 'abc1234'", ["gitSha: 'abc1234',", ...fields.map((f) => `08-31 10:00:00.000 I/ReactNativeJS( 8286):   ${f}`)].join('\n'))
+    expect(named).not.toBe(capture())
+    return named
+  }
+  const fromAnEmulator = () => naming("platform: 'android',", 'emulator: true,', "deviceModel: 'sdk_gphone64_x86_64'")
+
+  it('refuses an Android emulator’s capture — a real Android log, and this PC’s audio path', () => {
+    // 2026-11-27: taken for the tablet's, it proposed CALL_DISPATCH_LAG_MS 71 → 28.
+    expect(() => analyze(fromAnEmulator(), CONSTANTS)).toThrow(NotATabletCapture)
+    expect(() => analyze(fromAnEmulator(), CONSTANTS)).toThrow(/written on "android-emulator", not on the tablet/)
+  })
+
+  it('still analyzes a real device that says it is one', () => {
+    const real = naming("platform: 'android',", 'emulator: false,', "deviceModel: 'SM-X200'")
+    expect(analyze(real, CONSTANTS).breath.calls).toBe(analyze(capture(), CONSTANTS).breath.calls)
+  })
+
   it('still analyzes a capture that names the tablet, and one that names nothing', () => {
     const named = capture().replace("gitSha: 'abc1234'", "gitSha: 'abc1234',\n08-31 10:00:00.000 I/ReactNativeJS( 8286):   platform: 'android'")
     expect(named).not.toBe(capture())
@@ -557,6 +591,14 @@ describe('a capture the tablet did not write', () => {
       const result = run(fromThePc())
       expect(result.status).toBe(3)
       expect(result.stderr).toMatch(/not on the tablet/)
+      expect(result.stdout).toBe('')
+      expect(readdirSync(dir)).toEqual(['logcat.txt'])
+    })
+
+    it('does the same for an emulator’s capture', () => {
+      const result = run(fromAnEmulator())
+      expect(result.status).toBe(3)
+      expect(result.stderr).toMatch(/written on "android-emulator", not on the tablet/)
       expect(result.stdout).toBe('')
       expect(readdirSync(dir)).toEqual(['logcat.txt'])
     })

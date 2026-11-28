@@ -358,6 +358,71 @@ describe.each([0, 1_000, 3_600_000, 86_400_000])(
       expect(h.session.workElapsedAt(h.clock.now())).toBe(0)
     })
 
+    it('opens the round at the skip, not at the tick before it', () => {
+      // The intro does not end on a tick. The 30 ms since the last one was
+      // lead-in; none of it is work. Counting it put the work clock — which
+      // schedules the calls and scores the punches — ahead of the bell for
+      // the whole round.
+      const h = at(3_000)
+      h.session.start()
+      h.run(1_000)
+      h.clock.advance(30)
+      h.session.skipCountdown()
+      expect(h.session.workElapsedAt(h.clock.now())).toBe(0)
+
+      h.clock.advance(20)
+      h.session.advance()
+      expect(h.session.snapshot().workElapsedMs).toBe(20)
+      expect(h.session.workElapsedAt(h.clock.now())).toBe(20)
+    })
+
+    it('opens the next round at the skip of a rest, not at the tick before it', () => {
+      const h = at()
+      h.session.start()
+      h.run(10_000 + 1_000)
+      h.clock.advance(30)
+      h.session.skipRest()
+      expect(h.session.snapshot().roundIndex).toBe(1)
+      expect(h.session.workElapsedAt(h.clock.now())).toBe(0)
+
+      h.clock.advance(20)
+      h.session.advance()
+      expect(h.session.snapshot().workElapsedMs).toBe(20)
+      expect(h.session.workElapsedAt(h.clock.now())).toBe(20)
+    })
+
+    it('gives a round opened by a skip its whole length', () => {
+      // The same head start, seen from the other end: the round would close
+      // that much before its time.
+      const h = at(3_000)
+      h.session.start()
+      h.run(1_000)
+      h.clock.advance(30)
+      h.session.skipCountdown()
+
+      h.clock.advance(9_999)
+      h.session.advance()
+      expect(h.session.snapshot().phase).toBe('work')
+      expect(h.session.snapshot().phaseRemainingMs).toBe(1)
+
+      h.clock.advance(1)
+      h.session.advance()
+      expect(h.session.snapshot().phase).toBe('rest')
+    })
+
+    it('ends the session, and nothing else, when the last rest is skipped between ticks', () => {
+      const h = at()
+      const lastRest: SessionRoundSpec[] = [{ workDurationMs: 1_000, restAfterMs: 5_000 }]
+      const session = new WorkoutSessionClock(lastRest, { clock: h.clock, countdownMs: 0 })
+      session.start()
+      h.clock.advance(1_000)
+      session.advance()
+      expect(session.snapshot().phase).toBe('rest')
+      h.clock.advance(30)
+      expect(session.skipRest().map((t) => t.type)).toEqual(['completed'])
+      expect(session.workElapsedAt(asMonotonicMs(h.clock.now() + 500))).toBe(1_000)
+    })
+
     it('agrees with the ring projection, so scoring and the rings share one rule', () => {
       // `SharedWorkClock` is the UI thread's copy of this clock. The two are
       // written separately (one is a worklet), so this pins them together.

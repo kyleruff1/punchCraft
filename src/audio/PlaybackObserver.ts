@@ -24,6 +24,12 @@
  * teardown. The observer never creates players, never calls into a player
  * it has been told to forget, and holds one listener and one timer at a
  * time — flag off, it is never constructed at all.
+ *
+ * Everything above is the tablet. A browser's player says different things
+ * with the same fields — `playing: true` the moment play is asked for — so
+ * the PC build hands the observer a reading of its own (`readStatus`,
+ * supplied by `observedStatus.web.ts`). The tablet build supplies none and
+ * every status reaches `onStatus` exactly as it arrived.
  */
 
 export type ObservedKind =
@@ -47,6 +53,14 @@ export interface StatusLike {
   duration?: number
   currentIndex?: number
 }
+
+/**
+ * How one platform's status is to be read: the statuses the observer should
+ * see in its place — none to ignore it, the same one to pass it on, two when
+ * a single report covers both a start and a stop. `started` is whether the
+ * play being watched has an onset yet.
+ */
+export type StatusReading = (status: StatusLike, started: boolean) => readonly StatusLike[]
 
 type Subscription = { remove?: () => void } | (() => void) | undefined | void
 
@@ -102,6 +116,11 @@ export interface PlaybackObserverOptions {
   pollIntervalMs?: number
   /** Which event carries status on this player kind. Default `playbackStatusUpdate`. */
   statusEvent?: string
+  /**
+   * A platform's own reading of a status event, applied before the observer
+   * sees it. Absent — the tablet — every status is read as it arrives.
+   */
+  readStatus?: StatusReading
 }
 
 interface Entry {
@@ -172,6 +191,7 @@ export class PlaybackObserver {
   private readonly endGraceMs: number
   private readonly pollIntervalMs: number
   private readonly statusEvent: string
+  private readonly readStatus: StatusReading | undefined
 
   private readonly players = new Map<ObservablePlayer, PlayerState>()
   /** The one deadline timer, re-armed to the earliest pending deadline. */
@@ -191,6 +211,7 @@ export class PlaybackObserver {
     this.endGraceMs = opts.endGraceMs ?? 2_000
     this.pollIntervalMs = opts.pollIntervalMs ?? 25
     this.statusEvent = opts.statusEvent ?? 'playbackStatusUpdate'
+    this.readStatus = opts.readStatus
   }
 
   /**
@@ -271,7 +292,13 @@ export class PlaybackObserver {
     if (typeof player.addListener === 'function') {
       try {
         state.subscription = player.addListener(statusEvent, (status) => {
-          this.onStatus(state, status)
+          if (this.readStatus === undefined) {
+            this.onStatus(state, status)
+            return
+          }
+          const entry = state.entry
+          const started = entry !== null && !entry.closed && entry.onsetMs !== null
+          for (const each of this.readStatus(status, started)) this.onStatus(state, each)
         })
         if (state.subscription !== undefined) return
       } catch {

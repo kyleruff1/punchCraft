@@ -57,8 +57,9 @@ import {
   waitForLogLine,
   waitForUiTarget,
 } from './drive-workout-first-round.mjs'
-import { boolField, extractField, recordsWithTag } from './logcat.mjs'
+import { EMULATOR_PLATFORM, boolField, capturePlatform, extractField, recordsWithTag } from './logcat.mjs'
 import { renderObservedTable, summarizeObserved } from './observed-summary.mjs'
+import { fitWorkAxis, parseBoundaries, parseTokenDue } from './observed-timing.mjs'
 import { parseLogcat } from './verify-first-round.mjs'
 
 // `import.meta.url` is null under jest's CommonJS transform (cwd = repo root there).
@@ -279,6 +280,60 @@ export function timingVerdictFromExit(code, gate) {
   }
 }
 
+/**
+ * Whether adb's device is an emulator — asked of the device, not the capture.
+ *
+ * The capture can say so itself (`capturePlatform`), but only from a build
+ * new enough to carry the field; an old release APK installed in an emulator
+ * to test an upgrade says nothing. The device always knows: adb names every
+ * emulator `emulator-<port>`, and its image sets `ro.kernel.qemu` and
+ * `ro.build.characteristics`.
+ *
+ * @param {{ serial?: string, qemu?: string, characteristics?: string }} [device]
+ */
+export function isEmulatorDevice({ serial, qemu, characteristics } = {}) {
+  return (
+    /^emulator-[0-9]+$/.test(String(serial ?? '').trim()) ||
+    String(qemu ?? '').trim() === '1' ||
+    String(characteristics ?? '').split(',').some((c) => c.trim() === 'emulator')
+  )
+}
+
+/**
+ * Why a drive's timing is not judged, or `null` when the capture is the
+ * tablet's and it is.
+ *
+ * The timing analyzer describes the tablet's audio path and proposes the
+ * tablet's constants. An emulator on this PC is a PC (findings doc, N-19):
+ * on 2026-11-27 this suite ran the analyzer on one, and it proposed
+ * `CALL_DISPATCH_LAG_MS` 71 → 28. So for anything but the tablet the
+ * analyzer is not run at all — the drive keeps its correlator verdict, and
+ * the summary shows the work axis in its place.
+ */
+export function timingRefusal({ platform, deviceIsEmulator }) {
+  if (deviceIsEmulator || platform === EMULATOR_PLATFORM) return 'the device is an emulator, and an emulator on this PC is a PC'
+  if (platform !== 'android') return `the capture was written on "${platform}", not on the tablet`
+  return null
+}
+
+/**
+ * The work axis of a capture, one line per round: how many ring tokens place
+ * the round's work clock, how tightly, and how far the work-entered boundary
+ * record trails that clock's zero.
+ *
+ * This is the app's own two clocks and nothing else — no audio is in it —
+ * so it means on an emulator what it means on the tablet, and it is what is
+ * shown for a drive whose timing is not judged. A round whose boundary sits
+ * well behind the others' is N-18 (a round opened by a skip starting its work
+ * clock early).
+ */
+export function workAxisLines(logcatText) {
+  const fit = fitWorkAxis(parseTokenDue(logcatText), parseBoundaries(logcatText))
+  return [...fit.values()]
+    .sort((a, b) => a.roundIndex - b.roundIndex)
+    .map((r) => `round ${r.roundIndex}: ${r.n} ring tokens place the work clock (spread ${r.spreadMs} ms) · boundary record ${r.disagreementMs ?? '—'} ms after its zero`)
+}
+
 /** The more severe of two verdicts, by `aggregateVerdicts`' own ordering. */
 export function worstVerdict(a, b) {
   const rank = (v) => (v === 'FAIL' || v === 'ERROR' ? 3 : v === 'STALE' ? 2 : v === 'WARN' ? 1 : 0)
@@ -408,7 +463,7 @@ export function renderSummaryMd(rows, meta) {
   lines.push(`# Suite ${meta.suiteId}`)
   lines.push('')
   lines.push(
-    `device ${meta.deviceId} · ${meta.launch} launch · vocab ${meta.vocab} · sim ${meta.sim} · ${meta.firstRoundOnly ? 'first round only' : 'full sessions'} · timing gate ${meta.timingGate ?? 'warn'} · ${rows.length} drives · exit ${meta.exitCode}`,
+    `device ${meta.deviceId}${meta.deviceIsEmulator ? ' (an emulator)' : ''} · ${meta.launch} launch · vocab ${meta.vocab} · sim ${meta.sim} · ${meta.firstRoundOnly ? 'first round only' : 'full sessions'} · timing gate ${meta.timingGate ?? 'warn'} · ${rows.length} drives · exit ${meta.exitCode}`,
   )
   lines.push('')
   // "voice onset (status event, ms)" — NOT the audible onset. This column is
@@ -442,10 +497,24 @@ export function renderSummaryMd(rows, meta) {
     const breath = f ? `${f.minBreathMs ?? '—'} / ${f.p5BreathMs ?? '—'}` : '—'
     const past = f ? String(f.barsAtOrPastPunch) : '—'
     const under = f ? `${f.barsUnderFloor}/${f.n}${f.barsUnderFloorRatio === null ? '' : ` (${Math.round(f.barsUnderFloorRatio * 1000) / 10}%)`}` : '—'
-    const timing = r.timingVerdict ? `${r.timingExit ?? '—'} ${r.timingVerdict}` : '—'
+    const timing = r.timingRefusal ? 'not judged' : r.timingVerdict ? `${r.timingExit ?? '—'} ${r.timingVerdict}` : '—'
     lines.push(
       `| ${r.workoutId} | ${r.vocab} | ${r.verdict} | ${r.reason ?? ''} | ${r.verifyExit ?? '—'} | ${timing} | ${breath} | ${past} | ${under} | ${r.stats ?? '—'} | ${voice || '—'} | ${inst} | ${tracks} | ${Math.round((r.elapsedMs ?? 0) / 1000)}s |`,
     )
+  }
+  const refused = rows.filter((r) => r.timingRefusal)
+  if (refused.length > 0) {
+    lines.push('')
+    lines.push('### Timing — not judged')
+    lines.push('')
+    lines.push(
+      `Not judged: ${[...new Set(refused.map((r) => r.timingRefusal))].join('; ')}. The timing analyzer was not run, so there is no breath, floor or proposal here, ` +
+        "and every onset figure in the table is this machine's — **no tablet constant is set from any of them**. " +
+        "What stands on any device is the verdict, the correlator, and the work axis below: the app's own two clocks, with no audio in it. " +
+        "A round whose boundary record sits well behind the others' is a work clock that started early (findings doc, N-18).",
+    )
+    lines.push('')
+    for (const r of refused) for (const line of r.workAxis ?? []) lines.push(`- **${r.workoutId} (${r.vocab})** — ${line}`)
   }
   const hardRows = rows.filter((r) => (r.timingHard?.length ?? 0) > 0)
   if (hardRows.length > 0) {
@@ -576,6 +645,10 @@ async function driveOne(ctx, job, attempt = 1) {
     verifyExit: null,
     timingExit: null,
     timingVerdict: null,
+    /** Why timing was not judged (an emulator, a PC capture); null when it was. */
+    timingRefusal: null,
+    /** The work-axis lines shown in its place. */
+    workAxis: null,
     timingHard: null,
     timingSoft: null,
     breathFloor: null,
@@ -816,7 +889,21 @@ async function driveOne(ctx, job, attempt = 1) {
       //
       // It runs AFTER the STALE retry path above returns, so a re-driven
       // workout is analyzed once, on the capture that was actually judged.
-      if (args.timingGate !== 'off') {
+      //
+      // Only on the tablet's own capture. Anything else — an emulator, which
+      // is this PC — is not analyzed at all, rather than analyzed and the
+      // proposals hidden: every figure in that report stands on a constant
+      // measured on the tablet. The drive keeps its correlator verdict.
+      const captureText = readFileSync(join(dir, 'logcat.txt'), 'utf8')
+      const refusal = timingRefusal({ platform: capturePlatform(captureText), deviceIsEmulator: ctx.deviceIsEmulator === true })
+      if (refusal !== null) {
+        row.timingVerdict = 'NOT JUDGED'
+        row.timingRefusal = refusal
+        row.workAxis = workAxisLines(captureText)
+        slog(`   timing not judged — ${refusal}`)
+        for (const line of row.workAxis) slog(`   work axis · ${line}`)
+      }
+      if (refusal === null && args.timingGate !== 'off') {
         const timing = spawnSync(
           'node',
           [join(REPO_ROOT, 'tools', 'analysis', 'observed-timing.mjs'), '--session', dir],
@@ -951,9 +1038,18 @@ async function main() {
     suiteLog.write(line + '\n')
   }
   const deviceId = pickDevice(args.device)
-  const ctx = { args, deviceId, slog, suiteDir, suiteId, hostSha, rows: [], activeCleanup: null }
+  const prop = (name) => {
+    try {
+      return adbShell(`getprop ${name}`, deviceId)
+    } catch {
+      return ''
+    }
+  }
+  const deviceIsEmulator = isEmulatorDevice({ serial: deviceId, qemu: prop('ro.kernel.qemu'), characteristics: prop('ro.build.characteristics') })
+  const ctx = { args, deviceId, deviceIsEmulator, slog, suiteDir, suiteId, hostSha, rows: [], activeCleanup: null }
   slog(`suite ${suiteId} · device ${deviceId} · ${jobs.length} drives · launch ${args.launch} · host sha ${hostSha}`)
   if (args.expectRelease) slog('expecting a RELEASE build (qa.run must report dev=false); swap back with `npm run android` afterwards')
+  if (deviceIsEmulator) slog('this device is an EMULATOR — verdicts and the work axis stand; timing is not judged, and no tablet constant is set from anything it reports')
 
   const restoreVolume = args.keepVolume ? null : muteForSuite(deviceId, slog)
   let restored = false
@@ -997,12 +1093,15 @@ async function main() {
       sim: args.sim,
       firstRoundOnly: args.firstRoundOnly,
       timingGate: args.timingGate,
+      deviceIsEmulator,
       exitCode,
     })
     writeFileSync(join(suiteDir, 'summary.md'), md, 'utf8')
     writeFileSync(join(suiteDir, 'summary.json'), JSON.stringify({ suiteId, deviceId, args, exitCode, rows: ctx.rows }, null, 2) + '\n', 'utf8')
     console.log('\n' + md)
-    if (args.ghLedger) ghLedger(judged, ctx)
+    // The ledger is the record of TABLET test-drives. An emulator's is not one.
+    if (args.ghLedger && deviceIsEmulator) slog('ledger: not appended — an emulator drive is not a tablet test-drive')
+    else if (args.ghLedger) ghLedger(judged, ctx)
     slog(`done · exit ${exitCode} · ${join(suiteDir, 'summary.md')}`)
   } finally {
     restore()

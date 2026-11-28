@@ -201,6 +201,21 @@ export function installSoundTap(scope, binding, workletSource, record) {
         emit({ id, type, atMs: clock.now(), ...describe(element) }),
       )
     }
+    // The element's own account of trouble. Nothing is judged from these;
+    // they are what explains a clip that sat without playing.
+    for (const type of ['waiting', 'stalled', 'suspend', 'error', 'abort']) {
+      element.addEventListener(type, () =>
+        emit({
+          id,
+          type,
+          atMs: clock.now(),
+          positionMs: element.currentTime * 1000,
+          readyState: element.readyState,
+          networkState: element.networkState,
+          error: element.error ? `${element.error.code}: ${element.error.message}` : null,
+        }),
+      )
+    }
     if (ready) connect(element, id)
     else waiting.push([element, id])
     return id

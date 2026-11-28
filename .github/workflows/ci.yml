@@ -104,21 +104,34 @@ jobs:
   # sound card would start its audio at all, and how late a shared
   # four-processor machine would send clips.
   #
-  # Its first two runs (2026-11-27, on the pull request that added it and on
-  # `main` after the merge) answered both, once each: the audio started, all
-  # 81 clips of the workout were heard, and the least gap before a ring was
-  # 365 and 373 ms — against 376 on a 16-processor PC. Each run took just
-  # under seven minutes.
+  # Both are answered (2026-11-27). Three runs of one workout: the audio
+  # started, all 81 clips were heard, and the least gap before a ring was 365
+  # to 373 ms — against 376 on a 16-processor PC — in just under seven
+  # minutes each. Then the manual run of all 22: 22 of 22 passed, two at a
+  # time, in 52 minutes; every clip heard, none silent or cut; least gap
+  # before a ring 262 ms (247 on that PC); parity with the tablet the same
+  # as on the PC — 12 identical, 10 skipped for re-recorded clips, none
+  # different.
   #
-  # Two runs of one workout are not a baseline. So what is heard still only
-  # warns here (`--sound-gate warn`) and the job stays out of the gate until
-  # it has held for a while. If a runner ever will not start its audio, the
-  # suite says the sound tap did not start, warns, and judges the rest. The
-  # manual run of all 22 has not been tried.
+  # So what is heard is judged here as it is on a PC: a clip that makes no
+  # sound, one cut short, or a call still sounding at its ring is a FAIL in
+  # the summary. Until then this ran with `--sound-gate warn`, which called
+  # the same findings WARN; the step went red on either, so what changed is
+  # what the summary says, not whether the job passes. If a runner ever will
+  # not start its audio, the suite says the sound tap did not start, warns,
+  # and judges the rest.
+  #
+  # Not yet seen on a runner: the rest that now follows round 1 in every
+  # drive (the bell, the rest line, the countdown), and the rings — whether
+  # each one lit, and how late it was painted. A ring painted more than
+  # 100 ms late warns, and a shared four-processor machine may well do that.
+  # That is one reason the job stays out of the gate until it has held for a
+  # while.
   pc-sync:
     name: pc sync (advisory)
     runs-on: ubuntu-latest
-    # A workout is five minutes of real time; all 22, two at a time, about an hour.
+    # A drive is round 1 and the rest after it, five to six minutes of real
+    # time; all 22, two at a time, a little over an hour.
     timeout-minutes: ${{ github.event_name == 'workflow_dispatch' && 150 || 30 }}
     continue-on-error: true
     steps:
@@ -131,7 +144,7 @@ jobs:
           cache: 'npm'
       - run: npm ci
       - name: Drive the PC suite
-        run: npm run pc:suite -- --sound-gate warn ${{ github.event_name != 'workflow_dispatch' && '--only quick-one-two' || '' }}
+        run: npm run pc:suite ${{ github.event_name != 'workflow_dispatch' && '-- --only quick-one-two' || '' }}
       - name: Compare what it said with the tablet
         if: ${{ !cancelled() }}
         run: npm run pc:parity

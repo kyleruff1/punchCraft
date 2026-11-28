@@ -54,6 +54,84 @@ Enable Developer Options → USB debugging, then verify:
 adb devices -l
 ```
 
+## An Android emulator, when there is no tablet
+
+A release build of the app runs in an Android emulator on this PC. First
+done 2026-11-27.
+
+**What it is good for:** the app's native path with nothing attached —
+Hermes, the UI-thread ring clock, the native audio players, expo-sqlite and
+its migrations, the QA deep link, and the tablet's own verify suite.
+
+**What it is not:** the tablet.
+
+- No gloves. It has no Bluetooth; the app asks for the permission twice
+  (at launch and on the live screen) and the second prompt holds the workout
+  until it is answered. Decline both.
+- **Every timing figure from it is a PC number.** Its processor and audio
+  path are this PC's, and no tablet constant is set from an emulator. The
+  tooling enforces most of that (N-19 in the findings doc): the app's QA run
+  record says `emulator: true`, `observed-timing.mjs` refuses such a
+  capture, and the verify suite asks the device and does not run the timing
+  analyzer for one. **Not enforced:** a capture taken by hand from an
+  emulator running a build older than `38d556f9` — an old APK installed to
+  test an upgrade — says nothing about its device. Do not analyze one.
+
+**The device.** AVD `punchcraft-emu`: Pixel Tablet profile (2560×1600),
+Android 15 (API 35, Google APIs, x86_64), 4 GB. `helioscape-dev`
+(`emulator-5554`) is another project's — leave it alone.
+
+```bash
+emulator -avd punchcraft-emu -no-window -no-snapshot -no-boot-anim -gpu host -port 5556   # → emulator-5556
+adb -s emulator-5556 emu kill                                                            # stop it
+```
+
+(`emulator` is `%ANDROID_HOME%emulatoremulator.exe`; it is not on the PATH.)
+
+**The build.** x86_64, the emulator's processor — four minutes here.
+
+```bash
+cd android && ./gradlew assembleRelease -PreactNativeArchitectures=x86_64 && cd ..
+adb -s emulator-5556 install -r android/app/build/outputs/apk/release/app-release.apk
+```
+
+*From a worktree:* `android/` is git-ignored and exists only in the main
+checkout. Copy its sources into the worktree — everything except
+`app/build`, `app/.cxx`, `.gradle` and `build` — and build there. Node
+finds `node_modules` by walking up to the main checkout's, so the native
+modules' build output lands there. The first such build also set
+`externalNativeBuild { cmake { buildStagingDirectory 'F:/pcx-n18' } }` in
+the copy's `android { }` block, against Windows's path limit (a worktree's
+root is 43 characters longer); whether it was needed was not tested.
+
+**Driving it.** QA mode must be on — Settings → QA mode, once per install.
+The suite mutes the emulator and restores it.
+
+```bash
+node tools/analysis/verify-suite.mjs --only=quick-one-two --device=emulator-5556 --expect-release --out=tools/analysis/suites/<name>
+```
+
+On an emulator the suite reports the verdict and the correlator's stats,
+marks timing "not judged", and prints the **work axis** in its place — per
+round, how many ring tokens place the work clock and how far the
+work-entered boundary record trails its zero. Those are the app's own two
+clocks with no audio in them, and they mean on an emulator what they mean
+on the tablet. The onset columns of its table are this PC's.
+
+**Reading the database.** The image is a userdebug one, so:
+
+```bash
+adb -s emulator-5556 root
+adb -s emulator-5556 shell sqlite3 /data/data/com.kyleruff.punchcraft/files/SQLite/punchcraft.db "SELECT id FROM schema_migrations"
+```
+
+**Testing an upgrade.** `artifacts/` in the main checkout holds September's
+release APKs, built for every processor, x86_64 included. Install one, run
+a workout to the end, then install the new build over it (`-r`: same id,
+same debug keystore, so the data stays). The new build's migrations then
+run on a database an old build wrote. An old build's QA link could still
+switch QA mode on, and the switch survives the upgrade.
+
 ## Installing SDK components (after Story 1 lock)
 
 If the spike locks Expo SDK 57 as expected, install what its Android template needs and accept licenses:
@@ -93,7 +171,7 @@ Added 2026-11-25. Everything here runs on the workstation with no tablet.
 | `npm run pc:glove-check` | Serves the PC glove check on `http://127.0.0.1:8787/` (loopback only; `PORT=` moves it). Open it in Chrome or Edge. See below. |
 | `npm run pc:app` | Builds the app for a browser and serves it on `http://127.0.0.1:8788/` (loopback only; `PORT=` moves it; `-- --no-build` serves the last build). See below. |
 | `npm run pc:smoke` | Builds, then drives the PC app in a headless Chrome or Edge: boot, a workout on simulated punches, stop, save, reload, the saved database read back out of the browser, then History and the session's summary. Fails on any error on the page. About a minute after the build. Also runs in CI as an advisory job. |
-| `npm run pc:suite` | The tablet's verify suite on the PC: drives every sample workout in a headless browser (round 1; `-- --full` for whole workouts; `-- --only a,b`), has the tablet's correlator judge each, and listens to what the page plays. All 22 take about 20 minutes, six at a time. Builds first, replacing `dist/pc-app/` — do not run `pc:app` or `pc:smoke` beside it. See `tools/pc/suite/README.md`. |
+| `npm run pc:suite` | The tablet's verify suite on the PC: drives every sample workout in a headless browser (round 1 and the rest after it; `-- --full` for whole workouts; `-- --only a,b`), has the tablet's correlator judge each, listens to what the page plays — calls, bells, intro, countdown, rest line — and checks that every ring lit. All 22 take about 22 minutes, six at a time; `--full` is 10 to 20 minutes a workout. Builds first, replacing `dist/pc-app/` — do not run `pc:app` or `pc:smoke` beside it. See `tools/pc/suite/README.md`. |
 | `npm run pc:parity` | Compares the newest `pc:suite` run with the tablet reference (`tools/pc/suite/tablet-reference/`): what was said, in what order, at what scheduled time. `-- --build-reference <tablet suite folder>` rebuilds the reference after a tablet suite run. |
 | `npm run tablet:reload` | Restarts Metro, cold-restarts the app on the tablet, waits for it to come up. `--no-metro` restarts only the app; `--dry-run` says what it would do. **Not yet proven on the device** — see the script's header. |
 

@@ -451,26 +451,40 @@ function tally(items, key) {
 /**
  * Thrown for a capture the tablet did not write.
  *
- * Everything this tool reports rests on two facts about the tablet's audio
- * path: the playback observer's "playing" event means something there, and it
- * runs `OBSERVER_ONSET_SKEW_MS` ahead of the sound. Neither holds in a
- * browser. expo-audio's web player reports "playing" the moment play is
- * requested, and it swaps its audio element under a `downloadFirst` clip,
- * which the observer reads as a play a few milliseconds long.
+ * Everything this tool reports rests on one measured fact about the tablet's
+ * audio path: there, the playback observer's "playing" event runs
+ * `OBSERVER_ONSET_SKEW_MS` ahead of the sound. Every onset is corrected by
+ * that constant, and every proposal is a tablet constant. A browser has a
+ * different audio path and a different latency, and no such figure has been
+ * measured for it — so a PC capture would have the tablet's correction
+ * applied to another machine's numbers, and tablet constants proposed from
+ * the result.
  *
  * Run on a PC capture (2026-11-26, quick-one-two round 1) this tool reported
  * five clips cut short that a direct measurement of the sound showed playing
- * in full, and proposed moving `CALL_DISPATCH_LAG_MS` from 71 to 28.
+ * in full, and proposed moving `CALL_DISPATCH_LAG_MS` from 71 to 28. Part of
+ * that was the observer itself, which then read a browser's statuses as the
+ * tablet's; it has had a reading of its own since 2026-11-27
+ * (`src/audio/observedStatus.web.ts`). The refusal does not rest on that and
+ * did not go with it: what the PC's observer says is checked on the PC, by
+ * the PC suite, against the sound (`tools/pc/suite/observer.mjs`).
+ *
+ * An Android emulator on the PC is the same case by another door
+ * (`'android-emulator'`): a real Android capture, and this PC's audio path.
+ * Before the QA run record said which it was, an emulator's capture was
+ * analyzed here as the tablet's (2026-11-27) and `CALL_DISPATCH_LAG_MS` was
+ * proposed at 28 against 71, with `CLICK_SCRIPT_PREARM_PAD_MS` at 180 against
+ * 200 — the same wrong 28 a PC capture had produced the day before.
  *
  * So it refuses, whole. Hiding only the proposals would leave the findings,
- * and they stand on the same two facts.
+ * and they stand on the same constant.
  */
 export class NotATabletCapture extends Error {
   constructor(platform) {
     super(
       `this capture was written on "${platform}", not on the tablet. observed-timing judges the tablet's audio path: ` +
-        `every figure rests on the tablet's measured start latency (OBSERVER_ONSET_SKEW_MS, ${OBSERVER_ONSET_SKEW_MS} ms), ` +
-        'and anywhere else the playback observer reports "started" the moment play is requested. ' +
+        `every onset is corrected by the tablet's measured start latency (OBSERVER_ONSET_SKEW_MS, ${OBSERVER_ONSET_SKEW_MS} ms) ` +
+        'and every proposal is a tablet constant; neither means anything for another machine. ' +
         'Nothing is reported and no constant is proposed from it.',
     )
     this.name = 'NotATabletCapture'
@@ -524,15 +538,25 @@ export function analyze(text, constants = null) {
   }
   for (const round of fit.values()) {
     if (round.disagreementMs === null) continue
-    // A round's OWN opening boundary carries `workElapsedMs: 0` — the session
-    // clock has not advanced yet — so the whole disagreement there is the gap
-    // between the transition firing and the log record being written, not two
-    // clocks disagreeing. Warning on it made every capture report a ~78 ms
-    // "clock disagreement" that was the log site's own latency.
+    // A round's OWN opening boundary carries `workElapsedMs: 0`, and its
+    // record is written after the bell has been sent. So the gap there is not
+    // two clocks disagreeing about the same instant, and it is a note rather
+    // than a warning — warning on it made every capture report one.
+    //
+    // What the gap IS depends on the build. This comment used to file all of
+    // it as "the log site's own latency", and that is how a real fault sat in
+    // every report from September to November unread (findings doc, N-18):
+    // a round opened by a skip — round 1 always is, the intro ends ahead of
+    // the lead-in's cap — started its work clock at the tick BEFORE the skip,
+    // so the calls, the ring tokens and the scoring ran that far ahead of the
+    // bell. Across the September suite the gap is 43 to 87 ms in round 1 and
+    // 7 to 22 ms in later rounds; the 7 to 22 is the bell being sent, the
+    // rest was the head start. Fixed 2026-11-27. On a build with the fix, a
+    // round-1 gap well above the later rounds' is that fault back.
     const opensTheRound = round.boundaryWorkElapsedMs === 0
     if (round.disagreementMs > FIT_DISAGREEMENT_HARD_MS) hard.push(`round ${round.roundIndex}: tokenDue fit disagrees with its work-entered boundary by ${round.disagreementMs} ms`)
     else if (!opensTheRound && round.disagreementMs > FIT_DISAGREEMENT_SOFT_MS) soft.push(`round ${round.roundIndex}: tokenDue fit vs boundary ${round.disagreementMs} ms`)
-    else if (opensTheRound && round.disagreementMs > FIT_DISAGREEMENT_SOFT_MS) notes.push(`round ${round.roundIndex}: the work-entered boundary trails the tokenDue fit by ${round.disagreementMs} ms — that is the boundary log site's latency (its workElapsedMs is 0 by construction), not a clock disagreement`)
+    else if (opensTheRound && round.disagreementMs > FIT_DISAGREEMENT_SOFT_MS) notes.push(`round ${round.roundIndex}: the work-entered boundary trails the tokenDue fit by ${round.disagreementMs} ms. The record is written after the bell is sent, so on a build from 2026-11-27 or later that is what sending the bell took. On an older build a round opened by a skip (round 1 always is) also started its work clock at the tick before the skip, and that head start is in this figure (findings doc, N-18) — compare the later rounds`)
   }
   const toMonotonic = (roundIndex, workMs) => {
     const round = fit.get(roundIndex)

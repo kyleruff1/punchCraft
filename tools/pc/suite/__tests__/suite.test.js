@@ -5,7 +5,16 @@
  */
 import { driveState } from '../drive.mjs'
 import { spread } from '../stats.mjs'
-import { defaultJobs, driveVerdict, lateness, parseArgs, pooled, renderSummary } from '../suite.mjs'
+import {
+  admissions,
+  defaultJobs,
+  driveVerdict,
+  lateness,
+  parseArgs,
+  pooled,
+  observerLine,
+  renderSummary,
+} from '../suite.mjs'
 
 const record = (code, fields = {}) => ({
   wallMs: 0,
@@ -13,7 +22,8 @@ const record = (code, fields = {}) => ({
   level: 'info',
   args: [`[INFO] ${code}`, 'message', fields],
 })
-const boundary = (transition) => record('workout.round.boundary', { transition, roundIndex: 0 })
+const boundary = (transition, roundIndex = 0) =>
+  record('workout.round.boundary', { transition, roundIndex })
 const staged = (fields = {}) =>
   record('workout.qa.run', { nonce: 'n-1', gitSha: 'abc1234', platform: 'web', ...fields })
 const aRound = [
@@ -22,6 +32,7 @@ const aRound = [
   boundary('countdown-entered'),
   boundary('work-entered'),
   boundary('rest-entered'),
+  boundary('work-entered', 1),
 ]
 
 describe('driveState', () => {
@@ -39,7 +50,9 @@ describe('driveState', () => {
       ended: null,
     })
     expect(driveState(aRound.slice(0, 4))).toMatchObject({ workEntered: true, ended: null })
-    expect(driveState(aRound)).toMatchObject({ ended: 'rest-entered', staged: { nonce: 'n-1' } })
+    // The end of round 1 is not the end of the run: the rest after it is in it.
+    expect(driveState(aRound.slice(0, 5)).ended).toBeNull()
+    expect(driveState(aRound)).toMatchObject({ ended: 'work-entered', staged: { nonce: 'n-1' } })
   })
 
   it('does not stop a whole workout at its first rest', () => {
@@ -51,7 +64,9 @@ describe('driveState', () => {
 
   it('ends on a stop as well as on a bell, and keeps the first ending it saw', () => {
     expect(driveState([...aRound.slice(0, 4), boundary('cancelled')]).ended).toBe('cancelled')
-    expect(driveState([...aRound, boundary('completed')]).ended).toBe('rest-entered')
+    expect(driveState([...aRound, boundary('completed', 1)]).ended).toBe('work-entered')
+    // A one-round workout has no second bell; it completes.
+    expect(driveState([...aRound.slice(0, 4), boundary('completed')]).ended).toBe('completed')
   })
 
   it('says why a link was refused', () => {
@@ -188,7 +203,7 @@ describe('driveVerdict', () => {
   const drive = (over = {}) => ({
     records: aRound,
     problems: [],
-    ended: 'rest-entered',
+    ended: 'work-entered',
     reason: null,
     staged: { nonce: 'n-1', gitSha: 'abc1234' },
     visibility: 'visible',
@@ -282,6 +297,55 @@ describe('driveVerdict', () => {
     })
   })
 
+  describe('with the ring check', () => {
+    const withRings = (rings, verifyExit = 0) =>
+      driveVerdict({ drive: drive(), verifyExit, hostSha: 'abc1234', nonce: 'n-1', rings })
+
+    it('fails a drive where a bar did not light all its rings', () => {
+      const unlit = {
+        hard: ['1 bar(s) did not light all their rings — first: q121-b1#0 reached ring 1 of 2'],
+        soft: [],
+      }
+      expect(withRings(unlit)).toEqual({ verdict: 'FAIL', reasons: unlit.hard })
+    })
+    it('warns on a late ring, and cannot rescue a drive the correlator failed', () => {
+      const late = { hard: [], soft: ['2 ring(s) were painted more than 100 ms after their time'] }
+      expect(withRings(late).verdict).toBe('WARN')
+      expect(withRings({ hard: [], soft: [] }, 1).verdict).toBe('FAIL')
+    })
+  })
+
+  describe('what the app itself admitted', () => {
+    const failed = record('workout.voice.playFailed', {
+      asset: 'li-2ba7c178',
+      error: 'no such file',
+    })
+    const missing = record('workout.voice.clipMissing', { asset: 'call-9-9' })
+    const skipped = record('workout.clickScript.skipped', { slot: 'call/1-2' })
+
+    it('counts the clips it logged it could not play, and the calls it chose to skip', () => {
+      expect(admissions([...aRound, failed, missing, skipped, skipped])).toEqual({
+        couldNotPlay: ['voice.playFailed: li-2ba7c178', 'voice.clipMissing: call-9-9'],
+        skipped: 2,
+        deferred: 0,
+      })
+    })
+
+    it('fails the drive on a clip the app could not play — in any round, whatever the correlator said', () => {
+      const result = judged({ records: [...aRound, failed] }, 0)
+      expect(result).toEqual({
+        verdict: 'FAIL',
+        reasons: [
+          'the app logged 1 clip(s) it could not play — first: voice.playFailed: li-2ba7c178',
+        ],
+      })
+    })
+
+    it('does not fail it on a call the app chose to skip', () => {
+      expect(judged({ records: [...aRound, skipped] }, 0).verdict).toBe('PASS')
+    })
+  })
+
   it('never lets a warning soften a failure', () => {
     expect(judged({ visibility: 'hidden' }, 1).verdict).toBe('FAIL')
   })
@@ -317,12 +381,12 @@ describe('renderSummary', () => {
     expect(md).toContain('**1 PASS · 1 FAIL**')
     // No sound was listened to in this row: its three columns are dashes.
     expect(md).toContain(
-      '| quick-one-two | numbers | PASS | matched=3 extras=0 reanchor=0 | 0 | — | — | — | 36 / 44 | 39.7 / 45.3 | 4:42 |',
+      '| quick-one-two | numbers | PASS | matched=3 extras=0 reanchor=0 | 0 | — | — | — | — | — | 36 / 44 | 39.7 / 45.3 | 4:42 |',
     )
     expect(md).toContain('- **body-work** (numbers): 1 error(s) on the page: x')
-    expect(md).toContain('round 1 · 1 at a time · simulated punches: captured-jam')
+    expect(md).toContain('round 1 and its rest · 1 at a time · simulated punches: captured-jam')
     const six = renderSummary([row()], { ...meta, args: { ...meta.args, jobs: 6 } })
-    expect(six).toContain('round 1 · 6 at a time ·')
+    expect(six).toContain('round 1 and its rest · 6 at a time ·')
   })
 
   it('shows what was heard: clips, losses, and the tightest and the usual gap before a ring', () => {
@@ -331,8 +395,53 @@ describe('renderSummary', () => {
       calls: { breath: { minMs: 351, medianMs: 376.8 } },
     }
     const md = renderSummary([row({ sound })], meta)
-    expect(md).toContain('| 0 | 80 of 81 | 1 / 0 | 351 / 376.8 | 36 / 44 |')
+    expect(md).toContain('| 0 | 80 of 81 | 1 / 0 | 351 / 376.8 | — | — | 36 / 44 |')
     expect(md).toMatch(/sound columns are measured/)
+  })
+
+  it('says how the app’s own observer compared with the audio elements, over every drive', () => {
+    const sound = (observer) => ({
+      clips: { played: 81, heard: 81, silent: [], cutShort: [] },
+      calls: { breath: { minMs: 351, medianMs: 376.8 } },
+      observer,
+    })
+    const one = {
+      records: 87,
+      compared: 87,
+      startMs: { minMs: -11.5, maxMs: 8.6 },
+      endMs: { minMs: -1.1, maxMs: 0.5 },
+      unseen: [],
+      unheard: [],
+    }
+    const two = {
+      records: 90,
+      compared: 88,
+      startMs: { minMs: -3, maxMs: 9.2 },
+      endMs: { minMs: -0.4, maxMs: 2 },
+      unseen: [{}],
+      unheard: [],
+    }
+    const md = renderSummary(
+      [row({ sound: sound(one) }), row({ sound: sound(two), vocab: 'techniques' })],
+      meta,
+    )
+    expect(md).toContain('## The app’s own observer')
+    expect(md).toContain('timed 177 plays')
+    expect(md).toContain('175 of them')
+    expect(md).toContain('at most 11.5 ms on when a clip began and 2 ms on when it ended')
+    expect(md).toContain('1 sounded that the observer never saw start')
+  })
+
+  it('leaves the observer out when no drive had anything to compare', () => {
+    expect(renderSummary([row()], meta)).not.toContain('own observer')
+    expect(observerLine([row({ sound: { observer: { compared: 0 } } })])).toBeNull()
+  })
+
+  it('shows how many rings lit, and how late they were painted', () => {
+    const rings = { lit: 194, rings: 194, paintedLate: { medianMs: 54.4, maxMs: 67.8 } }
+    expect(renderSummary([row({ rings })], meta)).toContain(
+      '| — | 194 of 194 | 54.4 / 67.8 | 36 / 44 |',
+    )
   })
 
   it('says in its heading how the sound was judged, and shouts when a fault was injected', () => {
@@ -365,6 +474,6 @@ describe('renderSummary', () => {
       ],
       meta,
     )
-    expect(md).toContain('| ERROR | — | 0 | — | — | — | — / — | — / — |')
+    expect(md).toContain('| ERROR | — | 0 | — | — | — | — | — | — / — | — / — |')
   })
 })

@@ -129,6 +129,55 @@ describe('a successful write lands everything together', () => {
     expect(h.workouts.listAdaptations(result.generatedWorkoutId)).toHaveLength(2)
   })
 
+  it('stores each adaptation with the session it was made in (migration 010)', () => {
+    const h = harness()
+    const decision = {
+      decidedAtMonotonicMs: 180_000,
+      boundary: 'rest',
+      inputs: {},
+      decision: {},
+    } as const
+    const first = persist(h, {
+      adaptations: [decision, { ...decision, decidedAtMonotonicMs: 360_000 }],
+    })
+    // The same workout again: the same plan row, a session of its own.
+    const second = persist(h, { adaptations: [decision], endedAtIso: '2026-08-24T10:00:00.000Z' })
+    expect(second.generatedWorkoutId).toBe(first.generatedWorkoutId)
+    expect(second.sessionId).not.toBe(first.sessionId)
+
+    // Together under the plan, as before…
+    expect(h.workouts.listAdaptations(first.generatedWorkoutId)).toHaveLength(3)
+    // …and now each session can be asked for its own.
+    expect(h.workouts.listAdaptationsForSession(first.sessionId)).toHaveLength(2)
+    expect(h.workouts.listAdaptationsForSession(second.sessionId)).toHaveLength(1)
+    expect(h.workouts.listAdaptationsForSession(first.sessionId)[0]?.sessionId).toBe(
+      first.sessionId,
+    )
+  })
+
+  it('takes a discarded session’s adaptations with it, and no one else’s (finding N-12)', () => {
+    const h = harness()
+    const decision = {
+      decidedAtMonotonicMs: 180_000,
+      boundary: 'rest',
+      inputs: {},
+      decision: {},
+    } as const
+    const kept = persist(h, { adaptations: [decision] })
+    const discarded = persist(h, {
+      adaptations: [decision, decision],
+      endedAtIso: '2026-08-24T10:00:00.000Z',
+    })
+    expect(h.count('workout_adaptations')).toBe(3)
+
+    // Discard is exactly this: the session row deleted, and nothing else said.
+    h.sessions.delete(discarded.sessionId)
+
+    expect(h.count('workout_adaptations')).toBe(1)
+    expect(h.workouts.listAdaptationsForSession(kept.sessionId)).toHaveLength(1)
+    expect(h.workouts.listAdaptations(kept.generatedWorkoutId)).toHaveLength(1)
+  })
+
   it('keeps monotonic time exactly as given (spec §3.2, §18.3)', () => {
     const h = harness()
     const result = persist(h, {

@@ -133,6 +133,12 @@ export interface CueResultRow {
 
 export interface AdaptationRecord {
   generatedWorkoutId: string
+  /**
+   * The session the decision was made in (migration 010). Absent on a row
+   * written before that, which belongs to its plan and to no session that
+   * can be named.
+   */
+  sessionId?: string | null
   /** Monotonic ms, stored exactly as given (§3.2, §18.3). */
   decidedAtMonotonicMs: number
   boundary: AdaptationBoundary
@@ -563,11 +569,12 @@ export class WorkoutRepository {
     }
     this.run(
       `INSERT INTO workout_adaptations
-         (id, generated_workout_id, decided_at_monotonic_ms, boundary, inputs_json, decision_json)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+         (id, generated_workout_id, session_id, decided_at_monotonic_ms, boundary, inputs_json, decision_json)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
         newId('adp'),
         a.generatedWorkoutId,
+        a.sessionId ?? null,
         a.decidedAtMonotonicMs,
         a.boundary,
         JSON.stringify(a.inputs ?? null),
@@ -576,21 +583,40 @@ export class WorkoutRepository {
     )
   }
 
-  /** Decisions in monotonic order — the order they were actually made. */
+  /**
+   * Every decision made on a plan, in monotonic order — the order they were
+   * actually made. A plan is shared by every session of that workout, so this
+   * is all of their decisions together; `listAdaptationsForSession` is one
+   * session's.
+   */
   listAdaptations(generatedWorkoutId: string): AdaptationRecord[] {
+    return this.adaptations('generated_workout_id = ?', generatedWorkoutId)
+  }
+
+  /**
+   * The decisions made in one session. Empty for a session saved before
+   * migration 010: its rows name no session and cannot be told from another's.
+   */
+  listAdaptationsForSession(sessionId: string): AdaptationRecord[] {
+    return this.adaptations('session_id = ?', sessionId)
+  }
+
+  private adaptations(where: string, value: string): AdaptationRecord[] {
     interface RawAdaptation {
       generated_workout_id: string
+      session_id: string | null
       decided_at_monotonic_ms: number
       boundary: AdaptationBoundary
       inputs_json: string
       decision_json: string
     }
     return this.select<RawAdaptation>(
-      `SELECT * FROM workout_adaptations WHERE generated_workout_id = ?
+      `SELECT * FROM workout_adaptations WHERE ${where}
         ORDER BY decided_at_monotonic_ms ASC, id ASC`,
-      [generatedWorkoutId],
+      [value],
     ).map((r) => ({
       generatedWorkoutId: r.generated_workout_id,
+      sessionId: r.session_id,
       decidedAtMonotonicMs: r.decided_at_monotonic_ms,
       boundary: r.boundary,
       inputs: parseJson<unknown>(r.inputs_json, 'workout_adaptations.inputs_json'),

@@ -7,6 +7,16 @@
 // modelled: how long before its ring a call stopped sounding.
 import { fitWorkAxis, roundWindows } from '../../analysis/observed-timing.mjs'
 import { fieldsOf, recordsOf } from './capture.mjs'
+import {
+  bellsAt,
+  ceremoniesOf,
+  ceremonyFindings,
+  isCut,
+  isSilent,
+  namedClips,
+} from './ceremonies.mjs'
+import { observerReport, renderObserver } from './observer.mjs'
+import { appStopTimes, clipKind, stopReasonOf } from './plays.mjs'
 import { spread } from './stats.mjs'
 
 /**
@@ -14,6 +24,7 @@ import { spread } from './stats.mjs'
  * @property {number} id the element
  * @property {number} playAtMs when `play()` was called
  * @property {string} src the last part of the element's address
+ * @property {ReturnType<typeof clipKind>} kind what it was playing, from that name
  * @property {number} volume the element's volume at the call (0 when muted)
  * @property {number | null} durationMs the element's own length, once known
  * @property {number | null} playingAtMs when the element said it was playing
@@ -21,6 +32,7 @@ import { spread } from './stats.mjs'
  * @property {string | null} stoppedBy `pause`, `ended`, `emptied`, or `replayed` — whichever came first
  * @property {number | null} stoppedAtMs
  * @property {number | null} stoppedPositionMs where the element's playhead was when it stopped
+ * @property {string | null} error the media error the element reported while playing it, if it did
  */
 
 /**
@@ -53,6 +65,7 @@ export function playsFrom(events) {
         id: event.id,
         playAtMs: event.atMs,
         src: event.src ?? '',
+        kind: clipKind(event.src ?? ''),
         volume: event.volume ?? 1,
         durationMs: event.durationMs ?? null,
         playingAtMs: null,
@@ -60,6 +73,7 @@ export function playsFrom(events) {
         stoppedBy: null,
         stoppedAtMs: null,
         stoppedPositionMs: null,
+        error: null,
       }
       // Played again before it had stopped: this play's position, taken
       // before the element restarts, is where the last one was cut off.
@@ -77,6 +91,9 @@ export function playsFrom(events) {
     if (event.type === 'playing') {
       play.playingAtMs ??= event.atMs
       play.durationMs ??= event.durationMs ?? null
+    } else if (event.type === 'error') {
+      // The element's own word that it could not play: a media error.
+      play.error ??= event.error ?? 'a media error'
     } else if (event.type === 'sound-start') {
       play.sound.push({ startMs: event.atMs, endMs: null, peak: null })
     } else if (event.type === 'sound-end') {
@@ -104,10 +121,25 @@ export function heardSpan(play) {
   return { firstSoundMs: first ? first.startMs : null, lastSoundMs: last ? last.endMs : null }
 }
 
+/**
+ * The kinds of element a call or lead-in can be playing on: a downloaded
+ * copy, a lead-in played from its file, or — when nothing else answered —
+ * the source-less element a download-first player starts on. `other` is a
+ * file this suite has no name for.
+ */
+const CALL_KINDS = ['downloaded', 'lead-in', 'phantom', 'other']
+
 /** How long after the app dispatched a clip its element's `play()` may fall and still be that clip. */
 export const PLAY_MATCH_WINDOW_MS = 250
 /** How far an element's own length may be from the clip's stated one and still be that clip. */
 export const LENGTH_MATCH_MS = 300
+/**
+ * A clip sent this close to the end of the capture has not had time to
+ * sound, and nothing can be said of it. Over 8 404 clips in 44 whole
+ * workouts (2026-11-27) the longest wait from a dispatch to its first sound
+ * was 122 ms; this is four times that.
+ */
+export const STARTING_MS = 500
 
 /**
  * @typedef {object} HeardClip a call or lead-in the app played, and what was heard of it
@@ -122,6 +154,7 @@ export const LENGTH_MATCH_MS = 300
  * @property {number | null} firstSoundMs
  * @property {number | null} lastSoundMs
  * @property {number | null} stoppedShortMs how far short of its end the element's playhead was when it stopped
+ * @property {ElementPlay | null} play the element play itself
  */
 
 /**
@@ -148,6 +181,9 @@ export function heardClips(records, plays) {
       .filter(
         (play) =>
           !claimed.has(play) &&
+          // A bell or a countdown clip can start in the same instant as a
+          // call. Its file name says it is not one.
+          CALL_KINDS.includes(play.kind) &&
           play.playAtMs >= f.dispatchMs - 5 &&
           play.playAtMs <= f.dispatchMs + PLAY_MATCH_WINDOW_MS &&
           (play.durationMs === null || Math.abs(play.durationMs - f.durationMs) <= LENGTH_MATCH_MS),
@@ -168,6 +204,7 @@ export function heardClips(records, plays) {
       volume: f.volume ?? 1,
       dispatchMs: f.dispatchMs,
       element: play ? play.id : null,
+      play,
       ...(play ? heardSpan(play) : { firstSoundMs: null, lastSoundMs: null }),
       /** How far short of its own end the element's playhead was when it stopped; null if it has not. */
       stoppedShortMs:
@@ -255,6 +292,7 @@ const brief = (clip) => ({
   statedMs: clip.statedMs,
   dispatchLateMs: clip.dispatchLateMs,
   element: clip.element,
+  stop: clip.stop ?? null,
 })
 
 /**
@@ -271,20 +309,63 @@ const brief = (clip) => ({
 export function soundReport(records, events, { floorMs, truncationMs }) {
   const ready = events.find((e) => e.type === 'tap-ready') ?? null
   const plays = playsFrom(events)
-  const clips = clipTimings(records, heardClips(records, plays))
+  const appStops = appStopTimes(records)
+  const clips = clipTimings(records, heardClips(records, plays)).map((clip) => ({
+    ...clip,
+    /** Why its play stopped; null when no element answered the dispatch. */
+    stop: clip.play ? stopReasonOf(clip.play, { appStops, truncationMs }) : null,
+  }))
+  const claimed = new Set(clips.map((clip) => clip.play))
+  // The clips the app plays by name — the bell above all — take their own
+  // element plays out of "everything else".
+  const named = namedClips(records, plays, { claimed, appStops, truncationMs })
+  const boundaries = bellsAt(records, named)
+  const place = (b) => ({ transition: b.transition, roundIndex: b.roundIndex })
+  const otherNamed = named.filter((clip) => clip.asset !== 'bell')
+  const nameOf = (clip) => ({ asset: clip.asset, stoppedShortMs: round1(clip.stoppedShortMs) })
+  // The intro, each countdown and each rest line: several clips back to back.
+  const chains = ceremoniesOf(records, plays, { claimed, appStops, truncationMs })
+  const ceremonies = ceremonyFindings(chains, boundaries, truncationMs)
+  // The app's own timing of the same plays, held against these elements.
+  const observer = observerReport(records, [
+    ...clips.map((clip) => ({ playId: clip.playId, first: clip.play, last: clip.play })),
+    ...named.map((clip) => ({ playId: clip.playId, first: clip.play, last: clip.play })),
+    ...chains.map((chain) => ({
+      playId: chain.playId,
+      first: chain.tracks[0]?.play ?? null,
+      last: chain.tracks.at(-1)?.play ?? null,
+    })),
+  ])
+  // Everything else the page played. An element that never had a source is
+  // not a play of anything.
+  const others = plays.filter((play) => !claimed.has(play) && play.kind !== 'phantom')
   // A clip played at volume 0 was ducked on purpose; silence is what it is for.
   const audible = clips.filter((c) => c.volume > 0)
-  const silent = audible.filter((c) => c.firstSoundMs === null)
-  // Still sounding when the capture stopped: nothing can be said of its end.
-  const unfinished = audible.filter((c) => c.firstSoundMs !== null && c.lastSoundMs === null)
+  // When the capture stopped: the last thing the page's log or the tap noted.
+  const endMs = Math.max(
+    0,
+    ...[...records.map((r) => r.monoMs), ...events.map((e) => e.atMs)].filter(Number.isFinite),
+  )
+  // Sent as the capture stopped. A drive ends three seconds into the next
+  // round, and a call sent in its last instant has made no sound *yet* —
+  // which is not a call that made no sound.
+  const starting = (c) => c.firstSoundMs === null && endMs - c.dispatchMs < STARTING_MS
+  const silent = audible.filter((c) => c.firstSoundMs === null && !starting(c))
+  // Still sounding when the capture stopped, or not yet: nothing can be said
+  // of its end.
+  const unfinished = audible.filter(
+    (c) => starting(c) || (c.firstSoundMs !== null && c.lastSoundMs === null),
+  )
   const heard = audible.filter((c) => c.heardMs !== null)
   // Cut short is judged by the playhead, not by the sound: where the element
   // was in the clip when it stopped. What is heard of a clip that played to
   // its end is still 60-150 ms less than the file's length — its own quiet
   // head and tail, under the follower's threshold — and that is not a cut.
-  const cutShort = audible.filter(
-    (c) => c.stoppedShortMs !== null && c.stoppedShortMs > truncationMs,
-  )
+  //
+  // And short of its end is not yet cut: the app stops some clips itself and
+  // says so, and a run ends while something is still playing. A clip is cut
+  // when nothing accounts for it — or when its own element was played again.
+  const cutShort = audible.filter((c) => c.stop === 'unexplained' || c.stop === 'replayed')
   const calls = heard.filter((c) => c.kind === 'call' && c.breathMs !== null)
   const leadIns = heard.filter((c) => c.kind === 'lead-in')
   const underFloor = calls.filter((c) => c.breathMs < floorMs)
@@ -317,12 +398,46 @@ export function soundReport(records, events, { floorMs, truncationMs }) {
       underFloorRatio:
         calls.length === 0 ? 0 : Math.round((underFloor.length / calls.length) * 1000) / 1000,
       pastRing: calls.filter((c) => c.breathMs <= 0).map(brief),
+      /** The same gap, round by round: `[{ roundIndex, n, minMs, medianMs, … }]`. */
+      byRound: [...new Set(calls.map((c) => c.roundIndex))]
+        .sort((a, b) => a - b)
+        .map((roundIndex) => ({
+          roundIndex,
+          ...spread(calls.filter((c) => c.roundIndex === roundIndex).map((c) => c.breathMs)),
+        })),
       tightest: [...calls]
         .sort((a, b) => a.breathMs - b.breathMs)
         .slice(0, 5)
         .map(brief),
     },
     leadIns: { n: leadIns.length },
+    /** A bell marks every round start, round end and finish. */
+    bells: {
+      expected: boundaries.length,
+      rung: boundaries.filter((b) => b.bell !== null).length,
+      missing: boundaries.filter((b) => b.bell === null).map(place),
+      silent: boundaries.filter((b) => b.bell !== null && isSilent(b.bell)).map(place),
+      cutShort: boundaries.filter((b) => b.bell !== null && isCut(b.bell)).map(place),
+      /** First sound after the boundary it marks. Reported, not judged. */
+      afterBoundary: spread(boundaries.map((b) => b.soundsAfterMs)),
+    },
+    /** The intro, the countdowns and the rest lines (`ceremonyFindings`). */
+    ceremonies: {
+      found: ceremonies.found,
+      broken: ceremonies.broken,
+      cutByApp: ceremonies.cutByApp,
+      talkedOver: ceremonies.talkedOver,
+      mixedVolumes: ceremonies.mixedVolumes,
+      /** A countdown's last word to the first sound of its bell. Reported, not judged. */
+      countdownToBell: spread(ceremonies.countdownToBellMs),
+    },
+    /** The other clips the app plays by name: lead-ins it speaks from a file, and the like. */
+    named: {
+      played: otherNamed.length,
+      heard: otherNamed.filter((clip) => clip.firstSoundMs !== null).length,
+      silent: otherNamed.filter(isSilent).map(nameOf),
+      cutShort: otherNamed.filter(isCut).map(nameOf),
+    },
     start: {
       afterDispatch: spread(heard.map((c) => c.startAfterDispatchMs)),
       afterSchedule: spread(heard.map((c) => c.startAfterScheduleMs)),
@@ -330,7 +445,14 @@ export function soundReport(records, events, { floorMs, truncationMs }) {
       armed: byPath('armed'),
     },
     length: { truncationMs, heardMinusStated: spread(heard.map((c) => c.heardMs - c.statedMs)) },
-    otherPlays: plays.length - clips.filter((c) => c.element !== null).length,
+    /** The app's playback observer against the same elements (`observerReport`). Reported, not judged. */
+    observer,
+    otherPlays: others.length,
+    /** Those, by what they were: `{ bell: 3, silence: 6, … }`. */
+    otherKinds: others.reduce(
+      (tally, play) => ({ ...tally, [play.kind]: (tally[play.kind] ?? 0) + 1 }),
+      {},
+    ),
   }
 }
 
@@ -349,8 +471,21 @@ export function renderSoundReport(report, title) {
       : '**the sound tap did not start — nothing below was measured**',
     ...tap.failures.map((f) => `- tap failure: ${f}`),
     '',
-    `calls and lead-ins: ${clips.played} played · ${clips.heard} heard · ${clips.silent.length} silent · ${clips.cutShort.length} cut short · ${clips.ducked} ducked on purpose · ${clips.unfinished} still sounding when the capture stopped`,
-    `other plays (bells, intro, countdown, metronome): ${report.otherPlays} — counted, not judged`,
+    `calls and lead-ins: ${clips.played} played · ${clips.heard} heard · ${clips.silent.length} silent · ${clips.cutShort.length} cut short · ${clips.ducked} ducked on purpose · ${clips.unfinished} not finished when the capture stopped`,
+    `bells: ${report.bells.rung} of ${report.bells.expected} round boundaries rung · ${report.bells.silent.length} silent · ${report.bells.cutShort.length} cut · first sound ${cell(report.bells.afterBoundary.medianMs)} ms after the boundary (most ${cell(report.bells.afterBoundary.maxMs)})`,
+    `intro, countdowns and rest lines: ${
+      Object.entries(report.ceremonies.found)
+        .map(([kind, n]) => `${n} ${kind}`)
+        .join(', ') || 'none'
+    } · ${report.ceremonies.broken.length} did not play whole · ${report.ceremonies.cutByApp.length} cut off by the app · countdown’s last word → bell ${cell(report.ceremonies.countdownToBell.medianMs)} ms (least ${cell(report.ceremonies.countdownToBell.minMs)})`,
+    `clips played by name: ${report.named.played} played · ${report.named.heard} heard · ${report.named.silent.length} silent · ${report.named.cutShort.length} cut`,
+    `other plays: ${report.otherPlays}${
+      report.otherPlays > 0
+        ? ` (${Object.entries(report.otherKinds)
+            .map(([kind, n]) => `${n} ${kind}`)
+            .join(', ')})`
+        : ''
+    } — counted, not judged`,
     '',
     '| ms | n | least | median | p95 | most |',
     '|---|---|---|---|---|---|',
@@ -361,6 +496,12 @@ export function renderSoundReport(report, title) {
     row('first sound after its scheduled send', start.afterSchedule),
     row('heard length − stated length', length.heardMinusStated),
     '',
+    ...(calls.byRound.length > 1
+      ? [
+          `gap before the ring, round by round (least / median ms): ${calls.byRound.map((r) => `round ${r.roundIndex + 1}: ${cell(r.minMs)} / ${cell(r.medianMs)} over ${r.n}`).join(' · ')}`,
+          '',
+        ]
+      : []),
     `intended gap before the ring: ${calls.intendedBreathMs.join(' / ') || '—'} ms · floor ${calls.floorMs} ms: ${calls.underFloor} of ${calls.n} under · **still sounding when the ring was due: ${calls.pastRing.length}**`,
   ]
   const list = (heading, items, line) => {
@@ -393,6 +534,7 @@ export function renderSoundReport(report, title) {
     (c) =>
       `${named(c)} — ${cell(c.breathMs)} ms before its ring, sent ${cell(c.dispatchLateMs)} ms late`,
   )
+  L.push('', ...renderObserver(report.observer).slice(0, -1))
   L.push(
     '',
     'Measured where the sound enters the browser’s mixer, against the schedule. The speaker is a further, constant delay. These are this PC’s figures; no tablet constant is set from them.',
@@ -448,6 +590,60 @@ export function soundVerdict(report, { floorRatio }) {
     hard.push(
       `${cutShort.length} clip(s) were stopped more than ${report.length.truncationMs} ms before their end — first: ${named(c)}, ${c.stoppedShortMs} ms of its ${c.statedMs} left unplayed`,
     )
+  }
+  const at = (b) => `${b.transition.replace('-entered', '')} of round ${b.roundIndex + 1}`
+  const { bells } = report
+  const byName = report.named
+  if (bells.missing.length > 0) {
+    hard.push(
+      `${bells.missing.length} round boundary(ies) had no bell — first: ${at(bells.missing[0])}`,
+    )
+  }
+  if (bells.silent.length > 0) {
+    hard.push(
+      `${bells.silent.length} bell(s) rang and made no sound — first: ${at(bells.silent[0])}`,
+    )
+  }
+  if (bells.cutShort.length > 0) {
+    hard.push(
+      `${bells.cutShort.length} bell(s) were stopped before their end — first: ${at(bells.cutShort[0])}`,
+    )
+  }
+  if (byName.silent.length > 0) {
+    hard.push(
+      `${byName.silent.length} named clip(s) were played and made no sound — first: ${byName.silent[0].asset}`,
+    )
+  }
+  if (byName.cutShort.length > 0) {
+    const c = byName.cutShort[0]
+    hard.push(
+      `${byName.cutShort.length} named clip(s) were stopped before their end — first: ${c.asset}, ${c.stoppedShortMs} ms left unplayed`,
+    )
+  }
+  const { broken, cutByApp, talkedOver, mixedVolumes } = report.ceremonies
+  if (broken.length > 0) {
+    hard.push(
+      `${broken.length} ceremony(ies) did not play as the app said — first: ${broken[0].label}: ${broken[0].why}`,
+    )
+  }
+  for (const cut of cutByApp) {
+    const lost =
+      cut.clipsUnreached > 0
+        ? `${cut.clipsUnreached} of its clips never started`
+        : `${cut.unplayedMs} ms of it was never heard`
+    const how =
+      cut.name === 'countdown'
+        ? 'the bell cut the'
+        : cut.name === 'intro'
+          ? 'the round began over the'
+          : 'the rest ended over the'
+    soft.push(`${how} ${cut.label}: ${lost}`)
+  }
+  for (const over of talkedOver) {
+    soft.push(`the rest line was still sounding ${over.overlapMs} ms into ${over.label}`)
+  }
+  for (const mixed of mixedVolumes) {
+    soft.push(`${mixed.label} played its clips at different volumes (${mixed.volumes.join(', ')})`)
   }
   const { pastRing, underFloor, underFloorRatio, n, floorMs, breath } = report.calls
   if (pastRing.length > 0) {

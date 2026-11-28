@@ -202,18 +202,36 @@ export const WEB_CAPTURE_TAG = 'PunchCraftWeb'
 const WEB_TAGGED_LINE = new RegExp(String.raw`^\d{2}-\d{2}\s+\S+\s+\w\/${WEB_CAPTURE_TAG}\(`, 'm')
 
 /**
- * Which platform wrote a capture: `'android'`, `'web'`, or whatever else the
- * app named.
+ * What `capturePlatform` calls an Android emulator. It is Android by name and
+ * a PC by everything the question is asked for: its processor and its audio
+ * path are the PC's.
+ */
+export const EMULATOR_PLATFORM = 'android-emulator'
+
+/**
+ * Which platform wrote a capture: `'android'` (the tablet), `'web'`,
+ * `'android-emulator'`, or whatever else the app named.
  *
  * The QA run record says so in its own `platform` field — but only since
  * 2026-11-26, and only when the capture holds one. So two more rules follow,
  * in order: a capture written under `WEB_CAPTURE_TAG` is the PC's; and a
  * capture that says nothing at all is the tablet's, because every capture
  * taken before that date is.
+ *
+ * An Android capture is then asked one more thing: the record's `emulator`
+ * field (since 2026-11-27, `src/diagnostics/deviceKind.ts`). An emulator's
+ * capture was once taken for the tablet's, and tablet constants proposed from
+ * it (findings doc, N-19).
+ *
+ * **What this cannot see:** an emulator running a build from before that
+ * field existed says nothing, and is read as the tablet. The verify suite
+ * closes that from the other side — it asks the device itself
+ * (`isEmulatorDevice` in `verify-suite.mjs`).
  */
 export function capturePlatform(logcatText) {
   const run = recordsWithTag(logcatText, 'workout.qa.run').at(-1)
   const named = run ? extractField(run.body, 'platform') : undefined
-  if (named) return named
-  return WEB_TAGGED_LINE.test(logcatText) ? 'web' : 'android'
+  const platform = named ?? (WEB_TAGGED_LINE.test(logcatText) ? 'web' : 'android')
+  if (platform === 'android' && run && boolField(run.body, 'emulator') === true) return EMULATOR_PLATFORM
+  return platform
 }

@@ -36,12 +36,9 @@ export function driveState(records, { firstRoundOnly = true } = {}) {
     refused: /** @type {string | null} */ (null),
     started: false,
     workEntered: false,
-    /** What ended it: `rest-entered` (round 1 only), `completed` or `cancelled`. */
+    /** What ended it: `work-entered` (round 2 opening), `completed` or `cancelled`. */
     ended: /** @type {string | null} */ (null),
   }
-  const endings = firstRoundOnly
-    ? ['rest-entered', 'completed', 'cancelled']
-    : ['completed', 'cancelled']
   for (const record of records) {
     const code = codeOf(record)
     if (code === 'workout.qa.run') state.staged = fieldsOf(record)
@@ -49,9 +46,14 @@ export function driveState(records, { firstRoundOnly = true } = {}) {
     else if (code === 'workout.qa.run.invalid') state.refused = 'invalid-link'
     else if (code === 'workout.runner.start') state.started = true
     else if (code === 'workout.round.boundary') {
-      const { transition } = fieldsOf(record)
+      const { transition, roundIndex } = fieldsOf(record)
       if (transition === 'work-entered') state.workEntered = true
-      if (state.ended === null && endings.includes(transition)) state.ended = transition
+      // A round-1 run is round 1 and the rest after it: it ends at the bell
+      // that opens round 2, so the rest line and the countdown into that
+      // bell are in it. A one-round workout simply completes.
+      const secondBell = firstRoundOnly && transition === 'work-entered' && roundIndex >= 1
+      const over = transition === 'completed' || transition === 'cancelled'
+      if (state.ended === null && (secondBell || over)) state.ended = transition
     }
   }
   return state
