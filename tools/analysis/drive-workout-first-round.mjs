@@ -37,6 +37,8 @@ import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'no
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { recordsWithTag } from './logcat.mjs'
+
 // ---------------------------------------------------------------------------
 // Setup + args
 // ---------------------------------------------------------------------------
@@ -48,6 +50,15 @@ const REPO_ROOT = import.meta.url
   : process.cwd()
 
 export const PACKAGE = 'com.kyleruff.punchcraft'
+
+/**
+ * How many `workout.viz.batch` records a capture holds. Through
+ * `recordsWithTag`, not a typed pattern: the one here matched `workouts.`,
+ * so every forensic drive warned that it had none.
+ */
+export function vizBatchCount(logcatText) {
+  return recordsWithTag(logcatText, 'workout.viz.batch').length
+}
 /** What every capture streams: JS records, the app's native tag, crashes. */
 export const LOGCAT_FILTER = ['ReactNativeJS:V', 'workouts:V', 'AndroidRuntime:E', 'System.err:W', '*:S']
 
@@ -575,7 +586,7 @@ export async function drive(args) {
       log(`capture.wav: ${wavSize} bytes`)
       log(`screen.mp4:  ${mp4Size} bytes`)
       const vizBatches = existsSync(logcatFile)
-        ? (readFileSync(logcatFile, 'utf8').match(/workouts\.viz\.batch/g) ?? []).length
+        ? vizBatchCount(readFileSync(logcatFile, 'utf8'))
         : 0
       log(`viz.batch lines: ${vizBatches}`)
       if (vizBatches === 0) {

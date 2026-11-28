@@ -589,10 +589,18 @@ function gitShortSha() {
 }
 
 /** Whole-session health counters, the drive-full-workout.mjs set plus the observers. */
-function sessionCounters(logcatText) {
+/**
+ * What a drive's capture holds, counted.
+ *
+ * The two that name an event code go through `recordsWithTag`, never a
+ * pattern typed by hand: both used to match `workouts.` where the app logs
+ * `workout.`, and so read 0 on every drive ever judged.
+ */
+export function sessionCounters(logcatText) {
   const events = parseLogcat(logcatText)
   const count = (type) => events.filter((e) => e.type === type).length
   const re = (pattern) => (logcatText.match(pattern) ?? []).length
+  const records = (code) => recordsWithTag(logcatText, code).length
   return {
     workEntered: re(/transition: 'work-entered'/g),
     restEntered: re(/transition: 'rest-entered'/g),
@@ -603,10 +611,10 @@ function sessionCounters(logcatText) {
     restScriptsLoaded: re(/recovery loaded/g),
     warnCeremonies: re(/round warning prepared/g),
     voiceClipMissing: count('voice.clipMissing'),
-    instrumentClipMissing: re(/workouts\.instrument\.clipMissing/g),
+    instrumentClipMissing: records('workout.instrument.clipMissing'),
     playFailed: re(/voice\.playFailed/g),
     redbox: re(/AndroidRuntime/g),
-    qaBlocked: re(/workouts\.qa\.run\.blocked/g),
+    qaBlocked: records('workout.qa.run.blocked'),
   }
 }
 
