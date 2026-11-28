@@ -160,6 +160,13 @@ export function latencyCompensatedDispatchMs(
  */
 export const COACH_LANE_RELEASE_GRACE_MS = 50
 
+/**
+ * How long a bell is given to ring out when its player has not reported a
+ * length yet (a player reads 0 until its clip has loaded). `bell.wav` is
+ * 1,180 ms, measured from the file; the three tones are 60 to 300 ms.
+ */
+export const UNMEASURED_BELL_RING_MS = 1_500
+
 /** Clips carried on the bells volume rather than the voice volume (doc §25). */
 const BELL_ASSETS: ReadonlySet<VoiceAssetId> = new Set<VoiceAssetId>([
   'bell',
@@ -354,6 +361,15 @@ export class VoiceOutputExpo implements VoiceOutputPort {
    * oldest key first and makes eviction a single `keys().next()`.
    */
   private readonly players = new Map<string, AudioPlayer>()
+  /**
+   * Bell players that have been rung, and when each ring ends on `clock()`.
+   *
+   * Read by `release()` and by nothing else. A bell is deliberately not in
+   * the speech window (`busyUntilMs`) — it must never make the coach wait —
+   * so that window cannot say a bell is sounding, and the teardown that
+   * waits on it would cut the closing bell. This is how the teardown knows.
+   */
+  private readonly ringingUntilMs = new Map<AudioPlayer, number>()
   private readonly durations = new Map<string, number>()
   private pending: PendingGroup[] = []
   /** Clips still to play in the phrase currently sounding. */
@@ -810,10 +826,13 @@ export class VoiceOutputExpo implements VoiceOutputPort {
    * The subtraction lives here rather than at the call site because
    * `audibleUntilMs()` is stamped on THIS instance's clock, which defaults to
    * `performance.now()` — a caller reaching for `Date.now()` would compute a
-   * garbage delay. Used to tear the pool down without cutting a clip short:
-   * the closing ding-ding is started by the same runner tick that publishes
-   * the terminal phase, so releasing on that edge would kill the bell about
-   * 0 ms into its ring (GH #356).
+   * garbage delay. Used to tear the pool down without cutting the coach
+   * short (GH #356).
+   *
+   * **This is speech only.** It was written to protect the closing
+   * ding-ding, and never could: bells are kept out of the busy window on
+   * purpose (see `emit`), so for a bell this reads 0. `release()` spares a
+   * ringing bell itself.
    */
   msUntilQuiet(): number {
     const until = this.audibleUntilMs()
@@ -1134,6 +1153,7 @@ export class VoiceOutputExpo implements VoiceOutputPort {
       // #356 defect, and it made MAX_RESIDENT_PLAYERS bound nothing that
       // matters. `releaseAudioPlayer` is total and never throws.
       if (evicted !== undefined) this.observer?.forget(evicted, 'evicted')
+      if (evicted !== undefined) this.ringingUntilMs.delete(evicted)
       releaseAudioPlayer(evicted)
     }
 
@@ -1870,7 +1890,20 @@ export class VoiceOutputExpo implements VoiceOutputPort {
     this.metronomePlayer.setVolume(this.volumes.metronome)
   }
 
-  /** Release players and any held focus. */
+  /**
+   * Release players and any held focus.
+   *
+   * Everything is freed now — except a bell that is still ringing, which is
+   * freed when its ring ends. The last round closes on a bell, and with the
+   * workout over nothing holds the audio once the athlete leaves the screen
+   * (Exit, "See summary"): freeing the bell with the rest cut it off inside
+   * its 1.2 seconds. The caller cannot wait it out instead — `msUntilQuiet`
+   * is the speech window, and a bell is not in it.
+   *
+   * A spared bell has left the pool: it is not handed out again, a later
+   * `preload()` makes a new one, and a second `release()` cannot free it
+   * early or twice.
+   */
   release(): void {
     // Invalidate any preload still in flight (GH #356). `preload()` awaits
     // before it creates anything, so without this a blur landing inside that
@@ -1896,8 +1929,14 @@ export class VoiceOutputExpo implements VoiceOutputPort {
     }
     releaseAudioPlayer(this.phrasePlayer)
     this.phrasePlayer = null
-    for (const player of this.players.values()) releaseAudioPlayer(player)
+    const now = this.clock()
+    for (const player of this.players.values()) {
+      const ringsForMs = (this.ringingUntilMs.get(player) ?? 0) - now
+      if (ringsForMs > 0) this.schedule(() => releaseAudioPlayer(player), ringsForMs)
+      else releaseAudioPlayer(player)
+    }
     this.players.clear()
+    this.ringingUntilMs.clear()
     for (const player of this.clickScriptPlayers.values()) releaseAudioPlayer(player)
     this.clickScriptPlayers.clear()
     this.clickScriptArmed.clear()
@@ -2011,6 +2050,13 @@ export class VoiceOutputExpo implements VoiceOutputPort {
       if (!BELL_ASSETS.has(id)) {
         this.markBusy(
           this.assetDurationMs(id, form) ?? CALLOUT_CLIPS[id as CalloutClipId]?.durationMs,
+        )
+      } else {
+        // Not the speech window — see `ringingUntilMs`. Only so that
+        // `release()` can let this ring finish.
+        this.ringingUntilMs.set(
+          player,
+          dispatchMs + (this.assetDurationMs(id, form) ?? UNMEASURED_BELL_RING_MS),
         )
       }
       if (isChimeInAsset(id)) {

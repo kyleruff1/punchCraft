@@ -619,11 +619,15 @@ export default function LiveScreen(): React.JSX.Element {
       warnRef.current?.stop()
       recoveryRef.current?.stop()
     }
-    // Never cut a sounding clip. A workout that ENDS while blurred flips
-    // this effect on the very tick that starts the closing ding-ding, so
-    // releasing immediately would kill the bell about 0 ms into its ring.
-    // Quiet lane (the ordinary case: leaving an idle lobby) → 0, and the
-    // release happens in this commit.
+    // Never cut the coach mid-sentence: wait out whatever speech is
+    // sounding. Quiet lane (the ordinary case: leaving an idle lobby) → 0,
+    // and the release happens in this commit.
+    //
+    // The closing ding-ding is not waited for here and does not need to be.
+    // A bell is not in the speech window, so this reads 0 for it — which is
+    // how leaving within a second of the last bell used to cut it off.
+    // `output.release()` now spares a bell that is still ringing and frees
+    // it when the ring ends; that covers the unmount cleanup above too.
     const graceMs = output.msUntilQuiet()
     if (graceMs === 0) {
       freeEverything()
