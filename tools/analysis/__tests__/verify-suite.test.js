@@ -29,6 +29,8 @@ import {
   renderSummaryMd,
   ringGateVerdict,
   ringsCell,
+  roundsArgument,
+  roundsJudgedText,
   timingRefusal,
   timingVerdictFromExit,
   verdictFromVerifyExit,
@@ -571,5 +573,37 @@ describe('the rings, in the verify suite', () => {
       expect(md).toContain('- **body-work (numbers)** — 1 ring(s) were stepped over by a late frame — first: ring 2 of b')
       expect(md).toContain('A log line that never arrived is not a ring that did not light')
     })
+  })
+})
+
+describe('how far a drive was meant to run', () => {
+  it('tells the correlator to expect every round of a whole workout, and round 1 of a round-1 drive', () => {
+    expect(roundsArgument({ wholeWorkout: true, endedCleanly: true })).toEqual(['--rounds=all'])
+    expect(roundsArgument({ wholeWorkout: false, endedCleanly: true })).toEqual(['--rounds=1'])
+  })
+
+  it('says nothing for a drive that stopped short: its own failure is already the verdict', () => {
+    // A timeout is an ERROR with round 1 judged as far as it goes. Telling
+    // the correlator to expect every round would turn it into a FAIL.
+    expect(roundsArgument({ wholeWorkout: true, endedCleanly: false })).toEqual([])
+    expect(roundsArgument({ wholeWorkout: false, endedCleanly: false })).toEqual([])
+  })
+
+  it('reads how many rounds were judged from a correlator report', () => {
+    expect(roundsJudgedText({ roundsJudged: 3, roundsDescribed: 3 })).toBe('3 of 3 rounds')
+    expect(roundsJudgedText({ roundsJudged: 1, roundsDescribed: 4 })).toBe('1 of 4 rounds')
+  })
+
+  it('says nothing for a report from before reports said, or for none', () => {
+    expect(roundsJudgedText({ health: { verdict: 'PASS' } })).toBe('')
+    expect(roundsJudgedText(null)).toBe('')
+  })
+
+  it('shows the rounds judged beside the verifier exit code in the summary', () => {
+    const meta = { suiteId: 's', device: 'emulator-5556', release: true, hostSha: 'abc1234', timingGate: 'off' }
+    const row = { workoutId: 'body-work', vocab: 'numbers', verdict: 'PASS', reason: null, verifyExit: 0, elapsedMs: 0 }
+    expect(renderSummaryMd([{ ...row, roundsJudged: '4 of 4 rounds' }], meta)).toContain('| 0 · 4 of 4 rounds |')
+    // A row from before rows said keeps the bare exit code.
+    expect(renderSummaryMd([row], meta)).toContain('| PASS |  | 0 |')
   })
 })

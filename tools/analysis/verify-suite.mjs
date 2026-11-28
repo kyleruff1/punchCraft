@@ -308,6 +308,27 @@ export function timingVerdictFromExit(code, gate) {
   }
 }
 
+/**
+ * What to tell the correlator about how far a drive was meant to run.
+ *
+ * `--rounds=1` for a drive of round 1, `--rounds=all` for a whole workout:
+ * a round that was meant to be driven and is not whole in the capture then
+ * fails the run, so that judging every round cannot quietly become judging
+ * fewer. Nothing at all for a drive that did not end as it should — a
+ * timeout, a cancel: its rounds are judged as far as they go, and its own
+ * failure is already the verdict.
+ */
+export function roundsArgument({ wholeWorkout, endedCleanly }) {
+  if (!endedCleanly) return []
+  return [wholeWorkout ? '--rounds=all' : '--rounds=1']
+}
+
+/** `3 of 3 rounds`, from a correlator report; '' when the report does not say. */
+export function roundsJudgedText(report) {
+  if (!report || !Number.isInteger(report.roundsDescribed)) return ''
+  return `${report.roundsJudged} of ${report.roundsDescribed} rounds`
+}
+
 /** Whether two commit ids name the same commit: one is a prefix of the other. */
 export function sameCommit(a, b) {
   if (!a || !b || a === 'unknown' || b === 'unknown') return false
@@ -585,7 +606,7 @@ export function renderSummaryMd(rows, meta) {
     const under = f ? `${f.barsUnderFloor}/${f.n}${f.barsUnderFloorRatio === null ? '' : ` (${Math.round(f.barsUnderFloorRatio * 1000) / 10}%)`}` : '—'
     const timing = r.timingRefusal ? 'not judged' : r.timingVerdict ? `${r.timingExit ?? '—'} ${r.timingVerdict}` : '—'
     lines.push(
-      `| ${r.workoutId} | ${r.vocab} | ${r.verdict} | ${r.reason ?? ''} | ${r.verifyExit ?? '—'} | ${timing} | ${breath} | ${past} | ${under} | ${ringsCell(r.rings)} | ${r.stats ?? '—'} | ${voice || '—'} | ${inst} | ${tracks} | ${Math.round((r.elapsedMs ?? 0) / 1000)}s |`,
+      `| ${r.workoutId} | ${r.vocab} | ${r.verdict} | ${r.reason ?? ''} | ${r.verifyExit ?? '—'}${r.roundsJudged ? ` · ${r.roundsJudged}` : ''} | ${timing} | ${breath} | ${past} | ${under} | ${ringsCell(r.rings)} | ${r.stats ?? '—'} | ${voice || '—'} | ${inst} | ${tracks} | ${Math.round((r.elapsedMs ?? 0) / 1000)}s |`,
     )
   }
   const refused = rows.filter((r) => r.timingRefusal)
@@ -756,6 +777,8 @@ async function driveOne(ctx, job, attempt = 1) {
     timingRefusal: null,
     /** The work-axis lines shown in its place. */
     workAxis: null,
+    /** How many of the manifest's rounds the correlator judged: "3 of 3 rounds". */
+    roundsJudged: null,
     /** The ring check: its report, its findings, and what the gate made of them. */
     rings: null,
     ringFindings: null,
@@ -952,13 +975,22 @@ async function driveOne(ctx, job, attempt = 1) {
     row.observed = summarizeObserved(logcatText)
     writeFileSync(join(dir, 'observed-summary.json'), JSON.stringify(row.observed, null, 2) + '\n', 'utf8')
 
-    // The verifier judges round 1 whenever the capture got that far — a
-    // launch failure has no round to judge and keeps its ERROR.
+    // The verifier judges every round the capture holds whole, whenever it
+    // got as far as one — a launch failure has no round to judge and keeps
+    // its ERROR.
     const reachedRound = /transition: 'work-entered'/.test(logcatText)
     if (reachedRound) {
       const verify = spawnSync(
         'node',
-        [join(REPO_ROOT, 'tools', 'analysis', 'verify-first-round.mjs'), '--manifest', manifestPath, '--session', dir],
+        [
+          join(REPO_ROOT, 'tools', 'analysis', 'verify-first-round.mjs'),
+          '--manifest',
+          manifestPath,
+          '--session',
+          dir,
+          // A reason is already set for a drive that timed out or was cancelled.
+          ...roundsArgument({ wholeWorkout: !args.firstRoundOnly, endedCleanly: row.reason === null }),
+        ],
         { encoding: 'utf8', cwd: REPO_ROOT },
       )
       row.verifyExit = verify.status
@@ -968,6 +1000,7 @@ async function driveOne(ctx, job, attempt = 1) {
         const report = JSON.parse(readFileSync(reportPath, 'utf8'))
         row.stats = compactStats(report)
         row.health = report.health ?? null
+        row.roundsJudged = roundsJudgedText(report) || null
       }
       const verdict = verdictFromVerifyExit(verify.status)
       if (row.reason === null || verdict === 'FAIL') {
@@ -976,7 +1009,7 @@ async function driveOne(ctx, job, attempt = 1) {
         if (row.reason === null) row.verdict = verdict
         else if (verdict === 'FAIL') row.verdict = 'FAIL'
       }
-      slog(`   verify exit ${verify.status} → ${verdict}${row.stats ? ` · ${row.stats}` : ''}`)
+      slog(`   verify exit ${verify.status} → ${verdict}${row.stats ? ` · ${row.stats}` : ''}${row.roundsJudged ? ` · ${row.roundsJudged}` : ''}`)
       if (verdict === 'STALE' && attempt === 1) {
         slog('   STALE — regenerating the manifest and re-driving once')
         // The generator imports manifests that `require('…wav')`; the stub
