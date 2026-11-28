@@ -40,7 +40,6 @@ import { planRoundCoachSchedule } from '../../src/domain/coach/roundCoachSchedul
 import { disciplineOf } from '../../src/domain/workout/discipline'
 import type {
   CompiledCoachSlot,
-  CompiledScoreStrike,
 } from '../../src/domain/programs/workoutScore'
 
 const MS_PER_TICK = 60_000 / (60 * TRANSPORT_TICKS_PER_PULSE)
@@ -51,19 +50,6 @@ const REPO_ROOT = import.meta.url
   ? resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
   : process.cwd()
 const MANIFESTS_DIR = join(REPO_ROOT, 'tools', 'analysis', 'manifests')
-
-interface ExpectedStrike {
-  eventId: string
-  cueId: string
-  repId: string
-  repIndex: number
-  strikeIndex: number
-  token: string
-  startTick: number
-  startMs: number
-  targetStrikeTick: number
-  targetStrikeMs: number
-}
 
 type ExpectedCoachEvent =
   | {
@@ -119,8 +105,13 @@ interface FirstRoundManifest {
   workoutName: string
   /** Which click-script vocabulary the expectations priced (default numbers). */
   vocabulary: 'numbers' | 'techniques'
-  roundIndex: 0
-  workDurationMs: number
+  /**
+   * 2: the manifest holds every round, in `rounds`. A manifest without this
+   * field is from before that and describes round 1 only, in top-level
+   * `coachEvents` / `expectedCallBars` / `workDurationMs`; the verifier
+   * reads both (`manifestRounds`).
+   */
+  formatVersion: 2
   bpm: number
   /**
    * Whole-session shape for the unattended suite (GH #292): verify-suite.mjs
@@ -136,10 +127,17 @@ interface FirstRoundManifest {
     revision: number
     timelineHash: string
   }
-  strikes: readonly ExpectedStrike[]
-  coachEvents: readonly ExpectedCoachEvent[]
-  /** Round-1 bars that should receive a per-bar loop call (counted, not itemized). */
-  expectedCallBars: number
+  /**
+   * What the coach should say in each round, in order.
+   *
+   * Every round holds the click path's expectations: its section lead-ins,
+   * and how many per-bar calls the runner plans (counted, not itemized).
+   * Round 1 also holds the score path's — combo-announces and per-word
+   * calls — which no shipped workout produces; later rounds do not, because
+   * the compiled score's ticks run on a whole-workout axis and nothing
+   * needs them yet.
+   */
+  rounds: readonly ManifestRound[]
   silentByDesign: readonly {
     reason: string
     cueId: string
@@ -149,24 +147,17 @@ interface FirstRoundManifest {
   notes: readonly string[]
 }
 
-function tickToMs(tick: number): number {
-  return Math.round(tick * MS_PER_TICK)
+export interface ManifestRound {
+  roundIndex: number
+  workDurationMs: number
+  restAfterMs: number
+  coachEvents: readonly ExpectedCoachEvent[]
+  /** Bars the runner plans a per-bar call for, in this round. */
+  expectedCallBars: number
 }
 
-/** The bar's call slot name: punches as digits (`b` for body), rests as dots. */
-function toExpectedStrike(strike: CompiledScoreStrike): ExpectedStrike {
-  return {
-    eventId: strike.eventId,
-    cueId: strike.cueId,
-    repId: strike.repId,
-    repIndex: strike.repIndex,
-    strikeIndex: strike.strikeIndex,
-    token: strike.token,
-    startTick: strike.startTick,
-    startMs: tickToMs(strike.startTick),
-    targetStrikeTick: strike.targetStrikeTick,
-    targetStrikeMs: tickToMs(strike.targetStrikeTick),
-  }
+function tickToMs(tick: number): number {
+  return Math.round(tick * MS_PER_TICK)
 }
 
 function toExpectedCoachEvent(slot: CompiledCoachSlot): ExpectedCoachEvent | null {
@@ -209,10 +200,6 @@ export function buildFirstRoundManifest(
     compiledAtEpochMs: 0,
     coachAssets: runtimeCoachAssetResolver,
   })
-  const roundOneStrikes = compiled.strikes
-    .filter((s) => s.roundIndex === 0)
-    .slice()
-    .sort((a, b) => a.startTick - b.startTick)
 
   // Runtime plays combos two different ways depending on the cue's V1c
   // voicePolicy:
@@ -315,34 +302,55 @@ export function buildFirstRoundManifest(
   //
   // Section 1 has no in-round lead-in — the walkout or the countdown names
   // it before the bell — so the plan holds none and none is expected.
-  const plan = round0
-    ? planRoundCoachSchedule({
-        workoutId: workout.id,
-        roundIndex: 0,
-        cues: round0.cues,
-        vocabulary,
-        findCall: (motif) => findCallClip(motif, vocabulary, discipline),
-        findLeadIn: (slot) => findClickScript(slot, vocabulary),
-      })
-    : null
-  for (const entry of plan?.entries ?? []) {
-    if (entry.kind !== 'lead-in') continue
-    coachEvents.push({
-      kind: 'lead-in',
-      slot: entry.slot,
-      clipId: entry.clip.id,
-      text: entry.clip.text,
-      durationMs: entry.clip.durationMs,
-      expectedStartTick: Math.round(entry.dispatchAtMs / MS_PER_TICK),
-      expectedStartMs: entry.dispatchAtMs,
-      source: 'clickScript.schedule',
-    })
+  const planFor = (roundIndex: number) => {
+    const round = timeline[roundIndex]
+    return round
+      ? planRoundCoachSchedule({
+          workoutId: workout.id,
+          roundIndex,
+          cues: round.cues,
+          vocabulary,
+          findCall: (motif) => findCallClip(motif, vocabulary, discipline),
+          findLeadIn: (slot) => findClickScript(slot, vocabulary),
+        })
+      : null
   }
-  coachEvents.sort((a, b) => a.expectedStartTick - b.expectedStartTick)
-  // Per-bar calls are counted, not itemized: some seventy near-identical
-  // expectations a round would bury the report. The count is the plan's —
-  // the calls the runner will send, rep-0 calls included.
-  const expectedCallBars = plan ? plan.entries.filter((entry) => entry.kind === 'call').length : 0
+  /** A round's lead-ins as expectations, and the number of calls it plans. */
+  const clickPath = (roundIndex: number): { leadIns: ExpectedCoachEvent[]; calls: number } => {
+    const plan = planFor(roundIndex)
+    const leadIns: ExpectedCoachEvent[] = []
+    for (const entry of plan?.entries ?? []) {
+      if (entry.kind !== 'lead-in') continue
+      leadIns.push({
+        kind: 'lead-in',
+        slot: entry.slot,
+        clipId: entry.clip.id,
+        text: entry.clip.text,
+        durationMs: entry.clip.durationMs,
+        expectedStartTick: Math.round(entry.dispatchAtMs / MS_PER_TICK),
+        expectedStartMs: entry.dispatchAtMs,
+        source: 'clickScript.schedule',
+      })
+    }
+    // Per-bar calls are counted, not itemized: some seventy near-identical
+    // expectations a round would bury the report. The count is the plan's —
+    // the calls the runner will send, rep-0 calls included.
+    return { leadIns, calls: plan ? plan.entries.filter((entry) => entry.kind === 'call').length : 0 }
+  }
+  const rounds: ManifestRound[] = workout.schedule.map((scheduled, roundIndex) => {
+    const click = clickPath(roundIndex)
+    // Round 1 keeps the score path's expectations built above; the click
+    // path's are every round's.
+    const events = [...(roundIndex === 0 ? coachEvents : []), ...click.leadIns]
+    events.sort((a, b) => a.expectedStartTick - b.expectedStartTick)
+    return {
+      roundIndex,
+      workDurationMs: scheduled.workDurationMs,
+      restAfterMs: scheduled.restAfterMs,
+      coachEvents: events,
+      expectedCallBars: click.calls,
+    }
+  })
   const notes: string[] = []
   if (workoutId === 'pump-and-coast') {
     notes.push(
@@ -353,8 +361,7 @@ export function buildFirstRoundManifest(
     workoutId: sample.key,
     workoutName: sample.name,
     vocabulary,
-    roundIndex: 0,
-    workDurationMs: workout.schedule[0]?.workDurationMs ?? 0,
+    formatVersion: 2,
     bpm,
     roundCount: workout.schedule.length,
     scheduleMs: workout.schedule.map((round) => ({
@@ -368,9 +375,7 @@ export function buildFirstRoundManifest(
       revision: compiled.identity.revision,
       timelineHash: compiled.identity.timelineHash,
     },
-    strikes: roundOneStrikes.map(toExpectedStrike),
-    coachEvents,
-    expectedCallBars,
+    rounds,
     silentByDesign: [],
     notes,
   }
@@ -395,8 +400,11 @@ function writeManifest(manifest: FirstRoundManifest): string {
 function summarize(m: FirstRoundManifest): string {
   return [
     `${m.workoutId} (${m.workoutName})`,
-    `  round 1 · ${m.workDurationMs / 1000}s · ${m.bpm} bpm · hash=${m.identity.timelineHash} · ${m.roundCount} rounds · ${m.estimatedActivePunchesPerMinute}/min`,
-    `  strikes=${m.strikes.length} · coachEvents=${m.coachEvents.length} · silentByDesign=${m.silentByDesign.length}`,
+    `  ${m.bpm} bpm · hash=${m.identity.timelineHash} · ${m.roundCount} rounds · ${m.estimatedActivePunchesPerMinute}/min`,
+    ...m.rounds.map(
+      (r) =>
+        `  round ${r.roundIndex + 1} · ${r.workDurationMs / 1000}s · coachEvents=${r.coachEvents.length} · calls=${r.expectedCallBars}`,
+    ),
     ...(m.notes.length > 0 ? [`  notes:`, ...m.notes.map((n) => `    - ${n}`)] : []),
   ].join('\n')
 }
