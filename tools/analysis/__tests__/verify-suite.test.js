@@ -27,6 +27,8 @@ import {
   sameCommit,
   isEmulatorDevice,
   renderSummaryMd,
+  ringGateVerdict,
+  ringsCell,
   timingRefusal,
   timingVerdictFromExit,
   verdictFromVerifyExit,
@@ -491,5 +493,83 @@ describe('--require-sha: the installed build must be the commit asked for', () =
   it('refuses a build that cannot say what it is', () => {
     expect(buildRefusal({ installed: 'unknown', required: '8a080194' })).toMatch(/installed build is unknown/)
     expect(buildRefusal({ installed: null, required: '8a080194' })).toMatch(/installed build is unknown/)
+  })
+})
+
+describe('the rings, in the verify suite', () => {
+  const clean = { hard: [], soft: [] }
+  const soft = { hard: [], soft: ['1 ring(s) were stepped over by a late frame — first: ring 2 of b'] }
+  const hard = { hard: ['1 bar(s) did not light all their rings — first: a reached ring 2 of 3'], soft: [] }
+
+  describe('--rings-gate', () => {
+    it('starts at warn, and takes off or fail', () => {
+      expect(parseArgs(['--all']).ringsGate).toBe('warn')
+      expect(parseArgs(['--all', '--rings-gate=fail']).ringsGate).toBe('fail')
+      expect(parseArgs(['--all', '--rings-gate=off']).ringsGate).toBe('off')
+      expect(() => parseArgs(['--all', '--rings-gate=loud'])).toThrow(/--rings-gate/)
+    })
+
+    it('judges nothing when off', () => {
+      expect(ringGateVerdict(hard, 'off')).toBe('PASS')
+    })
+
+    it('at warn, a bar the app says was unlit is a WARN — and softer findings change nothing', () => {
+      // Staged: a device's log has never been read this way before.
+      expect(ringGateVerdict(hard, 'warn')).toBe('WARN')
+      expect(ringGateVerdict(soft, 'warn')).toBe('PASS')
+      expect(ringGateVerdict(clean, 'warn')).toBe('PASS')
+    })
+
+    it('at fail, an unlit bar is a FAIL and a softer finding a WARN', () => {
+      expect(ringGateVerdict(hard, 'fail')).toBe('FAIL')
+      expect(ringGateVerdict(soft, 'fail')).toBe('WARN')
+      expect(ringGateVerdict(clean, 'fail')).toBe('PASS')
+    })
+  })
+
+  describe('the table cell', () => {
+    const stamped = { lit: 194, rings: 194, rows: { lit: 180, masked: 14, other: 0, unrecorded: 0 }, paintedLate: { n: 194, medianMs: 13.2, maxMs: 14.1 } }
+
+    it('says how many the walk reached, how many were on a lit row, and how late', () => {
+      expect(ringsCell(stamped)).toBe('194 of 194 · 180 lit, 14 dim · 13.2 / 14.1 ms late')
+    })
+
+    it('names rings stepped to while another bar’s row was on stage', () => {
+      expect(ringsCell({ ...stamped, rows: { lit: 178, masked: 14, other: 2, unrecorded: 0 } })).toBe('194 of 194 · 178 lit, 14 dim, 2 off-row · 13.2 / 14.1 ms late')
+    })
+
+    it('says so when the capture is from a build that recorded neither', () => {
+      // September's tablet captures: a bar and a ring per step, and no more.
+      const bare = { lit: 506, rings: 506, rows: { lit: 0, masked: 0, other: 0, unrecorded: 506 }, paintedLate: { n: 0, medianMs: null, maxMs: null } }
+      expect(ringsCell(bare)).toBe('506 of 506 · when: not recorded')
+    })
+
+    it('is a dash for a drive that never reached a round', () => {
+      expect(ringsCell(null)).toBe('—')
+      expect(ringsCell(undefined)).toBe('—')
+    })
+  })
+
+  describe('the summary', () => {
+    const meta = { suiteId: '1', deviceId: 'dev', launch: 'cold', vocab: 'numbers', sim: 'captured-jam', firstRoundOnly: false, timingGate: 'fail', exitCode: 0 }
+    const rings = { lit: 194, rings: 194, rows: { lit: 180, masked: 14, other: 0, unrecorded: 0 }, paintedLate: { n: 194, medianMs: 13.2, maxMs: 14.1 } }
+
+    it('has a rings column, after the breath cells', () => {
+      const md = renderSummaryMd([{ workoutId: 'body-work', vocab: 'numbers', verdict: 'PASS', verifyExit: 0, timingExit: 0, timingVerdict: 'PASS', breathFloor: null, rings, elapsedMs: 1000 }], meta)
+      expect(md).toContain('| under floor | rings | stats |')
+      expect(md).toContain('| — | — | — | 194 of 194 · 180 lit, 14 dim · 13.2 / 14.1 ms late |')
+      expect(md).not.toContain('### Rings — findings')
+    })
+
+    it('lists every ring finding under the workout it belongs to', () => {
+      const md = renderSummaryMd(
+        [{ workoutId: 'body-work', vocab: 'numbers', verdict: 'WARN', verifyExit: 0, breathFloor: null, rings, ringVerdict: 'WARN', ringFindings: [...hard.hard, ...soft.soft], elapsedMs: 1000 }],
+        meta,
+      )
+      expect(md).toContain('### Rings — findings')
+      expect(md).toContain('- **body-work (numbers)** — 1 bar(s) did not light all their rings — first: a reached ring 2 of 3')
+      expect(md).toContain('- **body-work (numbers)** — 1 ring(s) were stepped over by a late frame — first: ring 2 of b')
+      expect(md).toContain('A log line that never arrived is not a ring that did not light')
+    })
   })
 })

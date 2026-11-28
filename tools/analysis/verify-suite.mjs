@@ -23,7 +23,8 @@
  *       [--only=a,b] [--device=<serial>] [--expect-release] [--first-round-only]
  *       [--sim=captured-jam|alternating-1-2|none] [--sim-force] [--sim-bpm=N]
  *       [--gh-ledger] [--dry-run] [--tap-fallback] [--keep-volume] [--out=<dir>]
- *       [--timing-gate=off|warn|fail] [--require-sha[=<sha>]] [--part]
+ *       [--timing-gate=off|warn|fail] [--rings-gate=off|warn|fail]
+ *       [--require-sha[=<sha>]] [--part]
  *
  * `--require-sha` makes "the installed build is this commit" a condition
  * rather than a warning: the first drive whose build is another commit FAILS
@@ -65,6 +66,7 @@ import {
 import { EMULATOR_PLATFORM, boolField, capturePlatform, extractField, recordsWithTag } from './logcat.mjs'
 import { renderObservedTable, summarizeObserved } from './observed-summary.mjs'
 import { fitWorkAxis, parseBoundaries, parseTokenDue } from './observed-timing.mjs'
+import { ringReportFromLogcat, ringVerdict } from './rings.mjs'
 import { parseLogcat } from './verify-first-round.mjs'
 
 // `import.meta.url` is null under jest's CommonJS transform (cwd = repo root there).
@@ -109,6 +111,8 @@ export function parseArgs(argv) {
     keepVolume: false,
     out: undefined,
     timingGate: 'fail',
+    /** See `ringGateVerdict`. Staged: it starts at `warn`. */
+    ringsGate: 'warn',
     /** undefined: only warn on a build from another commit. 'HEAD' or a sha: fail and stop. */
     requireSha: undefined,
     /**
@@ -134,6 +138,7 @@ export function parseArgs(argv) {
     else if (a === '--keep-volume') args.keepVolume = true
     else if (a.startsWith('--out=')) args.out = a.slice('--out='.length)
     else if (a.startsWith('--timing-gate=')) args.timingGate = a.slice('--timing-gate='.length)
+    else if (a.startsWith('--rings-gate=')) args.ringsGate = a.slice('--rings-gate='.length)
     else if (a === '--part') args.part = true
     else if (a === '--require-sha') args.requireSha = 'HEAD'
     else if (a.startsWith('--require-sha=')) args.requireSha = a.slice('--require-sha='.length)
@@ -141,6 +146,9 @@ export function parseArgs(argv) {
   }
   if (args.requireSha !== undefined && !/^(HEAD|[0-9a-f]{7,40})$/.test(args.requireSha)) {
     throw new Error(`--require-sha takes a commit id of 7 to 40 hex digits, got '${args.requireSha}'`)
+  }
+  if (!['off', 'warn', 'fail'].includes(args.ringsGate)) {
+    throw new Error(`--rings-gate must be off, warn or fail, got '${args.ringsGate}'`)
   }
   if (!['off', 'warn', 'fail'].includes(args.timingGate)) {
     throw new Error(`--timing-gate must be off, warn or fail, got '${args.timingGate}'`)
@@ -373,6 +381,45 @@ export function workAxisLines(logcatText) {
     .map((r) => `round ${r.roundIndex}: ${r.n} ring tokens place the work clock (spread ${r.spreadMs} ms) · boundary record ${r.disagreementMs ?? '—'} ms after its zero`)
 }
 
+/**
+ * What the ring check does to a drive's verdict.
+ *
+ * The check is the app's own two clocks and its own account of each bar —
+ * no audio — so it means the same on the tablet, an emulator and a PC. It is
+ * staged all the same, as the timing gate was, because a device's log has
+ * never been read this way and a gate that fails on first contact teaches
+ * everyone to turn it off:
+ *   off  — measure and report, judge nothing.
+ *   warn — a bar the app says did not light all its rings is a WARN. Its
+ *          softer findings (a ring stepped over, the two clocks apart, a
+ *          log that lost lines) are listed and change nothing. **The default.**
+ *   fail — an unlit bar is a FAIL; a softer finding is a WARN.
+ *
+ * @param {{ hard: string[], soft: string[] }} judged  from `ringVerdict`
+ * @param {string} gate
+ */
+export function ringGateVerdict(judged, gate) {
+  if (gate === 'off') return 'PASS'
+  if (judged.hard.length > 0) return gate === 'fail' ? 'FAIL' : 'WARN'
+  return gate === 'fail' && judged.soft.length > 0 ? 'WARN' : 'PASS'
+}
+
+/**
+ * A drive's rings in one table cell: how many the walk reached, how many of
+ * those were on a lit row, and how late they were painted — or that the
+ * capture is from a build that did not say.
+ */
+export function ringsCell(rings) {
+  if (!rings) return '—'
+  const reached = `${rings.lit} of ${rings.rings}`
+  const shown = rings.rows.unrecorded === rings.lit ? '' : ` · ${rings.rows.lit} lit, ${rings.rows.masked} dim${rings.rows.other > 0 ? `, ${rings.rows.other} off-row` : ''}`
+  const timed =
+    rings.paintedLate.n > 0
+      ? ` · ${rings.paintedLate.medianMs} / ${rings.paintedLate.maxMs} ms late`
+      : ' · when: not recorded'
+  return `${reached}${shown}${timed}`
+}
+
 /** The more severe of two verdicts, by `aggregateVerdicts`' own ordering. */
 export function worstVerdict(a, b) {
   const rank = (v) => (v === 'FAIL' || v === 'ERROR' ? 3 : v === 'STALE' ? 2 : v === 'WARN' ? 1 : 0)
@@ -518,8 +565,8 @@ export function renderSummaryMd(rows, meta) {
   // asserting the constant across the boundary the analyzer was careful to
   // keep. Plan 5b measured the playlist path at 94.8 ms and the claim is now
   // true as written.
-  lines.push('| workout | vocab | verdict | reason | verify | timing | breath min / p5 | at·past punch | under floor | stats | voice onset (status event, ms) | instrument onset (ms) | AudioTracks arm→end | elapsed |')
-  lines.push('|---|---|---|---|---|---|---|---|---|---|---|---|---|---|')
+  lines.push('| workout | vocab | verdict | reason | verify | timing | breath min / p5 | at·past punch | under floor | rings | stats | voice onset (status event, ms) | instrument onset (ms) | AudioTracks arm→end | elapsed |')
+  lines.push('|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|')
   for (const r of rows) {
     const voice = r.observed?.byKind
       ? Object.entries(r.observed.byKind)
@@ -538,7 +585,7 @@ export function renderSummaryMd(rows, meta) {
     const under = f ? `${f.barsUnderFloor}/${f.n}${f.barsUnderFloorRatio === null ? '' : ` (${Math.round(f.barsUnderFloorRatio * 1000) / 10}%)`}` : '—'
     const timing = r.timingRefusal ? 'not judged' : r.timingVerdict ? `${r.timingExit ?? '—'} ${r.timingVerdict}` : '—'
     lines.push(
-      `| ${r.workoutId} | ${r.vocab} | ${r.verdict} | ${r.reason ?? ''} | ${r.verifyExit ?? '—'} | ${timing} | ${breath} | ${past} | ${under} | ${r.stats ?? '—'} | ${voice || '—'} | ${inst} | ${tracks} | ${Math.round((r.elapsedMs ?? 0) / 1000)}s |`,
+      `| ${r.workoutId} | ${r.vocab} | ${r.verdict} | ${r.reason ?? ''} | ${r.verifyExit ?? '—'} | ${timing} | ${breath} | ${past} | ${under} | ${ringsCell(r.rings)} | ${r.stats ?? '—'} | ${voice || '—'} | ${inst} | ${tracks} | ${Math.round((r.elapsedMs ?? 0) / 1000)}s |`,
     )
   }
   const refused = rows.filter((r) => r.timingRefusal)
@@ -554,6 +601,19 @@ export function renderSummaryMd(rows, meta) {
     )
     lines.push('')
     for (const r of refused) for (const line of r.workAxis ?? []) lines.push(`- **${r.workoutId} (${r.vocab})** — ${line}`)
+  }
+  const ringRows = rows.filter((r) => (r.ringFindings?.length ?? 0) > 0)
+  if (ringRows.length > 0) {
+    lines.push('')
+    lines.push('### Rings — findings')
+    lines.push('')
+    lines.push(
+      'From the app’s own records: when each ring was stepped to, on which frame, from which ring, and whether its row was lit. ' +
+        'A bar the app says did not light all its rings changes the verdict; the rest is listed. ' +
+        'A log line that never arrived is not a ring that did not light, and is counted apart.',
+    )
+    lines.push('')
+    for (const r of ringRows) for (const finding of r.ringFindings) lines.push(`- **${r.workoutId} (${r.vocab})** — ${finding}`)
   }
   const hardRows = rows.filter((r) => (r.timingHard?.length ?? 0) > 0)
   if (hardRows.length > 0) {
@@ -696,6 +756,10 @@ async function driveOne(ctx, job, attempt = 1) {
     timingRefusal: null,
     /** The work-axis lines shown in its place. */
     workAxis: null,
+    /** The ring check: its report, its findings, and what the gate made of them. */
+    rings: null,
+    ringFindings: null,
+    ringVerdict: null,
     timingHard: null,
     timingSoft: null,
     breathFloor: null,
@@ -984,6 +1048,20 @@ async function driveOne(ctx, job, attempt = 1) {
         )
         for (const h of row.timingHard ?? []) slog(`   TIMING HARD: ${h}`)
       }
+    }
+    // The rings. Judged on every device: the app's own clocks and its own
+    // account of each bar, with no audio in it. Only for a drive that
+    // reached a round — there are no rings before one.
+    if (row.counters.workEntered > 0) {
+      const rings = ringReportFromLogcat(logcatText)
+      const judged = ringVerdict(rings)
+      writeFileSync(join(dir, 'rings-report.json'), JSON.stringify({ ...rings, verdict: judged }, null, 2) + '\n', 'utf8')
+      row.rings = rings
+      row.ringFindings = [...judged.hard, ...judged.soft]
+      row.ringVerdict = ringGateVerdict(judged, args.ringsGate)
+      row.verdict = worstVerdict(row.verdict, row.ringVerdict)
+      slog(`   rings: ${ringsCell(rings)}${row.ringVerdict === 'PASS' ? '' : ` → ${row.ringVerdict}`}`)
+      for (const finding of judged.hard) slog(`   RINGS: ${finding}`)
     }
     slog(`   ${renderObservedTable(row.observed).split('\n')[0]}`)
     if (row.counters.redbox > 0) slog(`   WARN: ${row.counters.redbox} AndroidRuntime lines in the capture`)
