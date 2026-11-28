@@ -2325,7 +2325,7 @@
       "source": "clickScript.schedule"
     }
   ],
-  "expectedCallBars": 52,
+  "expectedCallBars": 54,
   "silentByDesign": [],
   "notes": []
 }

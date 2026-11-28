@@ -2913,7 +2913,7 @@
       "source": "clickScript.schedule"
     }
   ],
-  "expectedCallBars": 63,
+  "expectedCallBars": 64,
   "silentByDesign": [],
   "notes": []
 }

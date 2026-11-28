@@ -36,8 +36,7 @@ import { findCallClip } from '../../src/audio/voiceAssets/callClips'
 import { findClickScript } from '../../src/audio/voiceAssets/clickScriptManifest'
 import { TRANSPORT_TICKS_PER_PULSE } from '../../src/domain/timing/TimingEngine'
 import { expandTimeline } from '../../src/domain/programs/CueTimeline'
-import { callDispatchAtMs, leadInDispatchAtMs } from '../../src/domain/coach/callPlacement'
-import { motifOf } from '../../src/domain/coach/callSlot'
+import { planRoundCoachSchedule } from '../../src/domain/coach/roundCoachSchedule'
 import { disciplineOf } from '../../src/domain/workout/discipline'
 import type {
   CompiledCoachSlot,
@@ -89,12 +88,11 @@ type ExpectedCoachEvent =
     }
   | {
       /**
-       * Script Bible v2 section lead-in (2026-09-01): the runner's
-       * buildLeadInSchedule dispatches `findClickScript(slot)` at
-       * `max(0, blockStartMs − durationMs − LEAD_IN_PAD_MS)` — this
-       * expectation mirrors that arithmetic exactly, so the correlator
-       * checks the DESIGN (clip finishes as the section starts), not a
-       * re-derivation of it.
+       * Script Bible v2 section lead-in (2026-09-01): a section's lead-in,
+       * as `planRoundCoachSchedule` plans it — the function the runner
+       * builds its schedule with. The expectation is that plan's own entry,
+       * so the correlator checks that the device carried the plan out, not
+       * a second derivation of it.
        */
       kind: 'lead-in'
       slot: string
@@ -303,92 +301,48 @@ export function buildFirstRoundManifest(
       }
     }
   }
-  // Script Bible v2 lead-ins (2026-09-01): one expectation per SECTION of
-  // round 1, mirroring the runner's buildLeadInSchedule — first cue of
-  // each block, clip resolved by slot key, dispatch scheduled so the clip
-  // FINISHES ~LEAD_IN_PAD_MS before the section's first strike. The pad
-  // constant is duplicated (the runner module is React Native and cannot
-  // be imported here); the correlator's window absorbs small drift, and a
-  // pad change without a manifest regen shows up as a uniform offset.
-  if (round0) {
-    const seenBlocks = new Set<string>()
-    for (const cue of round0.cues) {
-      if (cue.repeatIndex !== 0 || seenBlocks.has(cue.blockId)) continue
-      seenBlocks.add(cue.blockId)
-      // Section 1 is voiced PRE-BELL (in the walkout / warn ceremony,
-      // Kyle 2026-09-01) — the runner never dispatches it in-round, so
-      // expecting it here would report a designed silence as missing.
-      if (seenBlocks.size === 1) continue
-      const slot = `lead-in/${workout.id}/r1s${seenBlocks.size}`
-      const clip = findClickScript(slot, vocabulary)
-      if (!clip) continue
-      // A lead-in ends before the section's opening CALL, not before its
-      // first STRIKE. This used to anchor on `cue.scheduledStartMs`, which
-      // is the strike — about two seconds later than the call's dispatch —
-      // so every lead-in of every quick workout was flagged as mismatched
-      // on drives where the runtime had placed it exactly right. Both sides
-      // now compute it from `@domain/coach/callPlacement`.
-      const call = findCallClip(motifOf(cue.tokens), vocabulary, discipline)
-      const rep0Call = call
-        ? callDispatchAtMs({
-            cue,
-            scheduledStartMs: cue.scheduledStartMs,
-            vocabulary,
-            slot: call.slot,
-            clipDurationMs: call.clip.durationMs,
-          })
-        : undefined
-      const { dispatchAtMs: expectedStartMs } = leadInDispatchAtMs({
-        ...(rep0Call ? { rep0CallDispatchAtMs: rep0Call.dispatchAtMs } : {}),
-        scheduledStartMs: cue.scheduledStartMs,
-        clipDurationMs: clip.durationMs,
+  // The round's own schedule — its section lead-ins and its per-bar calls —
+  // from the SAME function the runner builds it with
+  // (`planRoundCoachSchedule`). It used to be restated here, and the
+  // restatement drifted twice. It anchored a lead-in to the section's first
+  // strike, about two seconds after the call the runner anchors it to. And
+  // it worked out each call's window with arithmetic of its own — the bar's
+  // start, less the clip, less a 100 ms pad the app replaced in September —
+  // so it pruned calls against a lead-in that the runner keeps:
+  // `expectedCallBars` was one to three short of what the runner sends in
+  // 20 of the 44 manifests, and a round could lose that many calls and still
+  // pass the coverage check (findings doc, N-20).
+  //
+  // Section 1 has no in-round lead-in — the walkout or the countdown names
+  // it before the bell — so the plan holds none and none is expected.
+  const plan = round0
+    ? planRoundCoachSchedule({
+        workoutId: workout.id,
+        roundIndex: 0,
+        cues: round0.cues,
         vocabulary,
+        findCall: (motif) => findCallClip(motif, vocabulary, discipline),
+        findLeadIn: (slot) => findClickScript(slot, vocabulary),
       })
-      coachEvents.push({
-        kind: 'lead-in',
-        slot,
-        clipId: clip.id,
-        text: clip.text,
-        durationMs: clip.durationMs,
-        expectedStartTick: Math.round(expectedStartMs / MS_PER_TICK),
-        expectedStartMs,
-        source: 'clickScript.schedule',
-      })
-    }
+    : null
+  for (const entry of plan?.entries ?? []) {
+    if (entry.kind !== 'lead-in') continue
+    coachEvents.push({
+      kind: 'lead-in',
+      slot: entry.slot,
+      clipId: entry.clip.id,
+      text: entry.clip.text,
+      durationMs: entry.clip.durationMs,
+      expectedStartTick: Math.round(entry.dispatchAtMs / MS_PER_TICK),
+      expectedStartMs: entry.dispatchAtMs,
+      source: 'clickScript.schedule',
+    })
   }
   coachEvents.sort((a, b) => a.expectedStartTick - b.expectedStartTick)
-  // Per-bar loop calls (Kyle, 2026-09-01): counted, not itemized — ~70
-  // near-identical expectations per round would bury the report. The
-  // denominator mirrors the runner's BUILD-TIME pruning exactly: bars
-  // whose call window overlaps a mid-round lead-in's (padded) window are
-  // dropped by design — the coach is announcing the next section, not
-  // calling this one — so they must not count as expected (first honest
-  // run read 75/90 "LOW" when ~15 of the gap was this pruning).
-  let expectedCallBars = 0
-  if (round0) {
-    const CALL_PAD_MS = 100
-    const leadWindows = coachEvents
-      .filter((e) => e.kind === 'lead-in')
-      .map((e) => ({ start: e.expectedStartMs - 500, end: e.expectedStartMs + e.durationMs }))
-    for (const cue of round0.cues) {
-      const call = findCallClip(motifOf(cue.tokens), vocabulary, discipline)
-      if (!call) continue
-      const { clip } = call
-      // Rep-0 bars are CALLED since W3 (mid-round sections) and Variant B
-      // (the round opener rides its authored setupMeasures pad,
-      // 2026-09-04). They are firstRep entries in the runner — exempt
-      // from the lead-in collision prune AND the busy retry — so they
-      // always count.
-      if (cue.repeatIndex === 0) {
-        expectedCallBars += 1
-        continue
-      }
-      const dispatchAt = Math.max(0, cue.scheduledStartMs - clip.durationMs - CALL_PAD_MS)
-      const end = dispatchAt + clip.durationMs
-      const pruned = leadWindows.some((w) => dispatchAt < w.end && end > w.start)
-      if (!pruned) expectedCallBars += 1
-    }
-  }
+  // Per-bar calls are counted, not itemized: some seventy near-identical
+  // expectations a round would bury the report. The count is the plan's —
+  // the calls the runner will send, rep-0 calls included.
+  const expectedCallBars = plan ? plan.entries.filter((entry) => entry.kind === 'call').length : 0
   const notes: string[] = []
   if (workoutId === 'pump-and-coast') {
     notes.push(
