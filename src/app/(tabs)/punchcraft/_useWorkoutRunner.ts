@@ -73,7 +73,7 @@ import type { TokenVisualState } from '@components/workout/tokenVisuals'
 import type { CueView } from '@components/workout/CueStage'
 import { logger, safe } from '@diagnostics/logger'
 import { VizForensics, type VizRecord } from '@diagnostics/vizForensics'
-import { motifOf } from '@domain/coach/callSlot'
+import { planRoundCoachSchedule } from '@domain/coach/roundCoachSchedule'
 import { CueAnnouncer, deliveryForCadence } from '@domain/coach/CueAnnouncer'
 import { selectPerformanceState } from '@domain/coach/performanceState'
 import { AUDIO_PRIORITY, type VoiceOutputPort } from '@domain/coach/VoiceOutputPort'
@@ -85,11 +85,7 @@ import { getWorkoutPersistence, type WorkoutPersistence } from '@storage/getWork
 import { persistWorkoutSession, type PersistedWorkoutSession } from '@storage/persistWorkoutSession'
 import { toCueResultRows, type PendingCueResultRow } from '@storage/cueResultRows'
 import type { AdaptationRecord, RealizedTokenStream } from '@storage/repositories/WorkoutRepository'
-import {
-  CALL_DISPATCH_LAG_MS,
-  callDispatchAtMs,
-  leadInDispatchAtMs,
-} from '@domain/coach/callPlacement'
+import { CALL_DISPATCH_LAG_MS } from '@domain/coach/callPlacement'
 import { isQaEnabled } from '@state/useQaStore'
 import { getLive, resetLive, setLive, type LiveVelocity } from '@state/useWorkoutStore'
 
@@ -711,131 +707,55 @@ export function useWorkoutRunner(args: UseWorkoutRunnerArgs): WorkoutRunner {
   const buildLeadInSchedule = useCallback(
     (roundIndex: number): void => {
       const vocabulary = clickVocabularyRef.current
-      // Lead-ins ride ahead of numbers by a fixed lead (Kyle, 2026-09-03);
-      // per-bar calls use the set-aware breath (breathForBar) instead, folded
-      // from the same tuned dense values via DENSE_BREATH_MS. Both leads now
-      // live inside `callPlacement`, which the manifest generator shares.
+      // The rule itself — which bars are called, with which clip and when,
+      // which lead-ins go between them, which calls give way to one — is
+      // `planRoundCoachSchedule` in the domain. The verifier's manifest
+      // generator calls the same function, so what the device is checked
+      // against is what the device was told to do. This hook supplies the
+      // clip bank and turns the plan into entries it can mark as played.
       const cues = timelineRef.current[roundIndex]?.cues ?? []
-      const seenBlocks = new Set<string>()
-      type Entry = NonNullable<typeof leadInScheduleRef.current>['entries'][number]
-      const leadIns: Entry[] = []
-      const calls: Entry[] = []
-      // Build the per-bar call entry for one cue (its motif named so it
-      // FINISHES a set-aware breath before the bar's first shot). Anchored to
-      // the first PUNCH (a bar may open on a rest). `firstRep` marks a
-      // section's rep-0 call so the collision filter leaves it beside its
-      // lead-in.
-      const buildCall = (cue: CueInstance, firstRep: boolean): Entry | null => {
-        // The key and the lookup are shared with the verifier's manifest
-        // generator (`callSlot.ts`, `callClips.ts`), so the two cannot
-        // disagree about which clip a bar is called with.
-        const found = findCallClip(motifOf(cue.tokens), vocabulary, discipline)
-        if (!found) return null
-        const { slot, clip } = found
-        // The placement itself lives in the domain (`callPlacement`) so the
-        // manifest generator computes the identical number instead of its own.
-        const { dispatchAtMs, firstNodeMs, breathMs } = callDispatchAtMs({
-          cue,
-          scheduledStartMs: cue.scheduledStartMs,
-          vocabulary,
-          slot,
-          clipDurationMs: clip.durationMs,
-        })
-        return {
-          kind: 'call',
-          slot,
-          text: clip.text,
-          module: clip.module,
-          durationMs: clip.durationMs,
-          breathMs,
-          // Asks CALL_DISPATCH_LAG_MS early: the scheduler fires late and the
-          // player takes time to sound, and the measured sum of the two was
-          // eating ~71 ms out of every bar's breath.
-          dispatchAtMs,
-          // A call that could not start by the bar's first beats is noise —
-          // the next bar's call is seconds away.
-          giveUpAtMs: firstNodeMs + 500,
-          firstNodeMs,
-          state: 'pending',
-          cueId: cue.id,
-          ...(firstRep ? { firstRep: true } : {}),
-        }
-      }
-      for (const cue of cues) {
-        if (cue.scoring !== 'sequence') continue
-        if (cue.repeatIndex === 0 && !seenBlocks.has(cue.blockId)) {
-          seenBlocks.add(cue.blockId)
-          // Kyle, 2026-09-04: the first set of every section was MUTED — the
-          // whisper described it, rep 0 threw silent, the coach entered on
-          // rep 1. Now EVERY section's rep 0 gets its call — including the
-          // round opener (Variant B, "fit in the missing audio for the first
-          // rep"): each round's first row now carries an authored
-          // setupMeasures pad (fit-round-openers.mjs), so the bell releases
-          // into a breath, the rep-0 call, then the first punches. The
-          // opener is still NAMED pre-bell (round 1 in the intro sequence,
-          // rounds 2+ in the warn playlist) — that ceremony is unchanged;
-          // only the per-bar call was missing.
-          const rep0Call = buildCall(cue, true)
-          if (rep0Call) calls.push(rep0Call)
-          // Section index is the block's ORDER in the round, not its id —
-          // blockId prefixes ('jab1-b2') do not match workout ids. Section 1
-          // has NO mid-round lead-in whisper (pre-bell ceremony owns that);
-          // sections 2+ sequence whisper → rep-0 call inside their pads.
-          if (seenBlocks.size > 1) {
-            const slot = `lead-in/${workout.id}/r${roundIndex + 1}s${seenBlocks.size}`
-            const clip = findClickScript(slot, vocabulary)
-            if (clip) {
-              // End before the rep-0 call starts (fallback: before the first
-              // shot, the old target, if there is no rep-0 call). Shared with
-              // the manifest generator, which used to anchor to the first shot
-              // unconditionally and so expected every lead-in ~2 s late.
-              const { dispatchAtMs, endByMs } = leadInDispatchAtMs({
-                ...(rep0Call ? { rep0CallDispatchAtMs: rep0Call.dispatchAtMs } : {}),
-                scheduledStartMs: cue.scheduledStartMs,
-                clipDurationMs: clip.durationMs,
-                vocabulary,
-              })
-              leadIns.push({
-                kind: 'lead-in',
-                slot,
-                text: clip.text,
-                module: clip.module,
-                durationMs: clip.durationMs,
-                dispatchAtMs,
-                giveUpAtMs: endByMs,
-                state: 'pending',
-              })
-            }
-          }
-          continue
-        }
-        const call = buildCall(cue, false)
-        if (call) calls.push(call)
-      }
-      // Deterministic collision resolution: a call whose window overlaps a
-      // lead-in's (padded) window is dropped at BUILD time, so the coach
-      // lane is guaranteed free when the lead-in comes due — lead-ins must
-      // never starve behind call-saturated busy checks.
-      const survivors = calls.filter((call) => {
-        // The rep-0 call is deliberately sequenced right after its section's
-        // lead-in — never drop it as a "collision" with that lead-in.
-        if (call.firstRep) return true
-        const callEnd = call.dispatchAtMs + call.durationMs
-        return !leadIns.some((li) => {
-          const liStart = li.dispatchAtMs - 500
-          const liEnd = li.dispatchAtMs + li.durationMs
-          return call.dispatchAtMs < liEnd && callEnd > liStart
-        })
+      const plan = planRoundCoachSchedule({
+        workoutId: workout.id,
+        roundIndex,
+        cues,
+        vocabulary,
+        findCall: (motif) => findCallClip(motif, vocabulary, discipline),
+        findLeadIn: (slot) => findClickScript(slot, vocabulary),
       })
-      const entries = [...leadIns, ...survivors].sort((a, b) => a.dispatchAtMs - b.dispatchAtMs)
-      leadInScheduleRef.current = { roundIndex, entries }
+      leadInScheduleRef.current = {
+        roundIndex,
+        entries: plan.entries.map((entry) =>
+          entry.kind === 'lead-in'
+            ? {
+                kind: 'lead-in',
+                slot: entry.slot,
+                text: entry.clip.text,
+                module: entry.clip.module,
+                durationMs: entry.clip.durationMs,
+                dispatchAtMs: entry.dispatchAtMs,
+                giveUpAtMs: entry.giveUpAtMs,
+                state: 'pending',
+              }
+            : {
+                kind: 'call',
+                slot: entry.slot,
+                text: entry.clip.text,
+                module: entry.clip.module,
+                durationMs: entry.clip.durationMs,
+                breathMs: entry.breathMs,
+                dispatchAtMs: entry.dispatchAtMs,
+                giveUpAtMs: entry.giveUpAtMs,
+                firstNodeMs: entry.firstNodeMs,
+                state: 'pending',
+                cueId: entry.cueId,
+                ...(entry.firstRep ? { firstRep: true } : {}),
+              },
+        ),
+      }
 
-      const calledIds = new Set(
-        survivors.filter((e) => e.cueId !== undefined).map((e) => e.cueId as string),
-      )
       maskedCueIdsRef.current = maskedBarIds(
         cues,
-        calledIds,
+        plan.calledCueIds,
         // "Lit = spoken" only holds while the coach is calling punches. With
         // the coach off, or on Minimal (no punch calls), the visuals are the
         // workout and nothing may be dimmed waiting for a call that is not
