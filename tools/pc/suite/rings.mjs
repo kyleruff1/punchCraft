@@ -29,6 +29,10 @@ export function ringReport(records) {
       return { cueId, ordinal, atMs: r.monoMs, frameMs, workElapsedMs, from, row }
     }),
     promotes: recordsOf(records, 'workout.ring.promote').map((r) => fieldsOf(r).lateMs),
+    promotions: recordsOf(records, 'workout.ring.promote').map((r) => {
+      const { previousCueId, previousReached } = fieldsOf(r)
+      return { previousCueId, previousReached }
+    }),
     viz: recordsOf(records, 'workout.viz.batch').flatMap((r) => {
       try {
         return JSON.parse(fieldsOf(r).records)
@@ -37,5 +41,7 @@ export function ringReport(records) {
       }
     }),
     lastMs: records.at(-1)?.monoMs ?? 0,
+    // A page's records are whole: nothing is lost between the app and here.
+    capture: 'page',
   })
 }
