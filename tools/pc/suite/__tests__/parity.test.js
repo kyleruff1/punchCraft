@@ -1,17 +1,25 @@
 /**
- * Parity: does the PC say what the tablet said? Built here from captures
+ * Parity: does the PC say what the device said? Built here from captures
  * written by the PC's own writer, so each case is a capture the tablet's
- * parser really reads.
+ * parser really reads. A capture says which platform wrote it in its QA run
+ * record; one that says nothing here is the PC's, by its tag.
  */
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import path from 'node:path'
+
 import { logcatText } from '../capture.mjs'
 import {
   changedClips,
   compareSchedules,
   LOST_LINES_ALLOWED,
   parityOf,
+  REFERENCE_DIR,
+  referenceDevice,
   referenceFrom,
   referenceName,
+  referenceRounds,
   renderParity,
+  tabletFiguresOf,
 } from '../parity.mjs'
 import { dispatchKey, scheduleOf } from '../schedule.mjs'
 
@@ -80,6 +88,16 @@ const three = [
   call(10_600, { slot: 'call/1-2-3', said: 'One, two, three!' }),
 ]
 const dispatchesOf = (...calls) => scheduleOf(capture(...calls)).dispatches
+/** The same capture as a device wrote it: its QA run record names the platform. */
+const ranOn = (fields) => record('workout.qa.run', { monotonicTimeMs: 1, ...fields })
+const TABLET = { platform: 'android', emulator: false }
+const EMULATOR = { platform: 'android', emulator: true }
+const deviceCapture = (device, ...calls) =>
+  logcatText(
+    [ranOn(device), ...edges.slice(0, 2), ...calls.flat(), edges[2]].sort(
+      (a, b) => a.wallMs - b.wallMs,
+    ),
+  )
 
 describe('scheduleOf', () => {
   it('reads round 1 as what was scheduled: clip, words, due time, length, ring', () => {
@@ -208,7 +226,7 @@ describe('parityOf', () => {
   }
   const referenceOf = (...calls) =>
     referenceFrom({
-      logcatText: capture(...calls),
+      logcatText: deviceCapture(TABLET, ...calls),
       drive: tabletDrive,
       source: { suite: 'post-floor', capturedOn: '2026-09-08' },
     })
@@ -235,7 +253,11 @@ describe('parityOf', () => {
         verdict: 'WARN',
       },
     })
-    expect(reference.round1.dispatches).toHaveLength(3)
+    expect(reference.formatVersion).toBe(2)
+    expect(reference.rounds).toHaveLength(1)
+    expect(reference.rounds[0].dispatches).toHaveLength(3)
+    // The tablet wrote it: there is nothing of the tablet’s to carry beside it.
+    expect(reference.tablet).toBeUndefined()
     expect(reference.timing.dispatchLateMs.medianMs).toBe(30)
     expect(referenceFrom({ logcatText: '', drive: tabletDrive, source: {} })).toBeNull()
   })
@@ -251,7 +273,10 @@ describe('parityOf', () => {
     expect(result).toMatchObject({ status: 'SAME', same: 3, of: 3, differenceCount: 0, notes: [] })
     // Lateness differs — and is not what parity is about.
     expect(result.pc.dispatchLateMs.medianMs).toBe(60)
-    expect(result.tablet.dispatchLateMs.medianMs).toBe(30)
+    expect(result.reference).toMatchObject({ device: 'tablet', dispatchLateMs: { medianMs: 30 } })
+    // The tablet wrote the reference: its figures are the reference’s, said once.
+    expect(result.tablet).toBeNull()
+    expect(result.rounds).toEqual({ compared: 1, reference: 1, pc: 1 })
   })
 
   it('DIFFERS when a dispatch does, and says which', () => {
@@ -292,7 +317,7 @@ describe('parityOf', () => {
   it('skips, without failing, what it cannot compare', () => {
     expect(parity(three, null)).toMatchObject({
       status: 'SKIPPED',
-      notes: ['no tablet capture of this workout to compare with'],
+      notes: ['no device capture of this workout to compare with'],
     })
     const moved = parity(three, referenceOf(...three), { ...pcRow, timelineHash: 'v2:bbb' })
     expect(moved.status).toBe('SKIPPED')
@@ -312,13 +337,279 @@ describe('parityOf', () => {
     ]
     const md = renderParity(rows, { run: 'all22' })
     expect(md).toContain('**1 the same · 1 differ · 1 skipped**')
-    expect(md).toContain('| quick-one-two | numbers | yes — 3 of 3 | 30 / 30 | 30 / 30 |')
+    // Each lateness figure under the name of the device it is from.
+    expect(md).toContain(
+      '| quick-one-two | numbers | yes — 3 of 3 | 1 of 1 | 30 / 30 | 30 / 30 (tablet) | — | 40 / 40 | 40 / 40 (tablet) | — | tablet, 2026-09-08, build b8e72bc5 |',
+    )
     // The PC's changed dispatch is both things: not what the tablet said, and
     // something the tablet did not say.
     expect(md).toContain('**NO — 1 differ, 1 only on the PC**')
     expect(md).toContain('2026-09-08, build b8e72bc5')
     expect(md).toContain('## What differs')
-    expect(md).toContain('no tablet capture of this workout to compare with')
-    expect(md).toMatch(/Nothing on the tablet is tuned from the PC’s/)
+    expect(md).toContain('no device capture of this workout to compare with')
+    expect(md).toMatch(/Nothing on the tablet is tuned from either/)
+    expect(md).toContain('round 1, #2 PC: ')
+  })
+})
+
+/** A second round, 300 s after the first began, and what closes it. */
+const ROUND_2 = WORK + 300_000
+const round2 = (closing, ...calls) => [
+  record('workout.round.boundary', {
+    transition: 'work-entered',
+    roundIndex: 1,
+    workElapsedMs: 0,
+    monotonicTimeMs: ROUND_2,
+  }),
+  record('workout.cue.tokenDue', {
+    roundIndex: 1,
+    workElapsedMs: 4_020,
+    monotonicTimeMs: ROUND_2 + 4_020,
+    scheduledMs: 4_000,
+  }),
+  ...calls.flat(),
+  ...(closing === null
+    ? []
+    : [
+        record('workout.round.boundary', {
+          transition: closing,
+          roundIndex: 1,
+          monotonicTimeMs: ROUND_2 + 240_000,
+        }),
+      ]),
+]
+/** A call in round 2: the same record, stamped on round 2’s part of the clock. */
+const later = (at, options) =>
+  call(at, options).map((r) => {
+    const fields = { ...r.args[2] }
+    if (fields.monotonicTimeMs !== undefined) fields.monotonicTimeMs += 300_000
+    if (fields.dispatchMs !== undefined) fields.dispatchMs += 300_000
+    return { ...r, wallMs: r.wallMs + 300_000, args: [r.args[0], r.args[1], fields] }
+  })
+const twoRounds = (device, closing, second = [later(2_600), later(6_600)]) =>
+  logcatText(
+    [
+      ...(device ? [ranOn(device)] : []),
+      ...edges,
+      ...three.flat(),
+      ...round2(closing, ...second),
+    ].sort((a, b) => a.wallMs - b.wallMs),
+  )
+
+describe('every round of a capture', () => {
+  it('reads each round the capture opened, and says which it holds whole', () => {
+    const schedule = scheduleOf(twoRounds(null, 'completed'))
+    expect(
+      schedule.rounds.map((r) => [r.roundIndex, r.whole, r.dispatches.length, r.tokensDue]),
+    ).toEqual([
+      [0, true, 3, 1],
+      [1, true, 2, 1],
+    ])
+    // Round 1 is still what the top level holds; the lateness is every whole round’s.
+    expect(schedule.dispatches).toHaveLength(3)
+    expect(schedule.dispatchLateMs.n).toBe(5)
+    expect(schedule.ringTokenLateMs).toMatchObject({ n: 2, minMs: 20, maxMs: 40 })
+  })
+
+  it('does not call a round whole when the capture ends inside it', () => {
+    // The default PC drive stops three seconds into round 2.
+    const schedule = scheduleOf(twoRounds(null, null))
+    expect(schedule.rounds.map((r) => r.whole)).toEqual([true, false])
+    expect(schedule.dispatchLateMs.n).toBe(3)
+  })
+
+  it('nor one that was cancelled: it ended, and was not completed', () => {
+    expect(scheduleOf(twoRounds(null, 'cancelled')).rounds.map((r) => r.whole)).toEqual([
+      true,
+      false,
+    ])
+  })
+})
+
+describe('a reference names its device', () => {
+  const drive = {
+    workoutId: 'quick-one-two',
+    vocab: 'numbers',
+    timelineHash: 'v2:aaa',
+    verdict: 'PASS',
+    stats: 'matched=3',
+    build: { gitSha: 'aa3a8f83', sim: 'captured-jam' },
+  }
+  const source = { suite: 'emu-all', capturedOn: '2026-11-28' }
+  const tabletReference = referenceFrom({
+    logcatText: deviceCapture(TABLET, ...three),
+    drive,
+    source: { suite: 'post-floor', capturedOn: '2026-09-08' },
+  })
+
+  it('by what the capture says wrote it', () => {
+    expect(referenceDevice(deviceCapture(TABLET, ...three))).toBe('tablet')
+    expect(referenceDevice(deviceCapture(EMULATOR, ...three))).toBe('emulator')
+  })
+
+  it('believes the suite’s row over a capture that does not say', () => {
+    // An emulator running a build from before the capture said so reads as
+    // the tablet. The suite asked the device, and its row knows.
+    const silent = deviceCapture(TABLET, ...three)
+    expect(referenceDevice(silent, { deviceIsEmulator: true })).toBe('emulator')
+    expect(
+      referenceDevice(silent, {
+        timingRefusal: 'the device is an emulator, and an emulator on this PC is a PC',
+      }),
+    ).toBe('emulator')
+    expect(referenceDevice(silent, { deviceIsEmulator: false, timingRefusal: null })).toBe('tablet')
+    // A row cannot make a PC capture a device’s.
+    expect(referenceDevice(capture(...three), { deviceIsEmulator: true })).toBeNull()
+  })
+
+  it('and refuses a PC capture: the reference is what the PC is compared with', () => {
+    expect(referenceDevice(capture(...three))).toBeNull()
+    expect(referenceFrom({ logcatText: capture(...three), drive, source })).toBeNull()
+  })
+
+  it('holds every round the capture holds whole, and no part of one', () => {
+    const whole = referenceFrom({ logcatText: twoRounds(EMULATOR, 'completed'), drive, source })
+    expect(whole.rounds.map((r) => [r.roundIndex, r.dispatches.length])).toEqual([
+      [0, 3],
+      [1, 2],
+    ])
+    expect(whole.source).toMatchObject({ device: 'emulator', build: 'aa3a8f83' })
+    const short = referenceFrom({ logcatText: twoRounds(EMULATOR, null), drive, source })
+    expect(short.rounds.map((r) => r.roundIndex)).toEqual([0])
+  })
+
+  it('carries the tablet’s own lateness forward when an emulator replaces a tablet capture', () => {
+    const fromEmulator = referenceFrom({
+      logcatText: twoRounds(EMULATOR, 'completed'),
+      drive,
+      source,
+      previous: tabletReference,
+    })
+    expect(fromEmulator.tablet).toMatchObject({
+      capturedOn: '2026-09-08',
+      suite: 'post-floor',
+      rounds: 1,
+      timing: { dispatchLateMs: { medianMs: 30 } },
+    })
+    // And again, when that one is itself replaced by another emulator run.
+    const again = referenceFrom({
+      logcatText: twoRounds(EMULATOR, 'completed'),
+      drive,
+      source,
+      previous: fromEmulator,
+    })
+    expect(again.tablet).toEqual(fromEmulator.tablet)
+  })
+
+  it('carries nothing when there is nothing of the tablet’s to carry, or the tablet wrote it', () => {
+    expect(tabletFiguresOf(null)).toBeNull()
+    expect(tabletFiguresOf({ source: { device: 'emulator' }, timing: {} })).toBeNull()
+    const fromTablet = referenceFrom({
+      logcatText: deviceCapture(TABLET, ...three),
+      drive,
+      source,
+      previous: tabletReference,
+    })
+    expect(fromTablet.tablet).toBeUndefined()
+  })
+
+  it('reads a reference from before references held every round', () => {
+    const old = { round1: { dispatches: [{ slot: 'call/1-2' }], tokensDue: 193 } }
+    expect(referenceRounds(old)).toEqual([
+      { roundIndex: 0, dispatches: [{ slot: 'call/1-2' }], tokensDue: 193 },
+    ])
+  })
+})
+
+describe('parity over every round', () => {
+  const drive = {
+    workoutId: 'quick-one-two',
+    vocab: 'numbers',
+    timelineHash: 'v2:aaa',
+    verdict: 'PASS',
+    stats: 'matched=3',
+    build: { gitSha: 'aa3a8f83', sim: 'captured-jam' },
+  }
+  const source = { suite: 'emu-all', capturedOn: '2026-11-28' }
+  const row = { workoutId: 'quick-one-two', vocab: 'numbers', timelineHash: 'v2:aaa', sound: null }
+  const tabletReference = referenceFrom({
+    logcatText: deviceCapture(TABLET, ...three),
+    drive,
+    source: { suite: 'post-floor', capturedOn: '2026-09-08' },
+  })
+  const reference = referenceFrom({
+    logcatText: twoRounds(EMULATOR, 'completed'),
+    drive,
+    source,
+    previous: tabletReference,
+  })
+  const against = (pcCapture, ref = reference) =>
+    parityOf({ row, schedule: scheduleOf(pcCapture), reference: ref })
+
+  it('compares a whole-workout run on every round the reference holds', () => {
+    const result = against(twoRounds(null, 'completed'))
+    expect(result).toMatchObject({
+      status: 'SAME',
+      same: 5,
+      of: 5,
+      rounds: { compared: 2, reference: 2, pc: 2 },
+    })
+  })
+
+  it('compares a round-1 run on round 1, and that is not a failure', () => {
+    expect(against(twoRounds(null, null))).toMatchObject({
+      status: 'SAME',
+      same: 3,
+      of: 3,
+      rounds: { compared: 1, reference: 2, pc: 1 },
+    })
+  })
+
+  it('finds a difference in round 2, and says which round', () => {
+    const result = against(twoRounds(null, 'completed', [later(2_600), later(6_700)]))
+    expect(result.status).toBe('DIFFERS')
+    expect(result.differences[0]).toMatchObject({ round: 2, index: 1 })
+  })
+
+  it('compares what it can with a reference that holds round 1 only', () => {
+    const old = { ...tabletReference, rounds: undefined, round1: tabletReference.rounds[0] }
+    expect(against(twoRounds(null, 'completed'), old)).toMatchObject({
+      status: 'SAME',
+      rounds: { compared: 1, reference: 1, pc: 2 },
+    })
+  })
+
+  it('skips a PC run that completed no round the reference holds', () => {
+    const none = logcatText([edges[0], ...three.flat()].sort((a, b) => a.wallMs - b.wallMs))
+    expect(against(none)).toMatchObject({
+      status: 'SKIPPED',
+      notes: ['the PC drive did not complete a round the reference holds'],
+    })
+  })
+
+  it('sets the emulator’s lateness and the tablet’s side by side, each under its own name', () => {
+    const md = renderParity([against(twoRounds(null, 'completed'))], { run: 'full' })
+    expect(md).toContain(
+      '| yes — 5 of 5 | 2 of 2 | 30 / 30 | 30 / 30 (emulator) | 30 / 30 (2026-09-08) |',
+    )
+    expect(md).toContain('| emulator, 2026-11-28, build aa3a8f83 |')
+    expect(md).toMatch(/An emulator on this PC is a PC/)
+  })
+})
+
+describe('the committed reference', () => {
+  const files = existsSync(REFERENCE_DIR)
+    ? readdirSync(REFERENCE_DIR).filter((f) => f.endsWith('.json'))
+    : []
+
+  it('is there, and every file reads: a device, and at least one round of dispatches', () => {
+    expect(files.length).toBeGreaterThanOrEqual(22)
+    for (const name of files) {
+      const reference = JSON.parse(readFileSync(path.join(REFERENCE_DIR, name), 'utf8'))
+      expect(['tablet', 'emulator']).toContain(reference.source.device)
+      const rounds = referenceRounds(reference)
+      expect(rounds.length).toBeGreaterThan(0)
+      expect(rounds[0].dispatches.length).toBeGreaterThan(0)
+    }
   })
 })

@@ -2,15 +2,19 @@
 
 The tablet's verify suite, on this machine, with no tablet attached. It
 drives each sample workout in a headless browser, has the tablet's own
-correlator judge it, listens to what the page plays, watches the rings, and
-compares what was said with what the tablet said.
+correlator judge every round of it, listens to what the page plays, watches
+the rings, and compares what was said with what a native build said.
+
+Its sibling is `npm run emu:suite` — the same suite on a native Android
+build in an emulator, which is where the tablet's tests are run
+(`docs/dev-setup.md`, "An Android emulator").
 
 ```
 npm run pc:suite                      all 22 workouts, round 1 and its rest — about 22 minutes
 npm run pc:suite -- --only quick-one-two,body-work
 npm run pc:suite -- --vocab techniques        (or both)
-npm run pc:suite -- --full                    whole workouts — 10 to 20 minutes each
-npm run pc:parity                     the newest run against the tablet
+npm run pc:suite -- --full                    whole workouts, every round judged — 10 to 20 minutes each
+npm run pc:parity                     the newest run against the device reference
 ```
 
 A run lands in `tools/pc/suite/runs/<date>/` (git-ignored): `summary.md`,
@@ -27,10 +31,28 @@ minutes on 16 processors.
 
 ## What it checks
 
-**The correlator.** `tools/analysis/verify-first-round.mjs`, unchanged, on a
-capture written in the tablet's `logcat.txt` layout against the same
-manifest. A coach line missing, extra or late; a call not dispatched; a
-clip that would not load. It reads round 1 and nothing after it.
+**The correlator.** `tools/analysis/verify-first-round.mjs`, the tablet's own,
+on a capture written in the tablet's `logcat.txt` layout against the same
+manifest. A manifest holds every round, and each round the capture holds
+whole is judged against its own part: a lead-in missing, extra or late (by
+name and time); how many calls were sent against how many the runner plans;
+a clip that would not load.
+
+The suite tells it how far the drive was meant to run — round 1 for the
+default drive, every round for `--full` — and a round that was meant to be
+driven and is not whole in the capture **fails** the drive. So checking
+every round cannot quietly become checking fewer. The summary shows it:
+`matched=6 extras=0 reanchor=0 · 2 of 2 rounds · 3 of 3 ceremonies`.
+
+**The ceremonies.** The walkout, each rest's line and each countdown are
+native playlists the app builds ahead of time and logs as it builds them.
+The manifest says what each line should read — how many tracks, how long,
+which script — and the correlator holds the capture to it, and to the
+ceremony having started. A countdown opens with one of fifteen lines picked
+at random; the app logs which, and its length is checked less that opener.
+A line that reads wrong fails. A ceremony with no line at all fails here,
+where a capture loses nothing, and only warns on a device, whose log drops
+lines. (Whether it was *heard* is the next check.)
 
 **The sound.** Every clip the page plays is routed through a measuring point
 inside the browser, which notes when its sound starts and stops. A drive
@@ -75,19 +97,29 @@ from the countdown's last word to the bell. The tablet aims that gap at 0 to
 a PC sits on the upper edge of that by construction.
 
 **The rings.** From the app's own records of what it scheduled and what it
-painted. A drive fails when a bar the app scheduled did not light all its
-rings. It warns when a ring was painted more than 100 ms after its scheduled
-time, when a late frame stepped over a ring, and when the app's 50 ms loop
-stalled and caught up. The 100 ms is this suite's own number, not a tablet
-constant. The rings cannot light out of order — the code only moves forward
+painted (`tools/analysis/rings.mjs`, which the emulator suite uses too). A
+drive fails when a bar the app scheduled did not light all its rings. It
+warns when a ring was painted more than 100 ms after its scheduled time,
+when a late frame stepped over a ring, when the app's 50 ms loop stalled and
+caught up, and when the ring clock ran more than 20 ms apart from the session
+clock. The 100 ms and the 20 ms are this check's own numbers, not tablet
+constants. The rings cannot light out of order — the code only moves forward
 within a bar — so that is not a rule.
+
+A ring is timed by the frame that painted it against the SESSION clock's
+schedule, which is the one the calls keep. The ring clock is the UI
+thread's copy, and judged against itself it cannot see the two drifting
+apart (N-18 read 2.8 ms late that way, and was 35). Rings on bars the app
+keeps dim on purpose — a bar with no call, and the first two measures of a
+round — are counted apart from rings that were shown lit.
 
 **The page.** Any error on the page fails the drive — the smoke test's rule.
 
-**Parity.** `pc:parity` compares round 1 of each workout with the tablet
-reference in `tablet-reference/`: which clip, its words, when it was due,
-how long it is, and when the ring it leads is due must match dispatch for
-dispatch. Lateness is shown side by side and never compared.
+**Parity.** `pc:parity` compares each workout with the device reference in
+`device-reference/`, in every round both hold whole: which clip, its words,
+when it was due, how long it is, and when the ring it leads is due must
+match dispatch for dispatch. Lateness is shown side by side, each figure
+under the name of the device it is from, and never compared.
 
 ## What it cannot tell you
 
@@ -95,10 +127,13 @@ dispatch. Lateness is shown side by side and never compared.
   start latency. The sound is measured where it enters the browser's mixer.
 - Whether the tablet's processor keeps up. Every lateness figure here is this
   PC's.
-- Whether rounds after the first say what they were meant to. The correlator
-  and its manifests cover round 1. In later rounds the suite judges what the
-  app played — that it sounded, whole, clear of its ring — and nothing says
-  what it should have played.
+- Whether each call was the right call. A round's lead-ins are checked by
+  name and time; its calls only by how many were sent.
+- Which line a rest plays when no script was authored for it. All 41 rests
+  in the samples have one; the seeded walkthrough behind them has no
+  expectation and is reported as not checked.
+- Anything that happens when the athlete leaves the screen. A drive ends on
+  the workout's last boundary and stays put.
 - Anything by ear.
 
 **No tablet timing constant is ever set from a number in these reports.**
@@ -131,26 +166,38 @@ Each must FAIL, on its own rule. `late-rings` holds back animation frames
 only: stalling the whole page would delay the calls with the rings and prove
 nothing about either.
 
-## The tablet reference
+## The device reference
 
-`tablet-reference/*.json` is round 1 of each workout as a tablet suite's
-captures recorded it, with the build and date it came from. After a tablet
-suite run, rebuild it:
+`device-reference/*.json` is each workout as a native build's suite captures
+recorded it — every round the capture holds whole — with the device, build
+and date it came from. After a suite run on the tablet or the emulator,
+rebuild it:
 
 ```
-npm run pc:parity -- --build-reference tools/analysis/suites/<the tablet run>
+npm run pc:parity -- --build-reference tools/analysis/suites/<the run>
 ```
+
+A reference says which device wrote it: `tablet` or `emulator`. What is said
+and when it is due is the same code on both, so either will do for that.
+The lateness beside it will not — an emulator on this PC is a PC — so a
+reference built from an emulator run keeps the tablet's own lateness from
+the file it replaces, under the date it was taken, and the report shows
+both. A PC capture is refused: the reference is what the PC is compared
+with. A file written before references held every round (`round1`, no
+`rounds`) still reads, as round 1.
 
 Parity **skips** a workout, with a note, when its timeline or one of its
-clips has changed since the tablet capture: a re-recorded clip is a different
+clips has changed since the device capture: a re-recorded clip is a different
 length, so it is sent at a different time. A skipped workout is not compared
-at all. As of 2026-11-26 ten of the 22 are skipped — four call clips were
-re-recorded after the September capture — and stay so until the tablet suite
-runs again.
+at all. As of 2026-11-28 none is: the reference was rebuilt from an emulator
+run of all 22 in both vocabularies, at the commit that changed nothing they
+play. Ten of the 22 had been skipped since four call clips were re-recorded
+after the tablet's September capture. The next re-recording skips its
+workouts again until a device suite runs.
 
-The tablet's log drops lines under load. A PC run that holds everything the
-tablet's capture holds, in order, plus one or two dispatches more, is read as
-the same with lines lost, and the report says so.
+A device's log drops lines under load. A PC run that holds everything the
+device's capture holds, in order, plus one or two dispatches more over the
+whole workout, is read as the same with lines lost, and the report says so.
 
 ## Running it
 

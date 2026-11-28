@@ -7,6 +7,7 @@
 
 import {
   aggregateVerdicts,
+  buildRefusal,
   appendLedgerRow,
   budgetMs,
   buildRunUrl,
@@ -23,8 +24,14 @@ import {
   planJobs,
   quoteForDeviceShell,
   runQuery,
+  sameCommit,
   isEmulatorDevice,
+  judgedSuffix,
   renderSummaryMd,
+  ringGateVerdict,
+  ringsCell,
+  roundsArgument,
+  roundsJudgedText,
   timingRefusal,
   timingVerdictFromExit,
   verdictFromVerifyExit,
@@ -269,6 +276,17 @@ describe('args', () => {
     expect(parseArgs(['--all', '--expect-release']).launch).toBe('cold')
     expect(parseArgs(['--all', '--launch=cold']).launch).toBe('cold')
   })
+  it('takes --require-sha bare (this checkout) or with a commit id, and nothing else', () => {
+    expect(parseArgs(['--all']).requireSha).toBeUndefined()
+    expect(parseArgs(['--all', '--require-sha']).requireSha).toBe('HEAD')
+    expect(parseArgs(['--all', '--require-sha=8a080194']).requireSha).toBe('8a080194')
+    expect(() => parseArgs(['--all', '--require-sha=main'])).toThrow(/--require-sha/)
+    expect(() => parseArgs(['--all', '--require-sha=abc'])).toThrow(/--require-sha/)
+  })
+  it('takes --part: one of several processes sharing a run folder', () => {
+    expect(parseArgs(['--all']).part).toBe(false)
+    expect(parseArgs(['--only=body-work', '--part']).part).toBe(true)
+  })
   it('rejects a run with nothing selected, a bad vocab, or an unknown flag', () => {
     expect(() => parseArgs([])).toThrow(/--all or --only/)
     expect(() => parseArgs(['--all', '--vocab=loud'])).toThrow(/--vocab/)
@@ -450,5 +468,148 @@ describe('an emulator is a PC (findings doc, N-19)', () => {
       expect(md).toContain('| 0 PASS |')
       expect(md).not.toContain('not judged')
     })
+  })
+})
+
+describe('--require-sha: the installed build must be the commit asked for', () => {
+  it('knows the same commit by either id being a prefix of the other', () => {
+    expect(sameCommit('8a080194', '8a080194c0ffee')).toBe(true)
+    expect(sameCommit('8a080194c0ffee', '8a080194')).toBe(true)
+    expect(sameCommit('8a080194', '6b47e616')).toBe(false)
+    expect(sameCommit('unknown', 'unknown')).toBe(false)
+    expect(sameCommit('', '8a080194')).toBe(false)
+    expect(sameCommit(undefined, '8a080194')).toBe(false)
+  })
+
+  it('refuses nothing when no commit is required', () => {
+    expect(buildRefusal({ installed: '6b47e616', required: undefined })).toBeNull()
+  })
+
+  it('lets the required build through', () => {
+    expect(buildRefusal({ installed: '8a080194', required: '8a080194c0ffee' })).toBeNull()
+  })
+
+  it('refuses another commit, naming both', () => {
+    expect(buildRefusal({ installed: '6b47e616', required: '8a080194' })).toBe('build-mismatch: the installed build is 6b47e616, and --require-sha asked for 8a080194')
+  })
+
+  it('refuses a build that cannot say what it is', () => {
+    expect(buildRefusal({ installed: 'unknown', required: '8a080194' })).toMatch(/installed build is unknown/)
+    expect(buildRefusal({ installed: null, required: '8a080194' })).toMatch(/installed build is unknown/)
+  })
+})
+
+describe('the rings, in the verify suite', () => {
+  const clean = { hard: [], soft: [] }
+  const soft = { hard: [], soft: ['1 ring(s) were stepped over by a late frame — first: ring 2 of b'] }
+  const hard = { hard: ['1 bar(s) did not light all their rings — first: a reached ring 2 of 3'], soft: [] }
+
+  describe('--rings-gate', () => {
+    it('starts at warn, and takes off or fail', () => {
+      expect(parseArgs(['--all']).ringsGate).toBe('warn')
+      expect(parseArgs(['--all', '--rings-gate=fail']).ringsGate).toBe('fail')
+      expect(parseArgs(['--all', '--rings-gate=off']).ringsGate).toBe('off')
+      expect(() => parseArgs(['--all', '--rings-gate=loud'])).toThrow(/--rings-gate/)
+    })
+
+    it('judges nothing when off', () => {
+      expect(ringGateVerdict(hard, 'off')).toBe('PASS')
+    })
+
+    it('at warn, a bar the app says was unlit is a WARN — and softer findings change nothing', () => {
+      // Staged: a device's log has never been read this way before.
+      expect(ringGateVerdict(hard, 'warn')).toBe('WARN')
+      expect(ringGateVerdict(soft, 'warn')).toBe('PASS')
+      expect(ringGateVerdict(clean, 'warn')).toBe('PASS')
+    })
+
+    it('at fail, an unlit bar is a FAIL and a softer finding a WARN', () => {
+      expect(ringGateVerdict(hard, 'fail')).toBe('FAIL')
+      expect(ringGateVerdict(soft, 'fail')).toBe('WARN')
+      expect(ringGateVerdict(clean, 'fail')).toBe('PASS')
+    })
+  })
+
+  describe('the table cell', () => {
+    const stamped = { lit: 194, rings: 194, rows: { lit: 180, masked: 14, other: 0, unrecorded: 0 }, paintedLate: { n: 194, medianMs: 13.2, maxMs: 14.1 } }
+
+    it('says how many the walk reached, how many were on a lit row, and how late', () => {
+      expect(ringsCell(stamped)).toBe('194 of 194 · 180 lit, 14 dim · 13.2 / 14.1 ms late')
+    })
+
+    it('names rings stepped to while another bar’s row was on stage', () => {
+      expect(ringsCell({ ...stamped, rows: { lit: 178, masked: 14, other: 2, unrecorded: 0 } })).toBe('194 of 194 · 178 lit, 14 dim, 2 off-row · 13.2 / 14.1 ms late')
+    })
+
+    it('says so when the capture is from a build that recorded neither', () => {
+      // September's tablet captures: a bar and a ring per step, and no more.
+      const bare = { lit: 506, rings: 506, rows: { lit: 0, masked: 0, other: 0, unrecorded: 506 }, paintedLate: { n: 0, medianMs: null, maxMs: null } }
+      expect(ringsCell(bare)).toBe('506 of 506 · when: not recorded')
+    })
+
+    it('is a dash for a drive that never reached a round', () => {
+      expect(ringsCell(null)).toBe('—')
+      expect(ringsCell(undefined)).toBe('—')
+    })
+  })
+
+  describe('the summary', () => {
+    const meta = { suiteId: '1', deviceId: 'dev', launch: 'cold', vocab: 'numbers', sim: 'captured-jam', firstRoundOnly: false, timingGate: 'fail', exitCode: 0 }
+    const rings = { lit: 194, rings: 194, rows: { lit: 180, masked: 14, other: 0, unrecorded: 0 }, paintedLate: { n: 194, medianMs: 13.2, maxMs: 14.1 } }
+
+    it('has a rings column, after the breath cells', () => {
+      const md = renderSummaryMd([{ workoutId: 'body-work', vocab: 'numbers', verdict: 'PASS', verifyExit: 0, timingExit: 0, timingVerdict: 'PASS', breathFloor: null, rings, elapsedMs: 1000 }], meta)
+      expect(md).toContain('| under floor | rings | stats |')
+      expect(md).toContain('| — | — | — | 194 of 194 · 180 lit, 14 dim · 13.2 / 14.1 ms late |')
+      expect(md).not.toContain('### Rings — findings')
+    })
+
+    it('lists every ring finding under the workout it belongs to', () => {
+      const md = renderSummaryMd(
+        [{ workoutId: 'body-work', vocab: 'numbers', verdict: 'WARN', verifyExit: 0, breathFloor: null, rings, ringVerdict: 'WARN', ringFindings: [...hard.hard, ...soft.soft], elapsedMs: 1000 }],
+        meta,
+      )
+      expect(md).toContain('### Rings — findings')
+      expect(md).toContain('- **body-work (numbers)** — 1 bar(s) did not light all their rings — first: a reached ring 2 of 3')
+      expect(md).toContain('- **body-work (numbers)** — 1 ring(s) were stepped over by a late frame — first: ring 2 of b')
+      expect(md).toContain('A log line that never arrived is not a ring that did not light')
+    })
+  })
+})
+
+describe('how far a drive was meant to run', () => {
+  it('tells the correlator to expect every round of a whole workout, and round 1 of a round-1 drive', () => {
+    expect(roundsArgument({ wholeWorkout: true, endedCleanly: true })).toEqual(['--rounds=all'])
+    expect(roundsArgument({ wholeWorkout: false, endedCleanly: true })).toEqual(['--rounds=1'])
+  })
+
+  it('says nothing for a drive that stopped short: its own failure is already the verdict', () => {
+    // A timeout is an ERROR with round 1 judged as far as it goes. Telling
+    // the correlator to expect every round would turn it into a FAIL.
+    expect(roundsArgument({ wholeWorkout: true, endedCleanly: false })).toEqual([])
+    expect(roundsArgument({ wholeWorkout: false, endedCleanly: false })).toEqual([])
+  })
+
+  it('reads how many rounds were judged from a correlator report', () => {
+    expect(roundsJudgedText({ roundsJudged: 3, roundsDescribed: 3 })).toBe('3 of 3 rounds')
+    expect(roundsJudgedText({ roundsJudged: 1, roundsDescribed: 4 })).toBe('1 of 4 rounds')
+  })
+
+  it('says nothing for a report from before reports said, or for none', () => {
+    expect(roundsJudgedText({ health: { verdict: 'PASS' } })).toBe('')
+    expect(roundsJudgedText(null)).toBe('')
+  })
+
+  it('shows the rounds judged beside the verifier exit code in the summary', () => {
+    const meta = { suiteId: 's', device: 'emulator-5556', release: true, hostSha: 'abc1234', timingGate: 'off' }
+    const row = { workoutId: 'body-work', vocab: 'numbers', verdict: 'PASS', reason: null, verifyExit: 0, elapsedMs: 0 }
+    expect(renderSummaryMd([{ ...row, roundsJudged: '4 of 4 rounds' }], meta)).toContain('| 0 · 4 of 4 rounds |')
+    expect(renderSummaryMd([{ ...row, roundsJudged: '4 of 4 rounds', ceremonies: '7 of 7 ceremonies' }], meta)).toContain(
+      '| 0 · 4 of 4 rounds · 7 of 7 ceremonies |',
+    )
+    expect(judgedSuffix({ ceremonies: '1 of 1 ceremonies' })).toBe(' · 1 of 1 ceremonies')
+    expect(judgedSuffix({})).toBe('')
+    // A row from before rows said keeps the bare exit code.
+    expect(renderSummaryMd([row], meta)).toContain('| PASS |  | 0 |')
   })
 })

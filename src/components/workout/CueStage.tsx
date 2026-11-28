@@ -21,7 +21,8 @@ import { RestSlot } from './RestSlot'
 import { useSharedValue, type SharedValue } from 'react-native-reanimated'
 
 import { PunchAvatarCard } from './PunchAvatarCard'
-import { useRingBeatClock, type RoundWalkPlan } from './useRingBeatClock'
+import { ringVisualFields, type StageRow } from './ringLog'
+import { useRingBeatClock, type OnRingStep, type RoundWalkPlan } from './useRingBeatClock'
 import type { SharedTransportAnchor } from '@domain/timing/SharedTransportAnchor'
 import type { SharedWorkClock } from '@domain/timing/SharedWorkClock'
 import { PunchToken } from './PunchToken'
@@ -31,7 +32,7 @@ import { fonts, sizes, weights } from '@/theme/typography'
 import type { CueInstance } from '@domain/programs/CueTimeline'
 import type { WorkoutToken } from '@domain/workout/WorkoutTokens'
 import type { Discipline } from '@domain/workout/discipline'
-import { logger, safe } from '@/diagnostics/logger'
+import { logger } from '@/diagnostics/logger'
 
 export interface CueView {
   cue: CueInstance
@@ -303,13 +304,21 @@ function useWalkedView(
   const walkOrdinal = useSharedValue(-1)
   const [walk, setWalk] = React.useState<{ epoch: string; ordinal: number } | null>(null)
   const cue = current?.cue
-  const onOrdinal = React.useCallback((epoch: string, ordinal: number) => {
-    setWalk({ epoch, ordinal })
-    logger.info('workout.ring.visual', 'walk advanced', {
-      cueId: safe(epoch),
-      ordinal: safe(ordinal),
-    })
-  }, [])
+  // The row on stage as this thread knows it at the moment a step arrives:
+  // the log says whether that row paints, is held dim, or is another bar.
+  const stageRef = React.useRef<StageRow | null>(null)
+  stageRef.current = current ? { cueId: current.cue.id, masked: current.masked === true } : null
+  const onOrdinal = React.useCallback<OnRingStep>(
+    (epoch, ordinal, from, workElapsedMs, frameMs) => {
+      setWalk({ epoch, ordinal })
+      logger.info(
+        'workout.ring.visual',
+        'walk advanced',
+        ringVisualFields({ epoch, ordinal, from, workElapsedMs, frameMs }, stageRef.current),
+      )
+    },
+    [],
+  )
   useRingBeatClock(plan, workClock, onOrdinal, walkOrdinal)
 
   const view = React.useMemo(() => {

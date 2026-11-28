@@ -48,10 +48,11 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
 
+import { ceremonyHealth, judgeCeremonies, parseCeremonyRecord, renderCeremonies } from './ceremonies.mjs'
 import {
+  capturePlatform,
   extractField,
   numField,
-  parseTimestampMs,
   stitchLogRecords,
   withCurrentTag,
 } from './logcat.mjs'
@@ -113,12 +114,18 @@ const DEFER_JOIN_WINDOW_MS = 5000
 export function parseLogcat(logcatText) {
   const events = []
   const records = stitchLogRecords(logcatText)
-  for (const { dateStr, timeStr, body: recorded } of records) {
-    const ts = parseTimestampMs(dateStr, timeStr)
+  for (const { ts, body: recorded } of records) {
     // Every check below matches the CURRENT event-code spelling. A capture
     // from before the rename spells them `puncheokie.*`; read it as written
     // today, or all ~240 stored captures parse to nothing.
     const body = withCurrentTag(recorded)
+    // The walkout, the rest line and the countdown: what the app built for
+    // each, and that it started (`ceremonies.mjs`).
+    const ceremony = parseCeremonyRecord(body, ts)
+    if (ceremony) {
+      events.push(ceremony)
+      continue
+    }
     if (body.includes('workout.runner.start')) {
       events.push({ type: 'runner.start', ts, workout: extractField(body, 'workout'), raw: body })
       continue
@@ -667,6 +674,12 @@ function classifyRunHealth(t0, reanchor, verdicts, extras, dispatcher, provenanc
     callsExpected > 0 ? Math.round((callsDispatched / callsExpected) * 100) : null
   const noCalls = callsExpected > 0 && callsDispatched === 0
   const lowCalls = callCoveragePct !== null && !noCalls && callCoveragePct < CALL_COVERAGE_LOW_PCT
+  // The expected number is the plan the runner builds its schedule from, so
+  // the runner cannot send more calls than it. When a capture holds more,
+  // the manifest and the build disagree about the round — which is how the
+  // manifest's own under-count went unseen for months (N-20): every such
+  // run read as "105 %" and passed.
+  const moreCallsThanPlanned = callsExpected > 0 && callsDispatched > callsExpected
 
   const hardFail =
     !t0 ||
@@ -683,6 +696,7 @@ function classifyRunHealth(t0, reanchor, verdicts, extras, dispatcher, provenanc
     deferredUnattributed > 0 ||
     reanchorRegression ||
     lowCalls ||
+    moreCallsThanPlanned ||
     // A run that cannot be tied to its manifest's timeline is not a pass.
     identityUnknown ||
     (gateSuppressed && newGates)
@@ -714,6 +728,7 @@ function classifyRunHealth(t0, reanchor, verdicts, extras, dispatcher, provenanc
     callCoveragePct,
     noCalls,
     lowCalls,
+    moreCallsThanPlanned,
     identityUnknown,
     stale,
     provenance: provenance.state,
@@ -725,17 +740,13 @@ function classifyRunHealth(t0, reanchor, verdicts, extras, dispatcher, provenanc
   }
 }
 
-function renderReport(
-  manifestPath,
-  sessionDir,
-  manifest,
-  t0,
-  health,
-  verdicts,
-  extras,
-  dispatcher,
-  provenance,
-) {
+/**
+ * The report: the capture and its manifest once, then a section for each
+ * round. A capture of one round reads as it always has.
+ */
+function renderReport(manifestPath, sessionDir, manifest, result) {
+  const { provenance, rounds } = result
+  const several = rounds.length > 1
   const lines = []
   lines.push(`# First-round verification — ${manifest.workoutName}`)
   lines.push('')
@@ -774,10 +785,57 @@ function renderReport(
         `re-arm (${provenance.distinctHashes.join(', ')}).`,
     )
   }
-  lines.push(`- BPM: ${manifest.bpm} · Work duration: ${manifest.workDurationMs / 1000}s`)
-  lines.push(`- t0 anchor: ${t0 ? t0.source + ' @ ' + t0.ts + 'ms' : 'MISSING (fatal)'}`)
+  const described = manifestRounds(manifest)
+  lines.push(
+    `- BPM: ${manifest.bpm} · Work duration: ${described.map((r) => `${r.workDurationMs / 1000}s`).join(', ')}`,
+  )
+  if (several) {
+    lines.push('')
+    lines.push(`## Verdict: **${result.health.verdict}**`)
+    lines.push('')
+    lines.push(
+      `${result.roundsJudged} of ${result.roundsDescribed} rounds judged` +
+        (result.roundsExpected > 0 ? ` — the drive was meant to complete ${result.roundsExpected}` : '') +
+        '. A round is judged only when the capture holds it whole.',
+    )
+    lines.push('')
+    lines.push('| Round | State | Verdict | Coach events matched | Calls sent / planned |')
+    lines.push('|---|---|---|---|---|')
+    for (const round of rounds) {
+      if (round.state !== 'judged') {
+        const why = round.state === 'opened' ? 'opened, not judged — the capture ends inside it' : 'not in the capture'
+        lines.push(`| ${round.roundIndex + 1} | ${why} | — | — | — |`)
+        continue
+      }
+      const h = round.health
+      lines.push(`| ${round.roundIndex + 1} | judged | ${h.verdict} | ${h.matched} of ${h.total} | ${h.callsDispatched} / ${h.callsExpected} |`)
+    }
+    if ((result.health.roundsNotJudged ?? []).length > 0) {
+      lines.push('')
+      lines.push(
+        `> **Round ${result.health.roundsNotJudged.map((r) => r + 1).join(', ')} was meant to be driven and is not whole in the capture.** That fails the run: a check of every round must not quietly become a check of fewer.`,
+      )
+    }
+  }
+  // Above the rounds when there are several, so it is not below four of them.
+  const ceremonyLines = renderCeremonies(result.ceremonies ?? [])
+  if (several) lines.push(...ceremonyLines)
+  for (const round of rounds.filter((r) => r.state === 'judged')) {
+    renderRound(lines, round, several)
+  }
+  if (!several) lines.push(...ceremonyLines)
+  return lines.join('\n')
+}
+
+/** One round of the report. `several` adds the round to its headings. */
+function renderRound(lines, round, several) {
+  const { t0, health, verdicts, extras, dispatcher } = round
+  const label = `round ${round.roundIndex + 1}`
+  const heading = (text) => (several ? `## Round ${round.roundIndex + 1} — ${text}` : `## ${text}`)
+  if (several) lines.push('')
+  lines.push(`- t0 anchor${several ? ` (${label})` : ''}: ${t0 ? t0.source + ' @ ' + t0.ts + 'ms' : 'MISSING (fatal)'}`)
   lines.push('')
-  lines.push(`## Verdict: **${health.verdict}**`)
+  lines.push(heading(`Verdict: **${health.verdict}**`))
   lines.push('')
   lines.push(`| Metric | Count |`)
   lines.push(`|---|---|`)
@@ -791,13 +849,19 @@ function renderReport(
   lines.push(`| Extra (stray) | ${health.extra} |`)
   if (dispatcher.expectedCallBars > 0) {
     const pct = health.callCoveragePct
-    const flag = health.noCalls ? ' — NONE (fail)' : health.lowCalls ? ' — LOW (warn)' : ''
+    const flag = health.noCalls
+      ? ' — NONE (fail)'
+      : health.lowCalls
+        ? ' — LOW (warn)'
+        : health.moreCallsThanPlanned
+          ? ' — MORE THAN PLANNED: the manifest and the build disagree (warn)'
+          : ''
     lines.push(
-      `| Loop calls dispatched (round 1) | ${dispatcher.callsDispatched} / ${dispatcher.expectedCallBars} bars (${pct}%${flag}) |`,
+      `| Loop calls dispatched (${label}) | ${dispatcher.callsDispatched} / ${dispatcher.expectedCallBars} bars (${pct}%${flag}) |`,
     )
   }
   lines.push(
-    `| Clips that failed to load or play (round 1) | ${health.playbackFailures}` +
+    `| Clips that failed to load or play (${label}) | ${health.playbackFailures}` +
       `${health.playbackFailures > 0 ? ` — ${dispatcher.clipMissingCount} did not load, ${dispatcher.playFailedCount} did not play (fail)` : ''} |`,
   )
   const windowSec = Math.round((health.observedWindowMs ?? 0) / 1000)
@@ -806,7 +870,7 @@ function renderReport(
       ? (health.reanchorInRound1 / (health.observedWindowMs / 1000)).toFixed(2)
       : '—'
   lines.push(
-    `| Transport re-anchors (round 1) | ${health.reanchorInRound1} ` +
+    `| Transport re-anchors (${label}) | ${health.reanchorInRound1} ` +
       `(ceiling: ${RE_ANCHOR_REGRESSION_CEILING}) |`,
   )
   lines.push(
@@ -814,7 +878,7 @@ function renderReport(
       `${health.truncated ? ' — capture truncated, count not comparable' : ''} |`,
   )
   lines.push('')
-  lines.push(`## Dispatcher (score path)`)
+  lines.push(heading('Dispatcher (score path)'))
   lines.push('')
   lines.push(`| Field | Value |`)
   lines.push(`|---|---|`)
@@ -822,7 +886,7 @@ function renderReport(
   lines.push(`| totalCompiledSlots | ${dispatcher.totalCompiledSlots ?? '—'} |`)
   lines.push(`| enqueuedSlots | ${dispatcher.enqueuedSlots ?? '—'} |`)
   lines.push(`| announceThenWorkCues | ${dispatcher.announceThenWorkCues ?? '—'} |`)
-  lines.push(`| manifest round-0 combo-announce expectations | ${health.comboExpected} |`)
+  lines.push(`| manifest combo-announce expectations (${label}) | ${health.comboExpected} |`)
   lines.push(`| deferred (dropped, lane busy) | ${dispatcher.deferredCount} |`)
   lines.push(`| ...of those, unattributed | ${health.deferredUnattributed} |`)
   lines.push(`| assetMissing | ${dispatcher.assetMissingCount} |`)
@@ -835,7 +899,7 @@ function renderReport(
     lines.push('')
   }
   if (verdicts.length > 0) {
-    lines.push(`## Per-event verdicts`)
+    lines.push(heading('Per-event verdicts'))
     lines.push('')
     lines.push(`| # | Expected text | Expected @ ms | Verdict | Observed @ ms | Δ ms |`)
     lines.push(`|---|---|---|---|---|---|`)
@@ -850,7 +914,7 @@ function renderReport(
     lines.push('')
   }
   if (extras.length > 0) {
-    lines.push(`## Extra / duplicated observed events`)
+    lines.push(heading('Extra / duplicated observed events'))
     lines.push('')
     lines.push(`| # | Text | Observed @ ms | Verdict |`)
     lines.push(`|---|---|---|---|`)
@@ -861,7 +925,6 @@ function renderReport(
     })
     lines.push('')
   }
-  return lines.join('\n')
 }
 
 // ---------------------------------------------------------------------------
@@ -869,14 +932,15 @@ function renderReport(
 // ---------------------------------------------------------------------------
 
 function parseArgs(argv) {
-  const args = { manifest: undefined, session: undefined }
+  const args = { manifest: undefined, session: undefined, rounds: undefined }
   for (const a of argv) {
     if (a.startsWith('--manifest=')) args.manifest = a.slice('--manifest='.length)
     else if (a === '--manifest') args._nextManifest = true
     else if (args._nextManifest) {
       args.manifest = a
       args._nextManifest = false
-    } else if (a.startsWith('--session=')) args.session = a.slice('--session='.length)
+    } else if (a.startsWith('--rounds=')) args.rounds = a.slice('--rounds='.length)
+    else if (a.startsWith('--session=')) args.session = a.slice('--session='.length)
     else if (a === '--session') args._nextSession = true
     else if (args._nextSession) {
       args.session = a
@@ -885,22 +949,83 @@ function parseArgs(argv) {
   }
   if (!args.manifest || !args.session) {
     throw new Error(
-      'Usage: node tools/analysis/verify-first-round.mjs --manifest <path.json> --session <sessionDir>',
+      'Usage: node tools/analysis/verify-first-round.mjs --manifest <path.json> --session <sessionDir> [--rounds=<n>|all]',
     )
   }
   return args
 }
 
-export function verify(manifest, logcatText) {
-  const events = parseLogcat(logcatText)
-  const t0 = findT0(events)
-  const provenance = checkProvenance(events, manifest)
-  const window = findRoundWindow(events, t0, manifest)
+/**
+ * The rounds a manifest describes.
+ *
+ * A manifest written before manifests held every round (no `rounds` list)
+ * describes round 1 and nothing else, in its top-level fields. Every stored
+ * capture's manifest is one of those, and reads here as a list of one.
+ */
+export function manifestRounds(manifest) {
+  if (Array.isArray(manifest.rounds)) return manifest.rounds
+  return [
+    {
+      roundIndex: manifest.roundIndex ?? 0,
+      workDurationMs: manifest.workDurationMs ?? 0,
+      coachEvents: manifest.coachEvents ?? [],
+      expectedCallBars: manifest.expectedCallBars ?? 0,
+    },
+  ]
+}
+
+const medianOf = (values) => {
+  const sorted = [...values].sort((a, b) => a - b)
+  return sorted[Math.floor(sorted.length / 2)]
+}
+
+/**
+ * Where a round after the first began and ended in a capture.
+ *
+ * `judged` needs both ends. A round is only judged whole: the default PC
+ * drive stops three seconds into round 2, and those three seconds are not a
+ * round. Its start is the `work-entered` record that names it; logcat drops
+ * lines, so when that one is missing the round is placed by its ring tokens,
+ * each of which carries the work clock's reading. Its end is its own
+ * `rest-entered`, or `completed` for the last round, which has no rest.
+ */
+function findLaterRound(events, roundIndex, isLast) {
+  const opened = events.find(
+    (e) => e.type === 'round.boundary' && e.transition === 'work-entered' && e.roundIndex === roundIndex,
+  )
+  let t0 = opened ? { ts: opened.ts, source: 'round.boundary work-entered' } : null
+  if (!t0) {
+    const zeros = events
+      .filter((e) => e.type === 'cue.tokenDue' && e.roundIndex === roundIndex && Number.isFinite(e.workElapsedMs))
+      .map((e) => e.ts - e.workElapsedMs)
+    if (zeros.length > 0) {
+      t0 = { ts: medianOf(zeros), source: 'cue.tokenDue — the work-entered record is not in the capture' }
+    }
+  }
+  if (!t0) return { state: 'absent', t0: null, window: null }
+  const closed = events.find(
+    (e) =>
+      e.type === 'round.boundary' &&
+      e.ts >= t0.ts &&
+      ((e.transition === 'rest-entered' && e.roundIndex === roundIndex) || (isLast && e.transition === 'completed')),
+  )
+  if (!closed) return { state: 'opened', t0, window: null }
+  return { state: 'judged', t0, window: { endMs: closed.ts - t0.ts, bounded: true, truncated: false } }
+}
+
+/**
+ * Judge one round against its part of the manifest.
+ *
+ * `wholeCapture` is the old behaviour of two counters — deferrals and missing
+ * assets were counted across the whole capture — kept for a manifest that
+ * describes one round, so that every stored verdict reads as it did. With
+ * several rounds each counts its own.
+ */
+function judgeRound({ events, manifest, round, provenance, t0, window, wholeCapture }) {
   const elapsed = (e) => (t0 ? e.ts - t0.ts : 0)
-  // Scope observations to the round this manifest describes. Captures run
-  // long (~346s against a 240s round), so without the bound a single-round
-  // manifest was being judged against two-plus rounds of traffic and the
-  // surplus all landed in `extra`.
+  // Scope observations to the round. Captures run long, so without the bound
+  // a round was judged against the next round's traffic and the surplus all
+  // landed in `extra`.
   const inWindow = (e) => {
     const ms = elapsed(e)
     return ms >= -LATE_WINDOW_MS && ms <= window.endMs + LATE_WINDOW_MS
@@ -917,6 +1042,7 @@ export function verify(manifest, logcatText) {
   const deferrals = events
     .filter((e) => e.type === 'slotDispatcher.deferred')
     .map((e) => ({ ...e, elapsedMs: elapsed(e) }))
+    .filter((e) => wholeCapture || inWindow(e))
   const reanchorAll = events.filter((e) => e.type === 'transport.reanchor')
   const reanchor = {
     total: reanchorAll.length,
@@ -925,42 +1051,204 @@ export function verify(manifest, logcatText) {
     truncated: window.truncated,
     bounded: window.bounded,
   }
-  // Per-bar loop calls (2026-09-01): counted against the manifest's
-  // expectedCallBars denominator, not itemized — ~70 near-identical
-  // per-event verdicts would bury the report.
+  // Per-bar loop calls: counted against the round's expected number, not
+  // itemized — some seventy near-identical verdicts would bury the report.
   const callsDispatched = events
     .filter((e) => e.type === 'clickScript.dispatch' && e.kind === 'call')
     .map((e) => ({ ...e, elapsedMs: elapsed(e) }))
     .filter(inWindow).length
   const dispatcher = {
     callsDispatched,
-    expectedCallBars: manifest.expectedCallBars ?? 0,
+    expectedCallBars: round.expectedCallBars ?? 0,
+    // Logged once, before the lead-in: it belongs to no round's window.
     armed: events.some((e) => e.type === 'slotDispatcher.armed'),
     deferredCount: deferrals.length,
-    assetMissingCount: events.filter((e) => e.type === 'slotDispatcher.assetMissing').length,
+    assetMissingCount: events.filter(
+      (e) => e.type === 'slotDispatcher.assetMissing' && (wholeCapture || inWindow(e)),
+    ).length,
     // Scoped to the round, like every other observation: a clip that fails
-    // in the walkout or a later round is not this manifest's to judge.
+    // in the walkout or another round is not this round's to answer for.
     playFailedCount: events.filter((e) => e.type === 'voice.playFailed' && inWindow(e)).length,
     clipMissingCount: events.filter((e) => e.type === 'voice.clipMissing' && inWindow(e)).length,
     totalCompiledSlots: provenance.totalCompiledSlots,
     enqueuedSlots: provenance.enqueuedSlots,
     announceThenWorkCues: provenance.announceThenWorkCues,
   }
-  const { verdicts, extras } = correlateCoachEvents(
-    manifest.coachEvents ?? [],
-    observed,
-    deferrals,
-  )
-  const health = classifyRunHealth(t0, reanchor, verdicts, extras, dispatcher, provenance, manifest)
+  const { verdicts, extras } = correlateCoachEvents(round.coachEvents ?? [], observed, deferrals)
+  const health = classifyRunHealth(t0, reanchor, verdicts, extras, dispatcher, provenance, {
+    ...manifest,
+    coachEvents: round.coachEvents ?? [],
+  })
   return {
     t0,
     verdicts,
     extras,
     health,
-    provenance,
     dispatcher,
     reanchorCount: reanchor.total,
     observedCount: observed.length,
+    window,
+  }
+}
+
+const HEALTH_COUNTS = [
+  'total',
+  'comboExpected',
+  'matched',
+  'late',
+  'early',
+  'missing',
+  'deferred',
+  'deferredUnattributed',
+  'assetMissing',
+  'wrongAsset',
+  'duplicated',
+  'extra',
+  'reanchorInRound1',
+  'playbackFailures',
+  'callsDispatched',
+  'callsExpected',
+]
+const HEALTH_FLAGS = [
+  'reanchorRegression',
+  'notArmed',
+  'expectsScoreSlots',
+  'noCalls',
+  'lowCalls',
+  'moreCallsThanPlanned',
+  'hardFail',
+  'softWarn',
+]
+
+/**
+ * One health for a whole capture: the counts added up, a flag set if any
+ * round set it, and the verdict the worst of them. A list of one is that one,
+ * untouched — which is what a single-round manifest has always produced.
+ */
+function combineHealth(parts) {
+  if (parts.length === 1) return parts[0]
+  const combined = { ...parts[0] }
+  for (const key of HEALTH_COUNTS) combined[key] = parts.reduce((n, h) => n + (h[key] ?? 0), 0)
+  for (const key of HEALTH_FLAGS) combined[key] = parts.some((h) => h[key] === true)
+  combined.callCoveragePct =
+    combined.callsExpected > 0 ? Math.round((combined.callsDispatched / combined.callsExpected) * 100) : null
+  combined.verdict = combined.hardFail ? 'FAIL' : combined.stale ? 'STALE' : combined.softWarn ? 'WARN' : 'PASS'
+  return combined
+}
+
+/**
+ * Judge a capture against its manifest — every round the manifest describes
+ * and the capture holds whole.
+ *
+ * Round 1 is found as it always was (the first `work-entered`, with the
+ * older anchors behind it), so a single-round manifest and every stored
+ * capture read exactly as before. Later rounds are found by the boundary
+ * that names them, and judged only when both their ends were captured.
+ *
+ * The top-level result is the whole capture's: counts summed over the
+ * judged rounds, the verdict the worst of them. `rounds` has each one.
+ *
+ * `options.expectRounds` says how many rounds the drive was MEANT to
+ * complete. Without it, fewer rounds than the manifest holds is simply a
+ * shorter drive. With it, a round that was meant to be driven and is not
+ * whole in the capture fails the run — so a check of every round cannot
+ * quietly become a check of one.
+ *
+ * @param {object} manifest
+ * @param {string} logcatText
+ * @param {{ expectRounds?: number }} [options]
+ */
+export function verify(manifest, logcatText, options = {}) {
+  const events = parseLogcat(logcatText)
+  const provenance = checkProvenance(events, manifest)
+  const described = manifestRounds(manifest)
+  const single = described.length === 1
+
+  const perRound = described.map((round, index) => {
+    if (index === 0) {
+      const t0 = findT0(events)
+      const window = findRoundWindow(events, t0, { workDurationMs: round.workDurationMs })
+      return {
+        roundIndex: round.roundIndex ?? 0,
+        state: 'judged',
+        ...judgeRound({ events, manifest, round, provenance, t0, window, wholeCapture: single }),
+      }
+    }
+    const found = findLaterRound(events, round.roundIndex ?? index, index === described.length - 1)
+    if (found.state !== 'judged') return { roundIndex: round.roundIndex ?? index, state: found.state, t0: found.t0 }
+    return {
+      roundIndex: round.roundIndex ?? index,
+      state: 'judged',
+      ...judgeRound({ events, manifest, round, provenance, t0: found.t0, window: found.window, wholeCapture: false }),
+    }
+  })
+
+  const judged = perRound.filter((r) => r.state === 'judged')
+  const first = perRound[0]
+  let health = combineHealth(judged.map((r) => r.health))
+  // What is said around the rounds. A rest is judged between the end of the
+  // round before it and the start of the round after, so each round says
+  // where it began and — when its closing boundary was captured — ended.
+  const ceremonies = judgeCeremonies(
+    events,
+    manifest,
+    perRound.map((r) => ({
+      t0Ts: r.t0 ? r.t0.ts : null,
+      endTs: r.state === 'judged' && r.t0 && r.window?.bounded ? r.t0.ts + r.window.endMs : null,
+    })),
+  )
+  if (ceremonies.length > 0) {
+    const { hard, soft, ...counts } = ceremonyHealth(ceremonies, {
+      lossless: capturePlatform(logcatText) === 'web',
+      suppressed: health.stale === true || health.identityUnknown === true,
+    })
+    const hardFail = health.hardFail || hard
+    const softWarn = health.softWarn || soft
+    health = {
+      ...health,
+      ...counts,
+      hardFail,
+      softWarn,
+      verdict: hardFail ? 'FAIL' : health.stale ? 'STALE' : softWarn ? 'WARN' : 'PASS',
+    }
+  }
+  const expected = Math.min(options.expectRounds ?? 0, described.length)
+  const notJudged = perRound.slice(0, expected).filter((r) => r.state !== 'judged')
+  if (notJudged.length > 0) {
+    // A round the drive was meant to complete is not whole in the capture.
+    health = {
+      ...health,
+      roundsNotJudged: notJudged.map((r) => r.roundIndex),
+      hardFail: true,
+      verdict: 'FAIL',
+    }
+  }
+  const tagged = (key) =>
+    single ? first[key] : judged.flatMap((r) => r[key].map((item) => ({ ...item, roundIndex: r.roundIndex })))
+  return {
+    t0: first.t0,
+    verdicts: tagged('verdicts'),
+    extras: tagged('extras'),
+    health,
+    provenance,
+    dispatcher: single
+      ? first.dispatcher
+      : {
+          ...first.dispatcher,
+          callsDispatched: judged.reduce((n, r) => n + r.dispatcher.callsDispatched, 0),
+          expectedCallBars: judged.reduce((n, r) => n + r.dispatcher.expectedCallBars, 0),
+          deferredCount: judged.reduce((n, r) => n + r.dispatcher.deferredCount, 0),
+          assetMissingCount: judged.reduce((n, r) => n + r.dispatcher.assetMissingCount, 0),
+          playFailedCount: judged.reduce((n, r) => n + r.dispatcher.playFailedCount, 0),
+          clipMissingCount: judged.reduce((n, r) => n + r.dispatcher.clipMissingCount, 0),
+        },
+    reanchorCount: first.reanchorCount,
+    observedCount: judged.reduce((n, r) => n + r.observedCount, 0),
+    rounds: perRound,
+    ceremonies,
+    roundsDescribed: described.length,
+    roundsJudged: judged.length,
+    roundsExpected: expected,
   }
 }
 
@@ -981,18 +1269,16 @@ function main() {
   }
   const manifest = JSON.parse(readFileSync(args.manifest, 'utf8'))
   const logcatText = readFileSync(sessionLogPath, 'utf8')
-  const result = verify(manifest, logcatText)
-  const md = renderReport(
-    basename(args.manifest),
-    args.session,
-    manifest,
-    result.t0,
-    result.health,
-    result.verdicts,
-    result.extras,
-    result.dispatcher,
-    result.provenance,
-  )
+  // How many rounds the drive was meant to complete: a number, or `all`.
+  // Left out, the capture is judged for whatever rounds it holds whole.
+  const expectRounds =
+    args.rounds === undefined ? undefined : args.rounds === 'all' ? manifestRounds(manifest).length : Number(args.rounds)
+  if (expectRounds !== undefined && !(Number.isInteger(expectRounds) && expectRounds >= 1)) {
+    console.error(`--rounds takes a whole number of rounds, or all; got '${args.rounds}'`)
+    process.exit(3)
+  }
+  const result = verify(manifest, logcatText, expectRounds === undefined ? {} : { expectRounds })
+  const md = renderReport(basename(args.manifest), args.session, manifest, result)
   const reportPath = join(args.session, 'verify-report.md')
   const jsonPath = join(args.session, 'verify-report.json')
   writeFileSync(reportPath, md, 'utf8')
@@ -1010,6 +1296,17 @@ function main() {
         observedCount: result.observedCount,
         verdicts: result.verdicts,
         extras: result.extras,
+        roundsDescribed: result.roundsDescribed,
+        roundsJudged: result.roundsJudged,
+        roundsExpected: result.roundsExpected,
+        ceremonies: result.ceremonies,
+        rounds: result.rounds.map((round) => ({
+          roundIndex: round.roundIndex,
+          state: round.state,
+          t0: round.t0 ?? null,
+          health: round.health ?? null,
+          dispatcher: round.dispatcher ?? null,
+        })),
       },
       null,
       2,

@@ -29,9 +29,15 @@ persisted QA flag —
   engine's zero-gain analyser reports trigger → first rendered frame per
   punch.
 
-The verifier (`verify-first-round.mjs`) still judges round 1; the suite adds
-whole-session health counters, AudioTrack readings at arm and at end, and
-the observers' summary beside every verdict.
+The verifier (`verify-first-round.mjs`, named for what it once did) judges
+**every round** the drive was meant to complete, and the walkout, rest line
+and countdown around them; the suite adds the ring check, whole-session
+health counters, AudioTrack readings at arm and at end, and the observers'
+summary beside every verdict.
+
+**Tablet tests are run on the emulator** (Kyle, 2026-11-28): `npm run
+emu:suite`, below. The tablet itself is for what only it can settle — its
+timing constants, anything by ear or eye, its own database, gloves.
 
 ### The same suite on the PC
 
@@ -124,10 +130,23 @@ The suite mutes the media stream (`cmd media_session volume --stream 3
 --set 0`, keyevent fallback) and restores it on exit and on Ctrl-C. Pass
 `--keep-volume` to leave it alone.
 
-### On an emulator
+### On an emulator — the default
 
-The same loop runs against an Android emulator with no tablet attached:
-`--device=emulator-5556`, an x86_64 release build. Recipe and limits:
+The same loop runs against an Android emulator with no tablet attached, in
+one command:
+
+```bash
+npm run emu:suite                              # all 22, whole workouts
+npm run emu:suite -- --vocab=both --jobs=4     # all 44, four emulators, about three hours
+npm run emu:suite -- --only=quick-one-two
+```
+
+It starts the emulator, builds x86_64 from this checkout when the APK is
+not HEAD's, installs, grants the Bluetooth permissions, switches QA mode on
+(as root — a link still cannot), and runs this suite with
+`--expect-release --require-sha`. With `--jobs` a drive that fails is driven
+again alone before it is reported. Do not commit while it runs:
+`--require-sha` holds every drive to HEAD. Recipe and limits:
 `docs/dev-setup.md`, "An Android emulator". The verdict, the correlator and
 the work-axis lines mean what they mean on the tablet. **Its timing figures
 are this PC's.** The suite knows an emulator when it sees one: it marks
@@ -160,14 +179,41 @@ node tools/analysis/observed-summary.mjs --session tools/analysis/suites/<epoch>
 
 | Verdict | Meaning | Suite exit |
 |---|---|---|
-| PASS | verifier exit 0 — round 1 correlated clean | 0 |
+| PASS | verifier exit 0 — every round the drive was meant to complete correlated clean, and the ceremonies were as planned | 0 |
 | WARN | verifier exit 2 — audible but drifted (late rows, soft warnings) | 2 |
 | STALE | verifier exit 4 after one manifest regen + re-drive — the installed bundle's timeline ≠ this checkout's | 4 |
 | FAIL | verifier exit 1 (hard-zero regression), or `build-mismatch` under `--expect-release` | 1 |
 | ERROR | the drive never reached a judged round: launch failed, no autostart, no countdown, cancelled, exception | 1 |
 
 A drive that reaches round 1 but times out before its last boundary keeps
-the timeout in `reason` while the verifier's verdict stands for round 1.
+the timeout in `reason` while the verifier's verdict stands for the rounds
+it holds whole.
+
+**How far a drive was meant to run is part of the verdict** (2026-11-28). A
+whole-workout drive tells the verifier to expect every round
+(`--rounds=all`); `--first-round-only` tells it to expect one. A round that
+was meant to be driven and is not whole in the capture is a FAIL. The
+summary's `verify` cell reads `0 · 4 of 4 rounds · 7 of 7 ceremonies`.
+
+**Ceremonies.** The walkout, each rest's line and each countdown are held to
+the line the app logs as it builds each one (tracks, length, script id; a
+countdown's length less whichever of the fifteen openers it drew) and to
+having started. A line that reads wrong is a FAIL. A ceremony with no line
+at all is a WARN on a device — logcat drops lines — unless the app logged
+its playlist failing, and a FAIL on a PC capture, which loses nothing.
+
+**Rings.** The `rings` column and `rings-report.json` (`--rings-gate
+off|warn|fail`, default `warn`): every ring timed by the frame that painted
+it against the session clock's schedule. A bar that did not light all its
+rings fails only where the app itself says so; a ring merely missing from a
+device's log is a warning with the count of lines the log is known to have
+lost.
+
+**`--require-sha[=<sha>]`** stops the suite at the first drive whose
+installed build is not that commit (default: HEAD). Without it a mismatch is
+only the `gitSha ≠ host` warning below. Manifests are only comparable with
+the build they were generated beside: clips are re-rendered, and a
+ceremony's length moves with them.
 
 **What the verifier gates on a library (click-script) workout** — changed
 2026-11-25, so verdicts from before that date are not comparable. Those
@@ -176,6 +222,9 @@ nothing to correlate. They are judged on what the click script did instead:
 
 - FAIL if any playback failed or a clip was missing, or if calls were
   expected and **none** was dispatched.
+- WARN if more calls were dispatched than the manifest plans — the manifest
+  IS the runner's plan (`planRoundCoachSchedule`), so more means the
+  manifest and the build disagree (N-20).
 - WARN if fewer than 90 % of the expected calls were dispatched
   (`CALL_COVERAGE_LOW_PCT`), or if the run's identity could not be
   established — no `workout.timeline.provenance` record to check the

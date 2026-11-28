@@ -144,11 +144,27 @@ export class WorkoutSessionClock {
     return transitions
   }
 
+  /**
+   * Hold the session where it is.
+   *
+   * The time since the last tick is counted first. A pause is a tap, and
+   * lands between two ticks; without this the clock froze at the tick
+   * BEFORE the tap and `resume` then set the anchor to its own instant, so
+   * every pause dropped up to a tick of the round — the round ran that much
+   * long. It is the mirror of the round that opened a tick early (N-18).
+   *
+   * So a pause can cross a boundary: if the round ended since the last tick,
+   * the rest is entered and THEN paused, and the transitions say so in that
+   * order. If the workout ended, it is completed and there is nothing to
+   * pause.
+   */
   pause(): SessionTransition[] {
     if (!this.isRunning()) return []
+    const crossed = this.advance()
+    if (!this.isRunning()) return crossed
     this.phaseBeforePause = this.phase
     this.phase = 'paused'
-    return [{ type: 'paused' }]
+    return [...crossed, { type: 'paused' }]
   }
 
   resume(): SessionTransition[] {
@@ -286,8 +302,18 @@ export class WorkoutSessionClock {
     return this.phase === 'countdown' || this.phase === 'work' || this.phase === 'rest'
   }
 
+  /**
+   * How long the phase in hand lasts — while paused, the phase being HELD.
+   *
+   * A paused session is part-way through a countdown, a round or a rest,
+   * and how much of it is left is the one thing a paused screen has to
+   * show. This answered for `paused` itself, which has no length, so
+   * `snapshot()` reported nothing left and the header read 0:00 for as
+   * long as the pause lasted. `advance` is unaffected: it accumulates
+   * nothing while paused and never asks.
+   */
   private currentPhaseDurationMs(): number | null {
-    switch (this.phase) {
+    switch (this.phase === 'paused' ? this.phaseBeforePause : this.phase) {
       case 'countdown':
         return this.countdownMs
       case 'work':

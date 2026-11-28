@@ -9,6 +9,7 @@ import {
   admissions,
   defaultJobs,
   driveVerdict,
+  endedAsMeant,
   lateness,
   parseArgs,
   pooled,
@@ -475,5 +476,49 @@ describe('renderSummary', () => {
       meta,
     )
     expect(md).toContain('| ERROR | — | 0 | — | — | — | — | — | — / — | — / — |')
+  })
+})
+
+describe('how far a drive was meant to run', () => {
+  it('ran as meant when it ended on the bell that opens round 2, or on the last one', () => {
+    expect(endedAsMeant({ ended: 'work-entered', reason: null })).toBe(true)
+    expect(endedAsMeant({ ended: 'completed', reason: null })).toBe(true)
+  })
+
+  it('did not when it was cancelled, ran out of time, or never ended', () => {
+    expect(endedAsMeant({ ended: 'cancelled', reason: null })).toBe(false)
+    expect(endedAsMeant({ ended: null, reason: 'over-budget' })).toBe(false)
+    expect(endedAsMeant({ ended: null, reason: null })).toBe(false)
+  })
+
+  it('shows how many rounds the correlator judged beside its counts', () => {
+    const row = {
+      workoutId: 'body-work',
+      vocab: 'numbers',
+      verdict: 'PASS',
+      reasons: [],
+      stats: 'matched=12 extras=0 reanchor=0',
+      roundsJudged: '4 of 4 rounds',
+      ceremonies: '7 of 7 ceremonies',
+      pageProblems: [],
+      lateness: {
+        dispatch: { medianMs: 36, p95Ms: 44 },
+        ringToken: { medianMs: 39.7, p95Ms: 45.3 },
+      },
+      elapsedMs: 900_000,
+    }
+    const meta = {
+      suiteId: 's',
+      hostSha: 'abc1234',
+      browser: '/opt/chrome',
+      args: parseArgs(['--full']),
+    }
+    const md = renderSummary([row], meta)
+    expect(md).toContain(
+      '| PASS | matched=12 extras=0 reanchor=0 · 4 of 4 rounds · 7 of 7 ceremonies | 0 |',
+    )
+    expect(md).toContain('“3 of 3 ceremonies” is the walkout, and each rest’s line and countdown')
+    expect(md).toContain('**How far a drive was meant to run is part of the verdict.**')
+    expect(md).not.toContain('have no independent check')
   })
 })

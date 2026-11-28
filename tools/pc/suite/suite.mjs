@@ -28,11 +28,15 @@ import os from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
 
+import { ceremoniesText } from '../../analysis/ceremonies.mjs'
 import {
   aggregateVerdicts,
   budgetMs,
   compactStats,
+  judgedSuffix,
   planJobs,
+  roundsArgument,
+  roundsJudgedText,
   verdictFromVerifyExit,
   worstVerdict,
 } from '../../analysis/verify-suite.mjs'
@@ -317,7 +321,7 @@ export function renderSummary(rows, meta) {
     const lit = g ? `${g.lit} of ${g.rings}` : '—'
     const painted = g ? `${ms(g.paintedLate.medianMs)} / ${ms(g.paintedLate.maxMs)}` : '—'
     L.push(
-      `| ${r.workoutId} | ${r.vocab} | ${r.verdict} | ${r.stats ?? '—'} | ${r.pageProblems.length} | ${heard} | ${lost} | ${gap} | ${lit} | ${painted} | ${ms(d?.medianMs)} / ${ms(d?.p95Ms)} | ${ms(t?.medianMs)} / ${ms(t?.p95Ms)} | ${clock(r.elapsedMs)} |`,
+      `| ${r.workoutId} | ${r.vocab} | ${r.verdict} | ${r.stats ?? '—'}${judgedSuffix(r)} | ${r.pageProblems.length} | ${heard} | ${lost} | ${gap} | ${lit} | ${painted} | ${ms(d?.medianMs)} / ${ms(d?.p95Ms)} | ${ms(t?.medianMs)} / ${ms(t?.p95Ms)} | ${clock(r.elapsedMs)} |`,
     )
   }
   const explained = rows.filter((r) => r.reasons.length > 0)
@@ -332,10 +336,10 @@ export function renderSummary(rows, meta) {
     '',
     '## How to read this',
     '',
-    '- **correlator** is the tablet’s own first-round verifier, run on this capture against the same manifest. What is said, in what order and when is code both devices share.',
+    '- **correlator** is the tablet’s own verifier, run on this capture against the same manifest. What is said, in what order and when is code both devices share. “3 of 3 rounds” is how many of the workout’s rounds it judged: a round is judged only when the capture holds it whole. “3 of 3 ceremonies” is the walkout, and each rest’s line and countdown: what the app built for each against what the manifest says, and that it started.',
     '- **The sound columns are measured**, not modelled: each call and lead-in is listened to in the page, and “last sound → ring due” is the gap between a call’s last sound and the scheduled time of the ring it leads. A clip that makes no sound, one cut short, or a call still sounding when its ring is due fails the drive. Each drive’s folder has the full `sound-report.md`.',
     '- **The lateness columns are this PC’s**, under whatever else it was doing. They are reported, not judged, and no tablet constant is ever set from them. The ring token is the runner’s 50 ms loop, not the painted ring.',
-    '- **Rounds after the first have no independent check.** The correlator and its manifests cover round 1. In later rounds the suite judges what the app played — that it sounded, whole, clear of its ring — and fails a clip the app itself logged it could not play. Nothing says what a later round should have played.',
+    '- **How far a drive was meant to run is part of the verdict.** The default drive is round 1 and the rest after it, and the correlator is told to expect round 1; `--full` is the whole workout, and it is told to expect every round. A round that was meant to be driven and is not whole in the capture fails the drive. The manifest gives each round its lead-ins by name and its calls by count — not each call by name.',
     '- **The tablet’s audio path is not judged here.** Its timing analyzer refuses a capture from a browser.',
     '',
   )
@@ -353,8 +357,21 @@ function soundLimits() {
   return limits
 }
 
-/** Run the tablet's correlator on a saved capture. */
-function correlate(dir, manifestPath) {
+/**
+ * Whether a drive ran to where it was meant to: no reason to have stopped
+ * short, and ended on the bell that opens round 2 or on the last one. A
+ * cancelled drive ended, but not there.
+ */
+export function endedAsMeant(drive) {
+  return drive.reason === null && (drive.ended === 'work-entered' || drive.ended === 'completed')
+}
+
+/**
+ * Run the tablet's correlator on a saved capture, telling it how far the
+ * drive was meant to run so that a round it should hold and does not fails
+ * the run (`roundsArgument`).
+ */
+function correlate(dir, manifestPath, { wholeWorkout, endedCleanly }) {
   const verify = spawnSync(
     process.execPath,
     [
@@ -363,6 +380,7 @@ function correlate(dir, manifestPath) {
       manifestPath,
       '--session',
       dir,
+      ...roundsArgument({ wholeWorkout, endedCleanly }),
     ],
     { encoding: 'utf8', cwd: REPO_ROOT },
   )
@@ -376,6 +394,8 @@ function correlate(dir, manifestPath) {
   return {
     verifyExit: verify.status,
     stats: report ? compactStats(report) : null,
+    roundsJudged: roundsJudgedText(report) || null,
+    ceremonies: ceremoniesText(report) || null,
     health: report?.health ?? null,
   }
 }
@@ -424,8 +444,11 @@ async function runJob({ job, args, executable, baseUrl, suiteId, suiteDir, hostS
   // A drive that never reached a round has nothing for the correlator to read.
   const reached = driveState(drive.records).workEntered
   const judged = reached
-    ? correlate(dir, manifestPath)
-    : { verifyExit: null, stats: null, health: null }
+    ? correlate(dir, manifestPath, {
+        wholeWorkout: args.full === true,
+        endedCleanly: endedAsMeant(drive),
+      })
+    : { verifyExit: null, stats: null, roundsJudged: null, ceremonies: null, health: null }
   const { verdict, reasons } = driveVerdict({
     drive,
     verifyExit: judged.verifyExit,

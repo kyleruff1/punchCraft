@@ -23,7 +23,13 @@
  *       [--only=a,b] [--device=<serial>] [--expect-release] [--first-round-only]
  *       [--sim=captured-jam|alternating-1-2|none] [--sim-force] [--sim-bpm=N]
  *       [--gh-ledger] [--dry-run] [--tap-fallback] [--keep-volume] [--out=<dir>]
- *       [--timing-gate=off|warn|fail]
+ *       [--timing-gate=off|warn|fail] [--rings-gate=off|warn|fail]
+ *       [--require-sha[=<sha>]] [--part]
+ *
+ * `--require-sha` makes "the installed build is this commit" a condition
+ * rather than a warning: the first drive whose build is another commit FAILS
+ * and the suite stops, because every drive after it would test the wrong
+ * code. Bare, it requires this checkout's HEAD.
  *
  * Each drive is judged twice: by `verify-first-round.mjs` (did the coach say
  * the right thing at the right mark) and by `observed-timing.mjs` (did the
@@ -57,17 +63,21 @@ import {
   waitForLogLine,
   waitForUiTarget,
 } from './drive-workout-first-round.mjs'
+import { ceremoniesText } from './ceremonies.mjs'
 import { EMULATOR_PLATFORM, boolField, capturePlatform, extractField, recordsWithTag } from './logcat.mjs'
 import { renderObservedTable, summarizeObserved } from './observed-summary.mjs'
 import { fitWorkAxis, parseBoundaries, parseTokenDue } from './observed-timing.mjs'
+import { ringReportFromLogcat, ringVerdict } from './rings.mjs'
 import { parseLogcat } from './verify-first-round.mjs'
 
 // `import.meta.url` is null under jest's CommonJS transform (cwd = repo root there).
 const REPO_ROOT = import.meta.url
   ? resolve(dirname(fileURLToPath(import.meta.url)), '..', '..')
   : process.cwd()
-const MANIFESTS_DIR = join(REPO_ROOT, 'tools', 'analysis', 'manifests')
-const SUITES_DIR = join(REPO_ROOT, 'tools', 'analysis', 'suites')
+export const MANIFESTS_DIR = join(REPO_ROOT, 'tools', 'analysis', 'manifests')
+export const SUITES_DIR = join(REPO_ROOT, 'tools', 'analysis', 'suites')
+/** Where a `--part` process leaves its rows, inside the run folder it shares. */
+export const PART_ROWS_DIR = '.rows'
 
 /** Walkout + countdown allowance before round 1's bell. */
 export const WALKOUT_ALLOWANCE_MS = 90_000
@@ -102,6 +112,15 @@ export function parseArgs(argv) {
     keepVolume: false,
     out: undefined,
     timingGate: 'fail',
+    /** See `ringGateVerdict`. Staged: it starts at `warn`. */
+    ringsGate: 'warn',
+    /** undefined: only warn on a build from another commit. 'HEAD' or a sha: fail and stop. */
+    requireSha: undefined,
+    /**
+     * One of several processes sharing a run folder (`emu:suite --jobs`): it
+     * writes its rows for the process that started it, and no summary.
+     */
+    part: false,
   }
   for (const a of argv) {
     if (a === '--all') args.all = true
@@ -120,7 +139,17 @@ export function parseArgs(argv) {
     else if (a === '--keep-volume') args.keepVolume = true
     else if (a.startsWith('--out=')) args.out = a.slice('--out='.length)
     else if (a.startsWith('--timing-gate=')) args.timingGate = a.slice('--timing-gate='.length)
+    else if (a.startsWith('--rings-gate=')) args.ringsGate = a.slice('--rings-gate='.length)
+    else if (a === '--part') args.part = true
+    else if (a === '--require-sha') args.requireSha = 'HEAD'
+    else if (a.startsWith('--require-sha=')) args.requireSha = a.slice('--require-sha='.length)
     else throw new Error(`unknown argument: ${a}`)
+  }
+  if (args.requireSha !== undefined && !/^(HEAD|[0-9a-f]{7,40})$/.test(args.requireSha)) {
+    throw new Error(`--require-sha takes a commit id of 7 to 40 hex digits, got '${args.requireSha}'`)
+  }
+  if (!['off', 'warn', 'fail'].includes(args.ringsGate)) {
+    throw new Error(`--rings-gate must be off, warn or fail, got '${args.ringsGate}'`)
   }
   if (!['off', 'warn', 'fail'].includes(args.timingGate)) {
     throw new Error(`--timing-gate must be off, warn or fail, got '${args.timingGate}'`)
@@ -281,6 +310,54 @@ export function timingVerdictFromExit(code, gate) {
 }
 
 /**
+ * What to tell the correlator about how far a drive was meant to run.
+ *
+ * `--rounds=1` for a drive of round 1, `--rounds=all` for a whole workout:
+ * a round that was meant to be driven and is not whole in the capture then
+ * fails the run, so that judging every round cannot quietly become judging
+ * fewer. Nothing at all for a drive that did not end as it should — a
+ * timeout, a cancel: its rounds are judged as far as they go, and its own
+ * failure is already the verdict.
+ */
+export function roundsArgument({ wholeWorkout, endedCleanly }) {
+  if (!endedCleanly) return []
+  return [wholeWorkout ? '--rounds=all' : '--rounds=1']
+}
+
+/**
+ * A row's `· 3 of 3 rounds · 7 of 7 ceremonies`, for the cell that holds the
+ * correlator's result; '' for a row from before rows said either.
+ */
+export function judgedSuffix(row) {
+  return [row.roundsJudged, row.ceremonies].filter(Boolean).map((text) => ` · ${text}`).join('')
+}
+
+/** `3 of 3 rounds`, from a correlator report; '' when the report does not say. */
+export function roundsJudgedText(report) {
+  if (!report || !Number.isInteger(report.roundsDescribed)) return ''
+  return `${report.roundsJudged} of ${report.roundsDescribed} rounds`
+}
+
+/** Whether two commit ids name the same commit: one is a prefix of the other. */
+export function sameCommit(a, b) {
+  if (!a || !b || a === 'unknown' || b === 'unknown') return false
+  return a.startsWith(b) || b.startsWith(a)
+}
+
+/**
+ * Why a drive is refused under `--require-sha`, or `null` when the installed
+ * build is the commit required (or none is).
+ *
+ * A build that cannot say what it is — no `gitSha`, or `unknown` — is
+ * refused too: "could not tell" is not "the right build".
+ */
+export function buildRefusal({ installed, required }) {
+  if (!required) return null
+  if (sameCommit(installed, required)) return null
+  return `build-mismatch: the installed build is ${installed || 'unknown'}, and --require-sha asked for ${required}`
+}
+
+/**
  * Whether adb's device is an emulator — asked of the device, not the capture.
  *
  * The capture can say so itself (`capturePlatform`), but only from a build
@@ -332,6 +409,45 @@ export function workAxisLines(logcatText) {
   return [...fit.values()]
     .sort((a, b) => a.roundIndex - b.roundIndex)
     .map((r) => `round ${r.roundIndex}: ${r.n} ring tokens place the work clock (spread ${r.spreadMs} ms) · boundary record ${r.disagreementMs ?? '—'} ms after its zero`)
+}
+
+/**
+ * What the ring check does to a drive's verdict.
+ *
+ * The check is the app's own two clocks and its own account of each bar —
+ * no audio — so it means the same on the tablet, an emulator and a PC. It is
+ * staged all the same, as the timing gate was, because a device's log has
+ * never been read this way and a gate that fails on first contact teaches
+ * everyone to turn it off:
+ *   off  — measure and report, judge nothing.
+ *   warn — a bar the app says did not light all its rings is a WARN. Its
+ *          softer findings (a ring stepped over, the two clocks apart, a
+ *          log that lost lines) are listed and change nothing. **The default.**
+ *   fail — an unlit bar is a FAIL; a softer finding is a WARN.
+ *
+ * @param {{ hard: string[], soft: string[] }} judged  from `ringVerdict`
+ * @param {string} gate
+ */
+export function ringGateVerdict(judged, gate) {
+  if (gate === 'off') return 'PASS'
+  if (judged.hard.length > 0) return gate === 'fail' ? 'FAIL' : 'WARN'
+  return gate === 'fail' && judged.soft.length > 0 ? 'WARN' : 'PASS'
+}
+
+/**
+ * A drive's rings in one table cell: how many the walk reached, how many of
+ * those were on a lit row, and how late they were painted — or that the
+ * capture is from a build that did not say.
+ */
+export function ringsCell(rings) {
+  if (!rings) return '—'
+  const reached = `${rings.lit} of ${rings.rings}`
+  const shown = rings.rows.unrecorded === rings.lit ? '' : ` · ${rings.rows.lit} lit, ${rings.rows.masked} dim${rings.rows.other > 0 ? `, ${rings.rows.other} off-row` : ''}`
+  const timed =
+    rings.paintedLate.n > 0
+      ? ` · ${rings.paintedLate.medianMs} / ${rings.paintedLate.maxMs} ms late`
+      : ' · when: not recorded'
+  return `${reached}${shown}${timed}`
 }
 
 /** The more severe of two verdicts, by `aggregateVerdicts`' own ordering. */
@@ -479,8 +595,8 @@ export function renderSummaryMd(rows, meta) {
   // asserting the constant across the boundary the analyzer was careful to
   // keep. Plan 5b measured the playlist path at 94.8 ms and the claim is now
   // true as written.
-  lines.push('| workout | vocab | verdict | reason | verify | timing | breath min / p5 | at·past punch | under floor | stats | voice onset (status event, ms) | instrument onset (ms) | AudioTracks arm→end | elapsed |')
-  lines.push('|---|---|---|---|---|---|---|---|---|---|---|---|---|---|')
+  lines.push('| workout | vocab | verdict | reason | verify | timing | breath min / p5 | at·past punch | under floor | rings | stats | voice onset (status event, ms) | instrument onset (ms) | AudioTracks arm→end | elapsed |')
+  lines.push('|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|')
   for (const r of rows) {
     const voice = r.observed?.byKind
       ? Object.entries(r.observed.byKind)
@@ -499,7 +615,7 @@ export function renderSummaryMd(rows, meta) {
     const under = f ? `${f.barsUnderFloor}/${f.n}${f.barsUnderFloorRatio === null ? '' : ` (${Math.round(f.barsUnderFloorRatio * 1000) / 10}%)`}` : '—'
     const timing = r.timingRefusal ? 'not judged' : r.timingVerdict ? `${r.timingExit ?? '—'} ${r.timingVerdict}` : '—'
     lines.push(
-      `| ${r.workoutId} | ${r.vocab} | ${r.verdict} | ${r.reason ?? ''} | ${r.verifyExit ?? '—'} | ${timing} | ${breath} | ${past} | ${under} | ${r.stats ?? '—'} | ${voice || '—'} | ${inst} | ${tracks} | ${Math.round((r.elapsedMs ?? 0) / 1000)}s |`,
+      `| ${r.workoutId} | ${r.vocab} | ${r.verdict} | ${r.reason ?? ''} | ${r.verifyExit ?? '—'}${judgedSuffix(r)} | ${timing} | ${breath} | ${past} | ${under} | ${ringsCell(r.rings)} | ${r.stats ?? '—'} | ${voice || '—'} | ${inst} | ${tracks} | ${Math.round((r.elapsedMs ?? 0) / 1000)}s |`,
     )
   }
   const refused = rows.filter((r) => r.timingRefusal)
@@ -515,6 +631,19 @@ export function renderSummaryMd(rows, meta) {
     )
     lines.push('')
     for (const r of refused) for (const line of r.workAxis ?? []) lines.push(`- **${r.workoutId} (${r.vocab})** — ${line}`)
+  }
+  const ringRows = rows.filter((r) => (r.ringFindings?.length ?? 0) > 0)
+  if (ringRows.length > 0) {
+    lines.push('')
+    lines.push('### Rings — findings')
+    lines.push('')
+    lines.push(
+      'From the app’s own records: when each ring was stepped to, on which frame, from which ring, and whether its row was lit. ' +
+        'A bar the app says did not light all its rings changes the verdict; the rest is listed. ' +
+        'A log line that never arrived is not a ring that did not light, and is counted apart.',
+    )
+    lines.push('')
+    for (const r of ringRows) for (const finding of r.ringFindings) lines.push(`- **${r.workoutId} (${r.vocab})** — ${finding}`)
   }
   const hardRows = rows.filter((r) => (r.timingHard?.length ?? 0) > 0)
   if (hardRows.length > 0) {
@@ -589,10 +718,18 @@ function gitShortSha() {
 }
 
 /** Whole-session health counters, the drive-full-workout.mjs set plus the observers. */
-function sessionCounters(logcatText) {
+/**
+ * What a drive's capture holds, counted.
+ *
+ * The two that name an event code go through `recordsWithTag`, never a
+ * pattern typed by hand: both used to match `workouts.` where the app logs
+ * `workout.`, and so read 0 on every drive ever judged.
+ */
+export function sessionCounters(logcatText) {
   const events = parseLogcat(logcatText)
   const count = (type) => events.filter((e) => e.type === type).length
   const re = (pattern) => (logcatText.match(pattern) ?? []).length
+  const records = (code) => recordsWithTag(logcatText, code).length
   return {
     workEntered: re(/transition: 'work-entered'/g),
     restEntered: re(/transition: 'rest-entered'/g),
@@ -603,10 +740,10 @@ function sessionCounters(logcatText) {
     restScriptsLoaded: re(/recovery loaded/g),
     warnCeremonies: re(/round warning prepared/g),
     voiceClipMissing: count('voice.clipMissing'),
-    instrumentClipMissing: re(/workouts\.instrument\.clipMissing/g),
+    instrumentClipMissing: records('workout.instrument.clipMissing'),
     playFailed: re(/voice\.playFailed/g),
     redbox: re(/AndroidRuntime/g),
-    qaBlocked: re(/workouts\.qa\.run\.blocked/g),
+    qaBlocked: records('workout.qa.run.blocked'),
   }
 }
 
@@ -638,6 +775,13 @@ async function driveOne(ctx, job, attempt = 1) {
     sessionDir: dir,
     manifest: job.manifestFile,
     timelineHash: manifest.identity?.timelineHash ?? null,
+    /**
+     * Whether the device was an emulator — asked of the device itself, not
+     * read from the capture, which only says so on a build new enough to
+     * (N-19). Whatever reads this row later can tell an emulator run from a
+     * tablet's without the capture's help.
+     */
+    deviceIsEmulator: ctx.deviceIsEmulator === true,
     url,
     budgetMs: budget,
     verdict: 'ERROR',
@@ -649,6 +793,14 @@ async function driveOne(ctx, job, attempt = 1) {
     timingRefusal: null,
     /** The work-axis lines shown in its place. */
     workAxis: null,
+    /** How many of the manifest's rounds the correlator judged: "3 of 3 rounds". */
+    roundsJudged: null,
+    /** How many of the ceremonies it judged were as planned: "7 of 7 ceremonies". */
+    ceremonies: null,
+    /** The ring check: its report, its findings, and what the gate made of them. */
+    rings: null,
+    ringFindings: null,
+    ringVerdict: null,
     timingHard: null,
     timingSoft: null,
     breathFloor: null,
@@ -753,6 +905,14 @@ async function driveOne(ctx, job, attempt = 1) {
         fail(`build-mismatch: expected a release build, qa.run reports dev=${row.build.dev}`, 'FAIL')
         return finish()
       }
+      const wrongBuild = buildRefusal({ installed: row.build.gitSha, required: ctx.requiredSha })
+      if (wrongBuild !== null) {
+        // Not this drive alone: every drive after it would test the same
+        // wrong build, so the suite stops here.
+        fail(wrongBuild, 'FAIL')
+        row.stopsSuite = true
+        return finish()
+      }
       if (row.build.gitSha && ctx.hostSha !== 'unknown' && !row.build.gitSha.startsWith(ctx.hostSha) && !ctx.hostSha.startsWith(row.build.gitSha)) {
         slog(`   WARN: build gitSha ${row.build.gitSha} ≠ host ${ctx.hostSha} — the installed bundle is not this checkout`)
         row.build.shaMismatch = true
@@ -833,13 +993,22 @@ async function driveOne(ctx, job, attempt = 1) {
     row.observed = summarizeObserved(logcatText)
     writeFileSync(join(dir, 'observed-summary.json'), JSON.stringify(row.observed, null, 2) + '\n', 'utf8')
 
-    // The verifier judges round 1 whenever the capture got that far — a
-    // launch failure has no round to judge and keeps its ERROR.
+    // The verifier judges every round the capture holds whole, whenever it
+    // got as far as one — a launch failure has no round to judge and keeps
+    // its ERROR.
     const reachedRound = /transition: 'work-entered'/.test(logcatText)
     if (reachedRound) {
       const verify = spawnSync(
         'node',
-        [join(REPO_ROOT, 'tools', 'analysis', 'verify-first-round.mjs'), '--manifest', manifestPath, '--session', dir],
+        [
+          join(REPO_ROOT, 'tools', 'analysis', 'verify-first-round.mjs'),
+          '--manifest',
+          manifestPath,
+          '--session',
+          dir,
+          // A reason is already set for a drive that timed out or was cancelled.
+          ...roundsArgument({ wholeWorkout: !args.firstRoundOnly, endedCleanly: row.reason === null }),
+        ],
         { encoding: 'utf8', cwd: REPO_ROOT },
       )
       row.verifyExit = verify.status
@@ -849,6 +1018,8 @@ async function driveOne(ctx, job, attempt = 1) {
         const report = JSON.parse(readFileSync(reportPath, 'utf8'))
         row.stats = compactStats(report)
         row.health = report.health ?? null
+        row.roundsJudged = roundsJudgedText(report) || null
+        row.ceremonies = ceremoniesText(report) || null
       }
       const verdict = verdictFromVerifyExit(verify.status)
       if (row.reason === null || verdict === 'FAIL') {
@@ -857,7 +1028,7 @@ async function driveOne(ctx, job, attempt = 1) {
         if (row.reason === null) row.verdict = verdict
         else if (verdict === 'FAIL') row.verdict = 'FAIL'
       }
-      slog(`   verify exit ${verify.status} → ${verdict}${row.stats ? ` · ${row.stats}` : ''}`)
+      slog(`   verify exit ${verify.status} → ${verdict}${row.stats ? ` · ${row.stats}` : ''}${judgedSuffix(row)}`)
       if (verdict === 'STALE' && attempt === 1) {
         slog('   STALE — regenerating the manifest and re-driving once')
         // The generator imports manifests that `require('…wav')`; the stub
@@ -929,6 +1100,20 @@ async function driveOne(ctx, job, attempt = 1) {
         )
         for (const h of row.timingHard ?? []) slog(`   TIMING HARD: ${h}`)
       }
+    }
+    // The rings. Judged on every device: the app's own clocks and its own
+    // account of each bar, with no audio in it. Only for a drive that
+    // reached a round — there are no rings before one.
+    if (row.counters.workEntered > 0) {
+      const rings = ringReportFromLogcat(logcatText)
+      const judged = ringVerdict(rings)
+      writeFileSync(join(dir, 'rings-report.json'), JSON.stringify({ ...rings, verdict: judged }, null, 2) + '\n', 'utf8')
+      row.rings = rings
+      row.ringFindings = [...judged.hard, ...judged.soft]
+      row.ringVerdict = ringGateVerdict(judged, args.ringsGate)
+      row.verdict = worstVerdict(row.verdict, row.ringVerdict)
+      slog(`   rings: ${ringsCell(rings)}${row.ringVerdict === 'PASS' ? '' : ` → ${row.ringVerdict}`}`)
+      for (const finding of judged.hard) slog(`   RINGS: ${finding}`)
     }
     slog(`   ${renderObservedTable(row.observed).split('\n')[0]}`)
     if (row.counters.redbox > 0) slog(`   WARN: ${row.counters.redbox} AndroidRuntime lines in the capture`)
@@ -1046,7 +1231,8 @@ async function main() {
     }
   }
   const deviceIsEmulator = isEmulatorDevice({ serial: deviceId, qemu: prop('ro.kernel.qemu'), characteristics: prop('ro.build.characteristics') })
-  const ctx = { args, deviceId, deviceIsEmulator, slog, suiteDir, suiteId, hostSha, rows: [], activeCleanup: null }
+  const requiredSha = args.requireSha === 'HEAD' ? hostSha : args.requireSha
+  const ctx = { args, deviceId, deviceIsEmulator, slog, suiteDir, suiteId, hostSha, requiredSha, rows: [], activeCleanup: null }
   slog(`suite ${suiteId} · device ${deviceId} · ${jobs.length} drives · launch ${args.launch} · host sha ${hostSha}`)
   if (args.expectRelease) slog('expecting a RELEASE build (qa.run must report dev=false); swap back with `npm run android` afterwards')
   if (deviceIsEmulator) slog('this device is an EMULATOR — verdicts and the work axis stand; timing is not judged, and no tablet constant is set from anything it reports')
@@ -1078,13 +1264,28 @@ async function main() {
 
   let exitCode = 0
   try {
-    for (const job of jobs) {
+    let stoppedAfter = null
+    for (const [index, job] of jobs.entries()) {
+      if (stoppedAfter !== null) break
       const row = await driveOne(ctx, job)
       ctx.rows.push(row)
-      writeFileSync(join(suiteDir, 'summary.json'), JSON.stringify({ suiteId, deviceId, args, rows: ctx.rows }, null, 2) + '\n', 'utf8')
+      if (row.stopsSuite) stoppedAfter = index
+      if (!args.part) writeFileSync(join(suiteDir, 'summary.json'), JSON.stringify({ suiteId, deviceId, args, rows: ctx.rows }, null, 2) + '\n', 'utf8')
+    }
+    if (stoppedAfter !== null) {
+      slog(`stopping: ${jobs.length - stoppedAfter - 1} drive(s) not run — they would have tested the same wrong build`)
     }
     const judged = ctx.rows.filter((r) => !r.superseded)
     exitCode = aggregateVerdicts(judged.map((r) => r.verdict))
+    if (args.part) {
+      // One of several processes sharing this folder. Its rows are left for the
+      // process that started them all, which writes the one summary.
+      ensureDir(join(suiteDir, PART_ROWS_DIR))
+      const name = `${jobs[0]?.dirName ?? 'none'}.json`
+      writeFileSync(join(suiteDir, PART_ROWS_DIR, name), JSON.stringify({ deviceId, exitCode, rows: ctx.rows }, null, 2) + '\n', 'utf8')
+      slog(`part done · exit ${exitCode}`)
+      return exitCode
+    }
     const md = renderSummaryMd(judged, {
       suiteId,
       deviceId,
